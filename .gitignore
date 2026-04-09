@@ -1,0 +1,71 @@
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Environment & secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+!**/.env.example
+
+# --- Node.js (backend) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- TypeScript / build ---
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Test & coverage ---
+coverage/
+.nyc_output/
+
+# --- Xcode / iOS ---
+**/xcuserdata/
+**/*.xcuserstate
+DerivedData/
+**/DerivedData/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/xcuserdata/
+
+# SwiftPM
+.build/
+
+# --- Supabase CLI (local) ---
+supabase/.temp/
+supabase/.branches/
+
+# --- Editors ---
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Local agent / IDE overrides (secrets, machine paths) ---
+.claude/settings.local.json
+
+# --- Misc ---
+instagram-cookies.txt

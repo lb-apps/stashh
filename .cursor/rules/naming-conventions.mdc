@@ -1,0 +1,61 @@
+---
+globs: ["**/*.swift"]
+alwaysApply: false
+---
+# Naming Conventions
+
+This project enforces naming standards at the level of an obsessive Apple engineer. Every identifier must read as if it came from a first-party Apple framework.
+
+## Core Principle
+
+Names must be clear at the point of use. Read every call site as a prose sentence — if it sounds unnatural or requires a comment to understand, rename it.
+
+## Allowed Abbreviations
+
+Only abbreviations that Apple itself uses in its public frameworks are permitted:
+
+- `x`, `xx`, `xxx`, `xxxx` as size-scale prefixes — `xSmall`, `xxLarge` (`DynamicTypeSize` pattern)
+- `URL`, `UUID`, `HTTP`, `JSON`, `XML`, `HTML`, `API`, `ID` — established acronyms used as full words
+- `max`, `min` — universally understood
+
+Everything else must be spelled out in full.
+
+## Forbidden Abbreviations
+
+The following (and anything like them) are strictly banned:
+
+`btn`, `lbl`, `img`, `str`, `num`, `val`, `obj`, `vc`, `nav`, `cfg`, `mgr`, `ctx`, `err`, `cb`, `fn`, `tmp`, `res`, `req`, `resp`, `auth`, `coord`, `attr`, `param`, `msg`, `notif`, `anim`, `perf`, `ref`
+
+## Rules by Identifier Type
+
+### Types (class, struct, enum, protocol, typealias)
+- Use nouns or noun phrases: `MapAnnotation`, `PlaceDetail`, `AuthenticationState`
+- No generic suffixes: never `PlaceManager`, `ListHelper`, `DataUtility`
+- Protocol naming:
+  - Capability → `-able` / `-ible`: `Identifiable`, `Equatable`
+  - Description → noun: `Collection`, `View`, `Shape`
+
+### Functions and Methods
+- Start with a verb: `fetchPlace()`, `saveList()`, `updateAnnotation()`
+- Parameters read as natural English at the call site:
+  - Good: `move(pin:to:)` → `move(pin: annotation, to: coordinate)`
+  - Bad: `movePinToCoord(pin:coord:)` → reads as jargon
+- Omit needless words but never at the cost of clarity
+
+### Properties
+- Use nouns or noun phrases: `placeName`, `savedLists`, `selectedCategory`
+- Booleans use `is`, `has`, `should`, `can`, `needs`:
+  - `isLoading`, `hasUnsavedChanges`, `shouldShowOnboarding`, `canEdit`
+- Never: `loading`, `unsavedChanges`, `showOnboarding`
+
+### Enum Cases
+- `lowerCamelCase`: `.backgroundBrand`, `.titleSmall`, `.xLarge`
+- No type name repetition: `Radius.large` not `Radius.radiusLarge`
+
+### Constants and Variables
+- `lowerCamelCase` throughout
+- Static constants in enums are the preferred token pattern for design system values
+
+## File Naming
+- One primary type per file, file name matches the type: `PlaceDetailView.swift`, `DesignSystem.swift`
+- No `Helpers.swift`, `Utils.swift`, `Extensions.swift` catch-all files — scope extensions to their subject: `Color+Hex.swift`
