@@ -67,14 +67,14 @@ function normalizeRecommendations(
 
 const genai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
 
-export interface ProgressEvent {
+interface ProgressEvent {
   step: "download" | "upload" | "analyze";
   status: "running" | "done";
   duration?: number;
   meta?: Record<string, unknown>;
 }
 
-export type ProgressCallback = (event: ProgressEvent) => void;
+type ProgressCallback = (event: ProgressEvent) => void;
 
 const SYSTEM_PROMPT = `You extract featured venues from one Instagram post (caption + video).
 

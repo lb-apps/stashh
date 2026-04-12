@@ -1,27 +1,3 @@
-import { z } from "zod";
-
-// ── Request ────────────────────────────────────────────────
-
-export const instagramUrlFieldSchema = z
-  .string()
-  .url()
-  .refine(
-    (url) => /instagram\.com\/(reel|p|stories)\//i.test(url),
-    "Must be a valid Instagram Reel, Post, or Story URL",
-  );
-
-/** Body for POST /api/v1/recognitions/pipeline (sync run) */
-export const recognitionPipelineBodySchema = z.object({
-  instagram_url: instagramUrlFieldSchema,
-});
-
-/** Query params for GET /api/v1/recognitions/stream */
-export const recognitionStreamQuerySchema = z.object({
-  url: instagramUrlFieldSchema,
-});
-
-export type RecognitionPipelineBody = z.infer<typeof recognitionPipelineBodySchema>;
-
 // ── Instagram content result ───────────────────────────────
 
 export interface InstagramContent {
@@ -69,18 +45,12 @@ export interface MatchedPlace {
   googlePlaceId: string;
   name: string;
   address: string;
-  city: string | null;
-  district: string | null;
-  country: string | null;
-  latitude: number;
-  longitude: number;
-  category: string | null;
   rating: number | null;
-  priceLevel: number | null;
-  /** App-managed thumbnail URL (stored in place-thumbnails bucket). */
-  thumbnailUrl: string | null;
-  phoneNumber: string | null;
-  websiteUrl: string | null;
+  /**
+   * First Places API photo resource name (e.g. places/.../photos/...).
+   * Persist to storage only when the user saves the place via POST /places.
+   */
+  firstPhotoName: string | null;
 }
 
 // ── Final API response ─────────────────────────────────────

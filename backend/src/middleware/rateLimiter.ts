@@ -3,7 +3,7 @@ import { sendError } from "../http/response.js";
 
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: 60,
   // requireAuth always runs first, so req.user.sub is always defined here
   keyGenerator: (req) => req.user?.sub ?? "unknown",
   validate: { keyGeneratorIpFallback: false },

@@ -2,12 +2,32 @@ import { config } from "../../config.js";
 import type { Json } from "../../types/database.js";
 import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation } from "../../types/schemas.js";
 import type { RecognitionRepository } from "./repository.js";
-import { normalizeInstagramSourceUrl } from "./normalizeSourceUrl.js";
 import type {
-  RecognitionBackoffResult,
   RecognitionResultRow,
   RecognitionTaskRow,
 } from "./types.js";
+
+interface RecognitionBackoffResult {
+  retryCount: number;
+  delayMilliseconds: number;
+}
+
+function stripTrailingSlash(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+  return pathname;
+}
+
+function normalizeInstagramSourceUrl(rawUrl: string): string {
+  const parsed = new URL(rawUrl);
+  parsed.protocol = "https:";
+  parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  parsed.pathname = stripTrailingSlash(parsed.pathname);
+  parsed.hash = "";
+  parsed.search = "";
+  return parsed.toString();
+}
 
 interface EnqueueRecognitionParams {
   ownerUserId: string;
@@ -28,11 +48,12 @@ const MINIMUM_BACKOFF_MILLISECONDS = 1_000;
 const MAXIMUM_BACKOFF_MILLISECONDS = 60_000;
 
 export interface RecognitionResultItem {
-  thumbnailUrl: string | null;
+  /** First Google Places photo resource name; persist on user save only. */
+  firstPhotoName: string | null;
   instagramUsername: string | null;
   recommendations: VenueRecommendation[];
   confidenceScore: number;
-  place: Omit<MatchedPlace, "thumbnailUrl">;
+  place: Omit<MatchedPlace, "firstPhotoName">;
 }
 
 function normalizeErrorMessage(error: unknown): string {
@@ -104,9 +125,9 @@ export class RecognitionService {
       .filter((entry): entry is typeof entry & { matchedPlace: MatchedPlace } => Boolean(entry.matchedPlace))
       .map((entry) => {
         const { matchedPlace } = entry;
-        const { thumbnailUrl, ...place } = matchedPlace;
+        const { firstPhotoName, ...place } = matchedPlace;
         return {
-          thumbnailUrl,
+          firstPhotoName,
           instagramUsername: entry.instagramUsername,
           recommendations: entry.recommendations,
           confidenceScore: entry.confidenceScore,

@@ -14,7 +14,8 @@ function inferExtension(contentType: string | null): string {
   return "jpg";
 }
 
-async function resolvePhotoUri(photoName: string, maxWidth = 400): Promise<string | null> {
+/** Resolves a short-lived photo URI for a Places API photo resource name. */
+export async function resolvePhotoUri(photoName: string, maxWidth = 400): Promise<string | null> {
   const url = new URL(`https://places.googleapis.com/v1/${photoName}/media`);
   url.searchParams.set("key", config.GOOGLE_PLACES_API_KEY);
   url.searchParams.set("maxWidthPx", String(maxWidth));

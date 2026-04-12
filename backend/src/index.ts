@@ -5,9 +5,8 @@ import http from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
-import { userListsRouter } from "./modules/user-lists/routes.js";
+import { listsRouter } from "./modules/lists/routes.js";
 import { placesRouter } from "./modules/places/routes.js";
-import { userPlacesRouter } from "./modules/user-places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
 import { listLogFiles, readLogFile } from "./logger.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -15,6 +14,8 @@ import { apiRateLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestIdMiddleware } from "./http/requestId.js";
 import { sendSuccess, sendError } from "./http/response.js";
+import { mountDocs } from "./docs.js";
+import { signInDevTestUser } from "./lib/devSupabasePasswordSignIn.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,59 +87,39 @@ app.use(express.static(resolve(__dirname, "../public")));
 // Dev-only: return a fresh Supabase access token for the test UI
 // Returns 404 in production
 app.get("/dev/token", async (req, res) => {
-  if (process.env["NODE_ENV"] === "production") {
-    sendError(res, req, 404, "NOT_FOUND", "Not found");
-    return;
-  }
-
-  const { SUPABASE_URL, supabasePublishableKey, DEV_TEST_EMAIL, DEV_TEST_PASSWORD } = config;
-
-  if (!supabasePublishableKey || !DEV_TEST_EMAIL || !DEV_TEST_PASSWORD) {
-    sendError(
-      res,
-      req,
-      503,
-      "SERVICE_UNAVAILABLE",
-      "DEV_TEST_EMAIL, DEV_TEST_PASSWORD, and SUPABASE_PUBLISHABLE_KEY (or legacy SUPABASE_ANON_KEY) must be set in .env",
-    );
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
-      {
-        method: "POST",
-        headers: {
-          apikey: supabasePublishableKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: DEV_TEST_EMAIL, password: DEV_TEST_PASSWORD }),
-      },
-    );
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await signInDevTestUser();
+  if (!result.ok) {
+    if (result.error === "production") {
+      sendError(res, req, 404, "NOT_FOUND", "Not found");
+      return;
+    }
+    if (result.error === "missing_env") {
       sendError(
         res,
         req,
-        response.status >= 400 && response.status < 600 ? response.status : 401,
-        "UNAUTHORIZED",
-        (body["error_description"] as string | undefined) ?? "Supabase auth failed",
+        503,
+        "SERVICE_UNAVAILABLE",
+        "DEV_TEST_EMAIL, DEV_TEST_PASSWORD, and SUPABASE_PUBLISHABLE_KEY (or legacy SUPABASE_ANON_KEY) must be set in .env",
       );
       return;
     }
-
-    const data = (await response.json()) as { access_token: string };
-    sendSuccess(res, req, 200, {
-      access_token: data.access_token,
-      supabase_url: SUPABASE_URL,
-      supabase_publishable_key: supabasePublishableKey,
-    });
-  } catch (err) {
-    console.error("[dev/token]", err);
-    sendError(res, req, 500, "INTERNAL", "Authentication request failed");
+    sendError(
+      res,
+      req,
+      result.httpStatus ?? 401,
+      "UNAUTHORIZED",
+      result.message ?? "Supabase auth failed",
+    );
+    return;
   }
+
+  sendSuccess(res, req, 200, {
+    access_token: result.access_token,
+    supabase_url: config.SUPABASE_URL,
+    supabase_publishable_key: config.supabasePublishableKey,
+    /** Same identity as password grant — UI can label saved places. */
+    dev_user_email: config.DEV_TEST_EMAIL ?? null,
+  });
 });
 
 // Health check — intentionally unprotected (for uptime probes)
@@ -182,19 +163,17 @@ app.get("/api/v1/logs/:id", requireAuth, async (req, res) => {
 
 // ── Lists (protected + rate limited) ────────────────────────────────────────
 
-app.use("/api/v1/user-lists", requireAuth, apiRateLimiter, userListsRouter);
+app.use("/api/v1/lists", requireAuth, apiRateLimiter, listsRouter);
 
 // ── Places catalog (protected + rate limited) ──────────────────────────────
 
 app.use("/api/v1/places", requireAuth, apiRateLimiter, placesRouter);
 
-// ── User places / saved venues (protected + rate limited) ────────────────────
-
-app.use("/api/v1/user-places", requireAuth, apiRateLimiter, userPlacesRouter);
-
 // ── Recognitions (protected + rate limited) ──────────────────────────────────
 
 app.use("/api/v1/recognitions", requireAuth, apiRateLimiter, recognitionsRouter);
+
+await mountDocs(app);
 
 app.use(errorHandler);
 

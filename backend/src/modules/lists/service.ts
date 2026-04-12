@@ -1,7 +1,9 @@
 import { AppHttpError } from "../../errors/appHttpError.js";
 import { isPostgrestError } from "../../errors/supabaseHttp.js";
-import { buildPaginationMeta, decodeOffsetCursor } from "./cursor.js";
-import type { UserListsRepository, ListPlaceWithPlace } from "./repository.js";
+import type { PlacesService } from "../places/service.js";
+import { buildPaginationMeta, decodeOffsetCursor } from "../../lib/pagination.js";
+import type { ApiPaginationMeta } from "../../http/types.js";
+import type { ListsRepository, ListPlaceWithPlace } from "./repository.js";
 import type { AddListPlaceBody, CreateListBody, ListPlacesQuery, PatchListBody } from "./types.js";
 
 export interface ListSummaryDto {
@@ -25,13 +27,11 @@ export interface ListPlaceItemDto {
   };
 }
 
-export interface ListPlacesPageDto {
-  items: ListPlaceItemDto[];
-  pagination: ReturnType<typeof buildPaginationMeta>;
-}
-
-export class UserListsService {
-  constructor(private readonly repo: UserListsRepository) {}
+export class ListsService {
+  constructor(
+    private readonly repo: ListsRepository,
+    private readonly placesService: PlacesService,
+  ) {}
 
   async listLists(ownerUserId: string): Promise<ListSummaryDto[]> {
     const rows = await this.repo.listListsForOwner(ownerUserId);
@@ -114,7 +114,7 @@ export class UserListsService {
     ownerUserId: string,
     listId: string,
     query: ListPlacesQuery,
-  ): Promise<{ data: { items: ListPlaceItemDto[] }; pagination: ReturnType<typeof buildPaginationMeta> }> {
+  ): Promise<{ data: { items: ListPlaceItemDto[] }; pagination: ApiPaginationMeta }> {
     const list = await this.repo.getListForOwner(listId, ownerUserId);
     if (!list) {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
@@ -165,10 +165,7 @@ export class UserListsService {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
 
-    const userPlace = await this.repo.getUserPlaceForOwner(body.user_place_id, ownerUserId);
-    if (!userPlace) {
-      throw new AppHttpError(400, "Invalid user place", "INVALID_USER_PLACE");
-    }
+    await this.placesService.assertUserPlaceOwnership(body.user_place_id, ownerUserId);
 
     try {
       const inserted = await this.repo.insertListPlace({

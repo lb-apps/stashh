@@ -1,8 +1,6 @@
 import { Router } from "express";
-import { createSupabaseClientForRequest } from "../../db/supabaseClient.js";
 import { sendCreated, sendError, sendSuccess } from "../../http/response.js";
-import { UserListsRepository } from "./repository.js";
-import { UserListsService } from "./service.js";
+import { createListsServiceFromRequest } from "./factory.js";
 import {
   addListPlaceBodySchema,
   createListBodySchema,
@@ -12,17 +10,16 @@ import {
   patchListBodySchema,
 } from "./types.js";
 
-export const userListsRouter = Router();
+export const listsRouter = Router();
 
-userListsRouter.get("/", async (req, res, next) => {
+listsRouter.get("/", async (req, res, next) => {
   const ownerUserId = req.user?.sub;
   if (!ownerUserId) {
     sendError(res, req, 401, "UNAUTHORIZED", "Unauthorized");
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.listLists(ownerUserId);
     sendSuccess(res, req, 200, data);
   } catch (err) {
@@ -30,7 +27,7 @@ userListsRouter.get("/", async (req, res, next) => {
   }
 });
 
-userListsRouter.post("/", async (req, res, next) => {
+listsRouter.post("/", async (req, res, next) => {
   const parsed = createListBodySchema.safeParse(req.body);
   if (!parsed.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid request body", parsed.error.flatten().fieldErrors);
@@ -42,8 +39,7 @@ userListsRouter.post("/", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.createList(ownerUserId, parsed.data);
     sendCreated(res, req, data);
   } catch (err) {
@@ -51,7 +47,7 @@ userListsRouter.post("/", async (req, res, next) => {
   }
 });
 
-userListsRouter.get("/:listId/places", async (req, res, next) => {
+listsRouter.get("/:listId/places", async (req, res, next) => {
   const parsedParams = listIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid list id", parsedParams.error.flatten().fieldErrors);
@@ -71,8 +67,7 @@ userListsRouter.get("/:listId/places", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const result = await service.listPlaces(ownerUserId, parsedParams.data.listId, parsedQuery.data);
     sendSuccess(res, req, 200, result.data, result.pagination);
   } catch (err) {
@@ -80,7 +75,7 @@ userListsRouter.get("/:listId/places", async (req, res, next) => {
   }
 });
 
-userListsRouter.post("/:listId/places", async (req, res, next) => {
+listsRouter.post("/:listId/places", async (req, res, next) => {
   const parsedParams = listIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid list id", parsedParams.error.flatten().fieldErrors);
@@ -97,8 +92,7 @@ userListsRouter.post("/:listId/places", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.addPlace(ownerUserId, parsedParams.data.listId, parsedBody.data);
     sendCreated(res, req, data);
   } catch (err) {
@@ -106,7 +100,7 @@ userListsRouter.post("/:listId/places", async (req, res, next) => {
   }
 });
 
-userListsRouter.delete("/:listId/places/:listPlaceId", async (req, res, next) => {
+listsRouter.delete("/:listId/places/:listPlaceId", async (req, res, next) => {
   const parsedParams = listPlaceParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid parameters", parsedParams.error.flatten().fieldErrors);
@@ -118,8 +112,7 @@ userListsRouter.delete("/:listId/places/:listPlaceId", async (req, res, next) =>
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.removePlace(
       ownerUserId,
       parsedParams.data.listId,
@@ -131,7 +124,7 @@ userListsRouter.delete("/:listId/places/:listPlaceId", async (req, res, next) =>
   }
 });
 
-userListsRouter.get("/:listId", async (req, res, next) => {
+listsRouter.get("/:listId", async (req, res, next) => {
   const parsedParams = listIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid list id", parsedParams.error.flatten().fieldErrors);
@@ -143,8 +136,7 @@ userListsRouter.get("/:listId", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.getList(ownerUserId, parsedParams.data.listId);
     sendSuccess(res, req, 200, data);
   } catch (err) {
@@ -152,7 +144,7 @@ userListsRouter.get("/:listId", async (req, res, next) => {
   }
 });
 
-userListsRouter.patch("/:listId", async (req, res, next) => {
+listsRouter.patch("/:listId", async (req, res, next) => {
   const parsedParams = listIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid list id", parsedParams.error.flatten().fieldErrors);
@@ -169,8 +161,7 @@ userListsRouter.patch("/:listId", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.updateList(ownerUserId, parsedParams.data.listId, parsedBody.data);
     sendSuccess(res, req, 200, data);
   } catch (err) {
@@ -178,7 +169,7 @@ userListsRouter.patch("/:listId", async (req, res, next) => {
   }
 });
 
-userListsRouter.delete("/:listId", async (req, res, next) => {
+listsRouter.delete("/:listId", async (req, res, next) => {
   const parsedParams = listIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid list id", parsedParams.error.flatten().fieldErrors);
@@ -190,8 +181,7 @@ userListsRouter.delete("/:listId", async (req, res, next) => {
     return;
   }
   try {
-    const supabase = createSupabaseClientForRequest(req);
-    const service = new UserListsService(new UserListsRepository(supabase));
+    const service = createListsServiceFromRequest(req);
     const data = await service.deleteList(ownerUserId, parsedParams.data.listId);
     sendSuccess(res, req, 200, data);
   } catch (err) {

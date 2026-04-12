@@ -10,15 +10,15 @@
     "worker:recognitions": "node --import tsx src/modules/recognitions/worker.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/errors/supabaseHttp.test.ts src/types/schemas.test.ts",
-    "verify:recognitions": "node --import tsx src/modules/recognitions/verification.ts",
     "db:types": "sh -c 'supabase gen types typescript --project-id \"${SUPABASE_PROJECT_REF}\" --schema public > src/types/database.ts'"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@google/genai": "^1.0.0",
+    "@scalar/express-api-reference": "^0.8.48",
     "@supabase/supabase-js": "^2.102.1",
     "@types/fluent-ffmpeg": "^2.1.28",
     "cors": "^2.8.6",

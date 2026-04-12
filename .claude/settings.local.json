@@ -55,7 +55,13 @@
       "Bash(curl -s -X POST http://localhost:3000/api/v1/recognitions/pipeline -H 'Content-Type: application/json' -d '{\"instagram_url\":\"https://www.instagram.com/reel/test\"}')",
       "Bash(curl -s -X POST http://localhost:3000/api/v1/recognitions/pipeline -H 'Content-Type: application/json' -H 'Authorization: Bearer invalidtoken' -d '{\"instagram_url\":\"https://www.instagram.com/reel/test\"}')",
       "Bash(kill %1)",
-      "Bash(ls /Users/emirhanerdogan/Projects/LittleBigApps/Discovery/backend/.env*)"
+      "Bash(ls /Users/emirhanerdogan/Projects/LittleBigApps/Discovery/backend/.env*)",
+      "Bash(npm view:*)",
+      "Bash(node -e \"const m = require.resolve\\('@asteasolutions/zod-to-openapi'\\); console.log\\(m\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(npx tsx -e ':*)",
+      "Bash(npm test:*)",
+      "Bash(node --import tsx -e ':*)"
     ]
   }
 }

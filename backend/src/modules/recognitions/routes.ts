@@ -8,11 +8,8 @@ import {
   recognitionIdentifierSchema,
   recognitionResultQuerySchema,
 } from "./types.js";
-import { registerRecognitionPipelineHttp } from "./pipelineHttp.js";
 
 export const recognitionsRouter = Router();
-
-registerRecognitionPipelineHttp(recognitionsRouter);
 
 recognitionsRouter.get("/result", async (req, res, next) => {
   const idRaw = req.query.id;

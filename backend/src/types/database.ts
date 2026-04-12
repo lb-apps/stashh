@@ -84,6 +84,12 @@ export interface Database {
           website_url: string | null;
           phone_number: string | null;
           source_updated_at: string | null;
+          user_rating_count: number | null;
+          business_status: string | null;
+          google_maps_uri: string | null;
+          types: Json | null;
+          regular_opening_hours: Json | null;
+          short_formatted_address: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -103,6 +109,12 @@ export interface Database {
           website_url?: string | null;
           phone_number?: string | null;
           source_updated_at?: string | null;
+          user_rating_count?: number | null;
+          business_status?: string | null;
+          google_maps_uri?: string | null;
+          types?: Json | null;
+          regular_opening_hours?: Json | null;
+          short_formatted_address?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -122,6 +134,12 @@ export interface Database {
           website_url?: string | null;
           phone_number?: string | null;
           source_updated_at?: string | null;
+          user_rating_count?: number | null;
+          business_status?: string | null;
+          google_maps_uri?: string | null;
+          types?: Json | null;
+          regular_opening_hours?: Json | null;
+          short_formatted_address?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -204,6 +222,7 @@ export interface Database {
           personal_note: string | null;
           recommendations: Json;
           saved_from_source_url: string | null;
+          source_instagram_username: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -214,6 +233,7 @@ export interface Database {
           personal_note?: string | null;
           recommendations?: Json;
           saved_from_source_url?: string | null;
+          source_instagram_username?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -224,6 +244,7 @@ export interface Database {
           personal_note?: string | null;
           recommendations?: Json;
           saved_from_source_url?: string | null;
+          source_instagram_username?: string | null;
           created_at?: string;
           updated_at?: string;
         };

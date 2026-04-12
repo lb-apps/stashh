@@ -1,16 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../types/database.js";
 
-export type UserListRow = Database["public"]["Tables"]["user_lists"]["Row"];
-export type UserListInsert = Database["public"]["Tables"]["user_lists"]["Insert"];
-export type UserListUpdate = Database["public"]["Tables"]["user_lists"]["Update"];
+export type ListRecord = Database["public"]["Tables"]["user_lists"]["Row"];
+export type ListInsert = Database["public"]["Tables"]["user_lists"]["Insert"];
+export type ListUpdate = Database["public"]["Tables"]["user_lists"]["Update"];
 export type ListPlaceRow = Database["public"]["Tables"]["list_places"]["Row"];
 export type ListPlaceInsert = Database["public"]["Tables"]["list_places"]["Insert"];
 
-export class UserListsRepository {
+export class ListsRepository {
   constructor(private readonly supabase: SupabaseClient<Database>) {}
 
-  async listListsForOwner(ownerUserId: string): Promise<UserListRow[]> {
+  async listListsForOwner(ownerUserId: string): Promise<ListRecord[]> {
     const { data, error } = await this.supabase
       .from("user_lists")
       .select("*")
@@ -50,7 +50,7 @@ export class UserListsRepository {
     return count ?? 0;
   }
 
-  async getListForOwner(listId: string, ownerUserId: string): Promise<UserListRow | null> {
+  async getListForOwner(listId: string, ownerUserId: string): Promise<ListRecord | null> {
     const { data, error } = await this.supabase
       .from("user_lists")
       .select("*")
@@ -62,13 +62,13 @@ export class UserListsRepository {
     return data;
   }
 
-  async insertList(row: UserListInsert): Promise<UserListRow> {
+  async insertList(row: ListInsert): Promise<ListRecord> {
     const { data, error } = await this.supabase.from("user_lists").insert(row).select("*").single();
     if (error) throw error;
     return data;
   }
 
-  async updateList(listId: string, ownerUserId: string, patch: UserListUpdate): Promise<UserListRow | null> {
+  async updateList(listId: string, ownerUserId: string, patch: ListUpdate): Promise<ListRecord | null> {
     const { data, error } = await this.supabase
       .from("user_lists")
       .update(patch)

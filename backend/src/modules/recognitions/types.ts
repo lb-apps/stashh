@@ -1,16 +1,6 @@
 import { z } from "zod";
 import type { Database } from "../../types/database.js";
 
-export const recognitionStatusValues = [
-  "queued",
-  "processing",
-  "completed",
-  "committed",
-  "cancelled",
-  "failed",
-] as const;
-
-export type RecognitionStatus = (typeof recognitionStatusValues)[number];
 export type RecognitionTaskRow = Database["public"]["Tables"]["recognition_tasks"]["Row"];
 export type RecognitionTaskInsert = Database["public"]["Tables"]["recognition_tasks"]["Insert"];
 export type RecognitionTaskUpdate = Database["public"]["Tables"]["recognition_tasks"]["Update"];
@@ -34,8 +24,3 @@ export const recognitionIdentifierSchema = z.object({
 export const recognitionResultQuerySchema = z.object({
   id: z.string().uuid("Result id must be a UUID"),
 });
-
-export interface RecognitionBackoffResult {
-  retryCount: number;
-  delayMilliseconds: number;
-}

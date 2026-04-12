@@ -1,4 +1,4 @@
--- Rename lists -> user_lists (API path: /api/v1/user-lists).
+-- Rename lists -> user_lists (API path: /api/v1/lists).
 -- FKs from list_places.list_id follow the renamed referenced table automatically.
 
 alter table public.lists rename to user_lists;

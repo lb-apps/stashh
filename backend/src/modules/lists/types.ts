@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PaginationQuery } from "../../lib/pagination.js";
 
 export const listIdParamsSchema = z.object({
   listId: z.string().uuid(),
@@ -27,12 +28,9 @@ export const addListPlaceBodySchema = z.object({
   user_place_id: z.string().uuid(),
 });
 
-export const listPlacesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  cursor: z.string().min(1).optional(),
-});
+export { paginationQuerySchema as listPlacesQuerySchema } from "../../lib/pagination.js";
 
 export type CreateListBody = z.infer<typeof createListBodySchema>;
 export type PatchListBody = z.infer<typeof patchListBodySchema>;
 export type AddListPlaceBody = z.infer<typeof addListPlaceBodySchema>;
-export type ListPlacesQuery = z.infer<typeof listPlacesQuerySchema>;
+export type ListPlacesQuery = PaginationQuery;

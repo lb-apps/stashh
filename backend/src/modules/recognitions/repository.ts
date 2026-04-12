@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../../types/database.js";
 import type {
-  RecognitionBackoffResult,
   RecognitionResultRow,
   RecognitionTaskInsert,
   RecognitionTaskRow,
@@ -20,7 +19,7 @@ interface RecoverStaleRecognitionParams {
 interface RequeueRecognitionParams {
   recognitionId: string;
   errorMessage: string;
-  backoff: RecognitionBackoffResult;
+  backoff: { retryCount: number; delayMilliseconds: number };
 }
 
 interface CompleteRecognitionParams {

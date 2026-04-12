@@ -1,5 +1,20 @@
-import type { ApiPaginationMeta } from "../../http/types.js";
+import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
+import type { ApiPaginationMeta } from "../http/types.js";
 
+extendZodWithOpenApi(z);
+
+/** Shared query for cursor + limit pagination (opaque offset cursor, Supabase `.range`). */
+export const paginationQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().min(1).optional(),
+  })
+  .openapi("PaginationQuery");
+
+export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
+
+/** Invalid or missing cursor decodes to offset 0 (first page). */
 export interface OffsetCursorPayload {
   o: number;
 }
@@ -40,3 +55,7 @@ export function buildPaginationMeta(
     has_more: hasMore,
   };
 }
+
+/** Reuse in OpenAPI operation descriptions for paginated list endpoints. */
+export const PAGINATION_OPERATION_DESCRIPTION =
+  "Paginated list: pass `limit` and optional `cursor` from the previous response’s `meta.pagination.next_cursor`.";
