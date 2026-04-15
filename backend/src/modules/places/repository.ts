@@ -3,9 +3,9 @@ import type { Database } from "../../types/database.js";
 
 export type PlaceRow = Database["public"]["Tables"]["places"]["Row"];
 export type PlaceInsert = Database["public"]["Tables"]["places"]["Insert"];
-export type UserPlaceRow = Database["public"]["Tables"]["user_places"]["Row"];
-export type UserPlaceInsert = Database["public"]["Tables"]["user_places"]["Insert"];
-export type UserPlaceUpdate = Database["public"]["Tables"]["user_places"]["Update"];
+export type SavedPlaceRow = Database["public"]["Tables"]["saved_places"]["Row"];
+export type SavedPlaceInsert = Database["public"]["Tables"]["saved_places"]["Insert"];
+export type SavedPlaceUpdate = Database["public"]["Tables"]["saved_places"]["Update"];
 
 export class PlacesRepository {
   constructor(
@@ -60,27 +60,27 @@ export class PlacesRepository {
     if (error) throw error;
   }
 
-  async countUserPlaces(ownerUserId: string): Promise<number> {
+  async countSavedPlaces(ownerUserId: string): Promise<number> {
     const { count, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .select("*", { count: "exact", head: true })
       .eq("owner_user_id", ownerUserId);
     if (error) throw error;
     return count ?? 0;
   }
 
-  async listUserPlacesPage(
+  async listSavedPlacesPage(
     ownerUserId: string,
     offset: number,
     limit: number,
   ): Promise<
     Array<{
-      user_place: UserPlaceRow;
+      saved_place: SavedPlaceRow;
       place: PlaceRow;
     }>
   > {
     const { data, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .select("*, places (*)")
       .eq("owner_user_id", ownerUserId)
       .order("created_at", { ascending: false })
@@ -90,37 +90,59 @@ export class PlacesRepository {
     if (error) throw error;
     const rows = data ?? [];
     return rows.map((r) => {
-      const row = r as unknown as UserPlaceRow & { places: PlaceRow | null };
-      const { places: place, ...user_place } = row;
+      const row = r as unknown as SavedPlaceRow & { places: PlaceRow | null };
+      const { places: place, ...saved_place } = row;
       if (!place) {
-        throw new Error("places embed missing for user_place");
+        throw new Error("places embed missing for saved_place");
       }
-      return { user_place, place };
+      return { saved_place, place };
     });
   }
 
-  async getUserPlaceForOwner(
-    userPlaceId: string,
+  async getSavedPlaceForOwner(
+    savedPlaceId: string,
     ownerUserId: string,
-  ): Promise<{ user_place: UserPlaceRow; place: PlaceRow } | null> {
+  ): Promise<{ saved_place: SavedPlaceRow; place: PlaceRow } | null> {
     const { data, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .select("*, places (*)")
-      .eq("id", userPlaceId)
+      .eq("id", savedPlaceId)
       .eq("owner_user_id", ownerUserId)
       .maybeSingle();
 
     if (error) throw error;
     if (!data) return null;
-    const row = data as unknown as UserPlaceRow & { places: PlaceRow | null };
-    const { places: place, ...user_place } = row;
+    const row = data as unknown as SavedPlaceRow & { places: PlaceRow | null };
+    const { places: place, ...saved_place } = row;
     if (!place) return null;
-    return { user_place, place };
+    return { saved_place, place };
+  }
+
+  /**
+   * Lookup saved_place by canonical places.id + owner (for the canonical ID API).
+   */
+  async getSavedPlaceByCanonicalId(
+    placeId: string,
+    ownerUserId: string,
+  ): Promise<{ saved_place: SavedPlaceRow; place: PlaceRow } | null> {
+    const { data, error } = await this.userSupabase
+      .from("saved_places")
+      .select("*, places (*)")
+      .eq("place_id", placeId)
+      .eq("owner_user_id", ownerUserId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as SavedPlaceRow & { places: PlaceRow | null };
+    const { places: place, ...saved_place } = row;
+    if (!place) return null;
+    return { saved_place, place };
   }
 
   async userOwnsPlace(ownerUserId: string, placeId: string): Promise<boolean> {
     const { data, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .select("id")
       .eq("owner_user_id", ownerUserId)
       .eq("place_id", placeId)
@@ -129,32 +151,32 @@ export class PlacesRepository {
     return (data?.length ?? 0) > 0;
   }
 
-  async insertUserPlace(row: UserPlaceInsert): Promise<UserPlaceRow> {
-    const { data, error } = await this.userSupabase.from("user_places").insert(row).select("*").single();
+  async insertSavedPlace(row: SavedPlaceInsert): Promise<SavedPlaceRow> {
+    const { data, error } = await this.userSupabase.from("saved_places").insert(row).select("*").single();
     if (error) throw error;
     return data;
   }
 
-  async tryInsertUserPlace(row: UserPlaceInsert): Promise<{ row: UserPlaceRow; created: boolean }> {
-    const { data, error } = await this.userSupabase.from("user_places").insert(row).select("*").single();
+  async tryInsertSavedPlace(row: SavedPlaceInsert): Promise<{ row: SavedPlaceRow; created: boolean }> {
+    const { data, error } = await this.userSupabase.from("saved_places").insert(row).select("*").single();
     if (!error && data) {
       return { row: data, created: true };
     }
     const code = (error as { code?: string } | null)?.code;
     if (code === "23505") {
-      const existing = await this.getUserPlaceByOwnerAndPlaceId(row.owner_user_id, row.place_id);
+      const existing = await this.getSavedPlaceByOwnerAndPlaceId(row.owner_user_id, row.place_id);
       if (!existing) throw error;
       return { row: existing, created: false };
     }
     throw error;
   }
 
-  async getUserPlaceByOwnerAndPlaceId(
+  async getSavedPlaceByOwnerAndPlaceId(
     ownerUserId: string,
     placeId: string,
-  ): Promise<UserPlaceRow | null> {
+  ): Promise<SavedPlaceRow | null> {
     const { data, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .select("*")
       .eq("owner_user_id", ownerUserId)
       .eq("place_id", placeId)
@@ -163,15 +185,15 @@ export class PlacesRepository {
     return data;
   }
 
-  async updateUserPlace(
-    userPlaceId: string,
+  async updateSavedPlace(
+    savedPlaceId: string,
     ownerUserId: string,
-    patch: UserPlaceUpdate,
-  ): Promise<UserPlaceRow | null> {
+    patch: SavedPlaceUpdate,
+  ): Promise<SavedPlaceRow | null> {
     const { data, error } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .update(patch)
-      .eq("id", userPlaceId)
+      .eq("id", savedPlaceId)
       .eq("owner_user_id", ownerUserId)
       .select("*")
       .maybeSingle();
@@ -179,11 +201,11 @@ export class PlacesRepository {
     return data;
   }
 
-  async deleteUserPlace(userPlaceId: string, ownerUserId: string): Promise<boolean> {
+  async deleteSavedPlace(savedPlaceId: string, ownerUserId: string): Promise<boolean> {
     const { error, count } = await this.userSupabase
-      .from("user_places")
+      .from("saved_places")
       .delete({ count: "exact" })
-      .eq("id", userPlaceId)
+      .eq("id", savedPlaceId)
       .eq("owner_user_id", ownerUserId);
     if (error) throw error;
     return (count ?? 0) > 0;

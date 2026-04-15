@@ -1,0 +1,49 @@
+---
+globs: ["backend/**/*.ts", "supabase/**/*.sql"]
+alwaysApply: false
+---
+# Backend Naming Conventions
+
+## Database — always snake_case
+
+All identifiers that touch the database **must** use `snake_case`:
+
+- SQL column names, table names, index names, constraint names
+- TypeScript interface/object properties that map to DB columns or are stored as JSONB (e.g. `RecognitionResultItem`, `MatchedPlace`, `ExtractedPlace`, `ExtractedPlaceWithMatch`)
+- Zod schema field names for request/response bodies that mirror DB rows
+
+```ts
+// ✅ correct
+interface MatchedPlace {
+  google_place_id: string;
+  first_photo_name: string | null;
+  confidence_score: number;
+}
+
+// ❌ wrong — camelCase must not appear in DB-bound types
+interface MatchedPlace {
+  googlePlaceId: string;
+  firstPhotoName: string | null;
+  confidenceScore: number;
+}
+```
+
+## TypeScript application code — camelCase
+
+Internal variables, function parameters, class properties, and non-DB interfaces
+follow standard TypeScript camelCase:
+
+```ts
+const ownerUserId = params.ownerUserId;
+async function getPlaceDetails(placeId: string) { … }
+```
+
+## Quick reference
+
+| Layer | Convention |
+|---|---|
+| DB columns / SQL | `snake_case` |
+| JSONB-stored object keys | `snake_case` |
+| API response bodies (mirrors DB row) | `snake_case` |
+| TypeScript vars / params / methods | `camelCase` |
+| TypeScript types / interfaces | `PascalCase` |

@@ -1,9 +1,11 @@
 import { config } from "../../config.js";
+import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
-import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation } from "../../types/schemas.js";
+import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, InstagramContent } from "../../types/schemas.js";
 import type { RecognitionRepository } from "./repository.js";
 import type {
   RecognitionResultRow,
+  RecognitionTaskOptions,
   RecognitionTaskRow,
 } from "./types.js";
 
@@ -32,6 +34,7 @@ function normalizeInstagramSourceUrl(rawUrl: string): string {
 interface EnqueueRecognitionParams {
   ownerUserId: string;
   sourceUrl: string;
+  options?: RecognitionTaskOptions;
 }
 
 interface ProcessRecognitionSuccessParams {
@@ -47,18 +50,40 @@ interface ProcessRecognitionFailureParams {
 const MINIMUM_BACKOFF_MILLISECONDS = 1_000;
 const MAXIMUM_BACKOFF_MILLISECONDS = 60_000;
 
-export interface RecognitionResultItem {
-  /** First Google Places photo resource name; persist on user save only. */
-  firstPhotoName: string | null;
-  instagramUsername: string | null;
+export interface RecognitionResultPlace {
+  google_place_id: string;
+  name: string;
+  address: string;
+  location: { latitude: number; longitude: number } | null;
+  rating: number | null;
+  thumbnail_url: string | null;
+  instagram_username: string | null;
   recommendations: VenueRecommendation[];
-  confidenceScore: number;
-  place: Omit<MatchedPlace, "firstPhotoName">;
 }
 
 function normalizeErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const candidate = error as {
+      message?: unknown;
+      code?: unknown;
+      details?: unknown;
+      hint?: unknown;
+    };
+    const parts = [
+      candidate.message,
+      candidate.code,
+      candidate.details,
+      candidate.hint,
+    ].filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length > 0) return parts.join(" | ");
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "[unserializable error object]";
+    }
+  }
   return "Unexpected recognition processing error";
 }
 
@@ -82,20 +107,21 @@ export class RecognitionService {
   constructor(private readonly recognitionRepository: RecognitionRepository) {}
 
   async enqueueRecognition(params: EnqueueRecognitionParams): Promise<RecognitionTaskRow> {
-    const normalizedSourceUrl = normalizeInstagramSourceUrl(params.sourceUrl);
+    const sourceUrl = normalizeInstagramSourceUrl(params.sourceUrl);
+    const options = params.options ?? {};
     return this.recognitionRepository.createQueuedRecognition({
       owner_user_id: params.ownerUserId,
-      source_url: params.sourceUrl,
-      normalized_source_url: normalizedSourceUrl,
+      source_url: sourceUrl,
       status: "queued",
       retry_count: 0,
+      options: options as Json,
     });
   }
 
   async getRecognition(
     recognitionId: string,
     ownerUserId: string,
-  ): Promise<{ task: RecognitionTaskRow; items: Json | null } | null> {
+  ): Promise<{ task: RecognitionTaskRow; places: Json | null } | null> {
     return this.recognitionRepository.getRecognitionByIdForOwner(recognitionId, ownerUserId);
   }
 
@@ -113,36 +139,40 @@ export class RecognitionService {
     return this.recognitionRepository.markRecognitionCommitted(recognitionId, ownerUserId);
   }
 
-  async getCachedResultId(normalizedSourceUrl: string): Promise<string | null> {
-    const cachedResult = await this.recognitionRepository.getRecognitionResultByNormalizedSourceUrl(
-      normalizedSourceUrl,
-    );
+  async getCachedResultId(sourceUrl: string): Promise<string | null> {
+    const cachedResult = await this.recognitionRepository.getRecognitionResultBySourceUrl(sourceUrl);
     return cachedResult?.id ?? null;
   }
 
-  mapPipelineResultToStoredItems(result: RecognitionPipelineResponse): RecognitionResultItem[] {
-    return result.extractedPlaces
-      .filter((entry): entry is typeof entry & { matchedPlace: MatchedPlace } => Boolean(entry.matchedPlace))
+  mapPipelineResultToStoredPlaces(
+    result: RecognitionPipelineResponse,
+    thumbnailUrls: Map<string, string>,
+  ): RecognitionResultPlace[] {
+    return result.extracted_places
+      .filter((entry): entry is typeof entry & { matched_place: MatchedPlace } => Boolean(entry.matched_place))
       .map((entry) => {
-        const { matchedPlace } = entry;
-        const { firstPhotoName, ...place } = matchedPlace;
+        const { matched_place } = entry;
+        const { first_photo_name: _, ...place } = matched_place;
         return {
-          firstPhotoName,
-          instagramUsername: entry.instagramUsername,
+          ...place,
+          thumbnail_url: thumbnailUrls.get(place.google_place_id) ?? null,
+          instagram_username: entry.instagram_username,
           recommendations: entry.recommendations,
-          confidenceScore: entry.confidenceScore,
-          place,
         };
       });
   }
 
   async upsertRecognitionResult(
-    normalizedSourceUrl: string,
-    items: RecognitionResultItem[],
+    sourceUrl: string,
+    places: RecognitionResultPlace[],
+    instagramContent: InstagramContent,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
-      normalizedSourceUrl,
-      items: items as unknown as Json,
+      sourceUrl,
+      places: places as unknown as Json,
+      videoUrl: instagramContent.video_url,
+      caption: instagramContent.caption,
+      sourceType: instagramContent.source_type,
     });
     return result.id;
   }
@@ -154,12 +184,16 @@ export class RecognitionService {
     });
   }
 
-  async processRecognitionFailure(params: ProcessRecognitionFailureParams): Promise<void> {
+  async processRecognitionFailure(params: ProcessRecognitionFailureParams, log?: Logger): Promise<void> {
     const normalizedErrorMessage = normalizeErrorMessage(params.error);
     const nextRetryCount = params.recognition.retry_count + 1;
 
     if (nextRetryCount <= config.RECOGNITIONS_MAX_RETRIES) {
       const backoff = calculateRetryBackoff(params.recognition.retry_count);
+      log?.warn(
+        { retryCount: nextRetryCount, maxRetries: config.RECOGNITIONS_MAX_RETRIES, delayMs: backoff.delayMilliseconds, reason: normalizedErrorMessage },
+        "retrying",
+      );
       await delay(backoff.delayMilliseconds);
       await this.recognitionRepository.requeueRecognition({
         recognitionId: params.recognition.id,
@@ -169,6 +203,10 @@ export class RecognitionService {
       return;
     }
 
+    log?.error(
+      { retryCount: params.recognition.retry_count, maxRetries: config.RECOGNITIONS_MAX_RETRIES, reason: normalizedErrorMessage },
+      "giving up",
+    );
     await this.recognitionRepository.failRecognition({
       recognitionId: params.recognition.id,
       errorMessage: normalizedErrorMessage,

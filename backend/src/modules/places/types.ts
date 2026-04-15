@@ -7,7 +7,7 @@ export type PlacesListQuery = PaginationQuery;
 
 const placeIdsArray = z.array(z.string().min(1)).min(1).max(50);
 
-/** POST /places — canonical writes + user_places links */
+/** POST /places — canonical writes + saved_places links */
 export const addPlacesBodySchema = z.discriminatedUnion("source", [
   z.object({
     source: z.literal("google"),
@@ -23,18 +23,13 @@ export const addPlacesBodySchema = z.discriminatedUnion("source", [
 export type AddPlacesBody = z.infer<typeof addPlacesBodySchema>;
 
 export const patchSavedPlaceBodySchema = z.object({
-  personal_note: z.string().max(5000).nullable().optional(),
-  recommendations: z.array(z.unknown()).optional(),
+  notes: z.string().max(5000).nullable().optional(),
 });
 
 export type PatchSavedPlaceBody = z.infer<typeof patchSavedPlaceBodySchema>;
 
 export const placeIdParamsSchema = z.object({
   placeId: z.string().uuid(),
-});
-
-export const savedPlaceIdParamsSchema = z.object({
-  id: z.string().uuid(),
 });
 
 export const placePhotosQuerySchema = z.object({

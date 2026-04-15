@@ -3,8 +3,11 @@ import type { Database } from "../../types/database.js";
 
 export type RecognitionTaskRow = Database["public"]["Tables"]["recognition_tasks"]["Row"];
 export type RecognitionTaskInsert = Database["public"]["Tables"]["recognition_tasks"]["Insert"];
-export type RecognitionTaskUpdate = Database["public"]["Tables"]["recognition_tasks"]["Update"];
 export type RecognitionResultRow = Database["public"]["Tables"]["recognition_results"]["Row"];
+
+export interface RecognitionTaskOptions {
+  bypass_cache?: boolean;
+}
 
 export const createRecognitionRequestSchema = z.object({
   source_url: z

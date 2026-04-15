@@ -1,45 +1,26 @@
 import { randomUUID } from "node:crypto";
-import { Client as PgClient } from "pg";
-import { createSupabaseServiceClient } from "../../db/supabaseClient.js";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createSupabaseServiceClient, createSupabaseRealtimeClient } from "../../db/supabaseClient.js";
 import { config } from "../../config.js";
-import { runRecognitionPipeline } from "../../services/recognitionPipeline.js";
+import { rootLogger, type Logger } from "../../lib/logger.js";
+import { createTaskLogger } from "./task-logger.js";
+import { fetchInstagramContent } from "./instagram-scraper.js";
+import { analyzeContent } from "./ai-analyzer.js";
+import { matchPlaces } from "./place-text-search.js";
+import { GooglePlacesClient } from "../../services/google/google-places-client.js";
+import { GooglePhotoMediaClient } from "../../services/google/google-photo-media-client.js";
+import { uploadPlaceThumbnail } from "../../lib/thumbnailUploader.js";
 import { RecognitionRepository } from "./repository.js";
 import { RecognitionService } from "./service.js";
-import type { RecognitionTaskRow } from "./types.js";
+import type { RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
 
 let shouldKeepRunning = true;
 let wakeResolver: (() => void) | null = null;
 let hasPendingWakeSignal = false;
 
-function formatUnknownError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object") {
-    const candidate = error as {
-      message?: unknown;
-      code?: unknown;
-      details?: unknown;
-      hint?: unknown;
-    };
-    const parts = [
-      candidate.message,
-      candidate.code,
-      candidate.details,
-      candidate.hint,
-    ]
-      .filter((value): value is string => typeof value === "string" && value.length > 0);
-    if (parts.length > 0) return parts.join(" | ");
-    try {
-      return JSON.stringify(error);
-    } catch {
-      return "[unserializable error object]";
-    }
-  }
-  return "Unexpected unknown error";
-}
-
 function createWorkerIdentifier(): string {
-  return `recognitions-worker-${randomUUID().slice(0, 8)}`;
+  return randomUUID().slice(0, 8);
 }
 
 function wakeWorkerLoop(): void {
@@ -49,10 +30,15 @@ function wakeWorkerLoop(): void {
   wakeResolver = null;
 }
 
-const ownProcessSignals = process.env["APP_ROLE"]?.toLowerCase() !== "combined";
+function isStandaloneWorker(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return resolve(entry) === resolve(fileURLToPath(import.meta.url));
+}
+
+const ownProcessSignals = isStandaloneWorker();
 
 export function requestWorkerShutdown(): void {
-  console.log("[recognitions-worker] shutdown requested");
   shouldKeepRunning = false;
   wakeWorkerLoop();
 }
@@ -81,105 +67,162 @@ async function waitForWakeSignal(maximumWaitMilliseconds: number): Promise<void>
 async function processRecognition(
   recognitionService: RecognitionService,
   recognition: RecognitionTaskRow,
+  googlePlacesClient: GooglePlacesClient,
+  googlePhotoMediaClient: GooglePhotoMediaClient,
+  workerLog: Logger,
 ): Promise<void> {
+  const taskOptions = (recognition.options ?? {}) as RecognitionTaskOptions;
+  const tl = createTaskLogger(workerLog, {
+    id: recognition.id,
+    sourceUrl: recognition.source_url,
+    retryCount: recognition.retry_count,
+    bypassCache: Boolean(taskOptions.bypass_cache),
+  });
+
   try {
     let cachedResultId: string | null = null;
-    if (!config.RECOGNITIONS_BYPASS_RESULT_CACHE) {
-      cachedResultId = await recognitionService.getCachedResultId(recognition.normalized_source_url);
+    if (!taskOptions.bypass_cache) {
+      cachedResultId = await tl.step("cache checked", async () => {
+        const hit = await recognitionService.getCachedResultId(recognition.source_url);
+        return { hit: Boolean(hit), resultId: hit } as { hit: boolean; resultId: string | null } & Record<string, unknown>;
+      }).then((r) => r.resultId);
     }
+
     if (cachedResultId) {
-      await recognitionService.processRecognitionSuccess({
-        recognitionId: recognition.id,
-        resultId: cachedResultId,
+      await tl.step("served from cache", async () => {
+        await recognitionService.processRecognitionSuccess({
+          recognitionId: recognition.id,
+          resultId: cachedResultId,
+        });
+        return { resultId: cachedResultId };
       });
-      console.log(
-        `[recognitions-worker] cache hit recognition=${recognition.id} url=${recognition.normalized_source_url} result=${cachedResultId}`,
-      );
+      tl.done();
       return;
     }
 
-    const extractionResult = await runRecognitionPipeline(recognition.source_url);
-    const items = recognitionService.mapPipelineResultToStoredItems(extractionResult);
-    const resultId = await recognitionService.upsertRecognitionResult(
-      recognition.normalized_source_url,
-      items,
-    );
+    const content = await tl.step("content fetched", async (stepLog) => {
+      const result = await fetchInstagramContent(recognition.source_url, stepLog);
+      return { videoFound: true, captionLength: result.caption?.length ?? 0, _content: result };
+    });
+    const instagramContent = (content as Record<string, unknown>)["_content"] as Awaited<ReturnType<typeof fetchInstagramContent>>;
+
+    const analysis = await tl.step("video analyzed", async (stepLog) => {
+      const result = await analyzeContent(instagramContent.video_url, instagramContent.caption, stepLog);
+      return { placeCount: result.places.length, _analysis: result };
+    });
+    const analysisResult = (analysis as Record<string, unknown>)["_analysis"] as Awaited<ReturnType<typeof analyzeContent>>;
+
+    const matchResult = await tl.step("places found", async () => {
+      const matches = await matchPlaces(analysisResult.places, googlePlacesClient);
+      const matchedCount = [...matches.values()].filter(Boolean).length;
+      return { total: analysisResult.places.length, matched: matchedCount, _matches: matches };
+    });
+    const placeMatches = (matchResult as Record<string, unknown>)["_matches"] as Awaited<ReturnType<typeof matchPlaces>>;
+
+    const matchedPlaces = analysisResult.places
+      .filter((p) => Boolean(placeMatches.get(p.name)))
+      .map((p) => placeMatches.get(p.name)!);
+
+    const thumbnailUrls = await tl.step("thumbnails saved", async (stepLog) => {
+      const supabase = createSupabaseServiceClient();
+      const urls = new Map<string, string>();
+      let saved = 0;
+      let failed = 0;
+      await Promise.all(
+        matchedPlaces.map(async (mp) => {
+          if (!mp.first_photo_name) return;
+          try {
+            const url = await uploadPlaceThumbnail(
+              mp.google_place_id,
+              mp.first_photo_name,
+              config.PLACE_THUMBNAILS_BUCKET,
+              supabase,
+              googlePhotoMediaClient,
+              stepLog,
+            );
+            if (url) {
+              urls.set(mp.google_place_id, url);
+              saved++;
+            }
+          } catch {
+            failed++;
+          }
+        }),
+      );
+      return { total: matchedPlaces.length, saved, failed, _urls: urls };
+    });
+    const urls = (thumbnailUrls as Record<string, unknown>)["_urls"] as Map<string, string>;
+
+    const resultId = await tl.step("result saved", async () => {
+      const extractedPlaces = analysisResult.places.map((place) => ({
+        raw_name: place.name,
+        location_hint: place.location_hint,
+        instagram_username: place.instagram_username,
+        recommendations: place.recommendations,
+        confidence_score: place.confidence_score,
+        source: place.source,
+        matched_place: placeMatches.get(place.name) ?? null,
+      }));
+      const places = recognitionService.mapPipelineResultToStoredPlaces(
+        { status: "completed", source_url: recognition.source_url, instagram_content: instagramContent, extracted_places: extractedPlaces },
+        urls,
+      );
+      const id = await recognitionService.upsertRecognitionResult(
+        recognition.source_url,
+        places,
+        instagramContent,
+      );
+      return { resultId: id, placeCount: places.length };
+    });
+
     await recognitionService.processRecognitionSuccess({
       recognitionId: recognition.id,
-      resultId,
+      resultId: (resultId as Record<string, unknown>)["resultId"] as string,
     });
-    console.log(`[recognitions-worker] completed ${recognition.id}`);
+
+    tl.done();
   } catch (error) {
-    await recognitionService.processRecognitionFailure({ recognition, error });
-    const errorMessage = formatUnknownError(error);
-    console.error(`[recognitions-worker] failed ${recognition.id}: ${errorMessage}`);
+    tl.fail(error);
+    await recognitionService.processRecognitionFailure({ recognition, error }, tl.log);
   }
 }
 
 async function runWorker(): Promise<void> {
   const workerIdentifier = createWorkerIdentifier();
+  const workerLog: Logger = rootLogger.child({ worker: workerIdentifier });
+
   const workerConcurrency = config.RECOGNITIONS_WORKER_CONCURRENCY;
   const claimBatchSize = config.RECOGNITIONS_CLAIM_BATCH_SIZE;
   const pollMinimumMilliseconds = config.RECOGNITIONS_POLL_MIN_MS;
   const pollMaximumMilliseconds = config.RECOGNITIONS_POLL_MAX_MS;
   const claimTimeoutMilliseconds = config.RECOGNITIONS_CLAIM_TIMEOUT_MS;
-  const recoveryScanIntervalMilliseconds =
-    config.RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS;
+  const recoveryScanIntervalMilliseconds = config.RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS;
 
   const supabaseClient = createSupabaseServiceClient();
   const recognitionRepository = new RecognitionRepository(supabaseClient);
   const recognitionService = new RecognitionService(recognitionRepository);
+  const googlePlacesClient = new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY);
+  const googlePhotoMediaClient = new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY);
 
-  const realtimeChannel = supabaseClient
-    .channel(`recognitions-worker-${workerIdentifier}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "recognition_tasks",
-      },
-      () => wakeWorkerLoop(),
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log("[recognitions-worker] realtime subscription active");
-      }
-    });
+  const realtimeClient = createSupabaseRealtimeClient();
+  let realtimeChannel: ReturnType<typeof supabaseClient.channel> | null = null;
 
-  let pgWakeClient: PgClient | null = null;
-  if (config.SUPABASE_DB_URL) {
-    try {
-      pgWakeClient = new PgClient({ connectionString: config.SUPABASE_DB_URL });
-      await pgWakeClient.connect();
-      pgWakeClient.on("notification", (message: { channel?: string }) => {
-        if (message.channel === "recognition_queue_wakeup") {
-          wakeWorkerLoop();
-        }
+  if (realtimeClient) {
+    realtimeChannel = realtimeClient
+      .channel(`recognitions-worker-${workerIdentifier}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "recognition_tasks" },
+        () => wakeWorkerLoop(),
+      )
+      .subscribe((status, err) => {
+        workerLog.info({ status, err: err?.message }, "realtime");
       });
-      pgWakeClient.on("error", (error: unknown) => {
-        const errorMessage = formatUnknownError(error);
-        console.error(`[recognitions-worker] pg listener error: ${errorMessage}`);
-      });
-      await pgWakeClient.query("LISTEN recognition_queue_wakeup");
-      console.log("[recognitions-worker] postgres LISTEN active (recognition_queue_wakeup)");
-    } catch (error) {
-      const errorMessage = formatUnknownError(error);
-      console.error(
-        `[recognitions-worker] failed to start postgres LISTEN; using realtime+poll only: ${errorMessage}`,
-      );
-      try {
-        await pgWakeClient?.end();
-      } catch {
-        // no-op: best effort cleanup on failed initialization
-      }
-      pgWakeClient = null;
-    }
+  } else {
+    workerLog.warn("realtime disabled — no publishable key, poll only");
   }
 
-  console.log(
-    `[recognitions-worker] started worker=${workerIdentifier} batch=${claimBatchSize} concurrency=${workerConcurrency} bypassResultCache=${config.RECOGNITIONS_BYPASS_RESULT_CACHE}`,
-  );
+  workerLog.info({ concurrency: workerConcurrency }, "started");
 
   let nextRecoveryScanAtMilliseconds = Date.now();
   const inFlightTasks = new Set<Promise<void>>();
@@ -195,19 +238,14 @@ async function runWorker(): Promise<void> {
   while (shouldKeepRunning) {
     try {
       if (Date.now() >= nextRecoveryScanAtMilliseconds) {
-        // Safety-net recovery for missed events or interrupted workers.
-        const recoveredRecognitions =
-          await recognitionRepository.recoverStaleRecognitions({
-            staleAfterMilliseconds: claimTimeoutMilliseconds,
-            claimBatchSize,
-          });
+        const recoveredRecognitions = await recognitionRepository.recoverStaleRecognitions({
+          staleAfterMilliseconds: claimTimeoutMilliseconds,
+          claimBatchSize,
+        });
         if (recoveredRecognitions.length > 0) {
-          console.log(
-            `[recognitions-worker] recovered ${recoveredRecognitions.length} stale recognitions`,
-          );
+          workerLog.info({ count: recoveredRecognitions.length }, "stale tasks recovered");
         }
-        nextRecoveryScanAtMilliseconds =
-          Date.now() + recoveryScanIntervalMilliseconds;
+        nextRecoveryScanAtMilliseconds = Date.now() + recoveryScanIntervalMilliseconds;
       }
 
       const availableCapacity = workerConcurrency - inFlightTasks.size;
@@ -227,15 +265,18 @@ async function runWorker(): Promise<void> {
         continue;
       }
 
+      workerLog.info(
+        { count: claimedRecognitions.length, taskIds: claimedRecognitions.map((r) => r.id) },
+        "tasks claimed",
+      );
       for (const recognition of claimedRecognitions) {
-        if (!shouldKeepRunning) {
-          break;
-        }
-        trackInFlightTask(processRecognition(recognitionService, recognition));
+        if (!shouldKeepRunning) break;
+        trackInFlightTask(
+          processRecognition(recognitionService, recognition, googlePlacesClient, googlePhotoMediaClient, workerLog),
+        );
       }
     } catch (error) {
-      const errorMessage = formatUnknownError(error);
-      console.error(`[recognitions-worker] loop error: ${errorMessage}`);
+      workerLog.error({ err: error }, "loop error");
       await waitForWakeSignal(pollMinimumMilliseconds);
     }
   }
@@ -244,33 +285,18 @@ async function runWorker(): Promise<void> {
     await Promise.allSettled(Array.from(inFlightTasks));
   }
 
-  if (pgWakeClient) {
-    try {
-      await pgWakeClient.query("UNLISTEN recognition_queue_wakeup");
-    } catch {
-      // no-op: shutdown should continue even if unlisten fails
-    }
-    await pgWakeClient.end().catch(() => undefined);
+  if (realtimeChannel) {
+    await (realtimeClient ?? supabaseClient).removeChannel(realtimeChannel);
   }
-
-  await supabaseClient.removeChannel(realtimeChannel);
-  console.log("[recognitions-worker] shutdown complete");
+  workerLog.info("shutdown complete");
 }
 
 if (ownProcessSignals) {
-  process.on("SIGTERM", () => {
-    console.log("[recognitions-worker] SIGTERM received");
-    requestWorkerShutdown();
-  });
-
-  process.on("SIGINT", () => {
-    console.log("[recognitions-worker] SIGINT received");
-    requestWorkerShutdown();
-  });
+  process.on("SIGTERM", () => requestWorkerShutdown());
+  process.on("SIGINT", () => requestWorkerShutdown());
 }
 
 void runWorker().catch((error) => {
-  const errorMessage = formatUnknownError(error);
-  console.error(`[recognitions-worker] fatal error: ${errorMessage}`);
+  rootLogger.fatal({ err: error }, "worker fatal error");
   process.exit(1);
 });

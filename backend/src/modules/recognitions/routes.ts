@@ -42,8 +42,11 @@ recognitionsRouter.get("/result", async (req, res, next) => {
 
     sendSuccess(res, req, 200, {
       result_id: result.id,
-      normalized_source_url: result.normalized_source_url,
-      items: result.items,
+      source_url: result.source_url,
+      video_url: result.video_url,
+      caption: result.caption,
+      source_type: result.source_type,
+      places: result.places,
       created_at: result.created_at,
       updated_at: result.updated_at,
     });
@@ -74,6 +77,9 @@ recognitionsRouter.post("/", async (req, res, next) => {
     const recognition = await recognitionService.enqueueRecognition({
       ownerUserId,
       sourceUrl: parsedBody.data.source_url,
+      options: {
+        bypass_cache: req.headers["x-bypass-cache"] === "true",
+      },
     });
 
     sendAccepted(res, req, {
@@ -113,14 +119,14 @@ recognitionsRouter.get("/:id", async (req, res, next) => {
       sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
       return;
     }
-    const { task: recognition, items } = recognitionData;
+    const { task: recognition, places } = recognitionData;
 
     sendSuccess(res, req, 200, {
       recognition_id: recognition.id,
       status: recognition.status,
       source_url: recognition.source_url,
       result_id: recognition.result_id,
-      items,
+      places,
       error_message: recognition.error_message,
       retry_count: recognition.retry_count,
       started_at: recognition.started_at,

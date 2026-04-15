@@ -45,7 +45,7 @@ export interface Database {
           id: string;
           list_id: string;
           owner_user_id: string;
-          user_place_id: string;
+          saved_place_id: string;
           created_at: string;
           updated_at: string;
         };
@@ -53,7 +53,7 @@ export interface Database {
           id?: string;
           list_id: string;
           owner_user_id: string;
-          user_place_id: string;
+          saved_place_id: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,7 +61,7 @@ export interface Database {
           id?: string;
           list_id?: string;
           owner_user_id?: string;
-          user_place_id?: string;
+          saved_place_id?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -83,13 +83,14 @@ export interface Database {
           thumbnail_url: string | null;
           website_url: string | null;
           phone_number: string | null;
-          source_updated_at: string | null;
-          user_rating_count: number | null;
+          rating_count: number | null;
           business_status: string | null;
           google_maps_uri: string | null;
           types: Json | null;
-          regular_opening_hours: Json | null;
+          opening_hours: Json | null;
           short_formatted_address: string | null;
+          instagram_username: string | null;
+          recommendations: Json;
           created_at: string;
           updated_at: string;
         };
@@ -108,13 +109,14 @@ export interface Database {
           thumbnail_url?: string | null;
           website_url?: string | null;
           phone_number?: string | null;
-          source_updated_at?: string | null;
-          user_rating_count?: number | null;
+          rating_count?: number | null;
           business_status?: string | null;
           google_maps_uri?: string | null;
           types?: Json | null;
-          regular_opening_hours?: Json | null;
+          opening_hours?: Json | null;
           short_formatted_address?: string | null;
+          instagram_username?: string | null;
+          recommendations?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -133,13 +135,14 @@ export interface Database {
           thumbnail_url?: string | null;
           website_url?: string | null;
           phone_number?: string | null;
-          source_updated_at?: string | null;
-          user_rating_count?: number | null;
+          rating_count?: number | null;
           business_status?: string | null;
           google_maps_uri?: string | null;
           types?: Json | null;
-          regular_opening_hours?: Json | null;
+          opening_hours?: Json | null;
           short_formatted_address?: string | null;
+          instagram_username?: string | null;
+          recommendations?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -148,22 +151,31 @@ export interface Database {
       recognition_results: {
         Row: {
           id: string;
-          normalized_source_url: string;
-          items: Json;
+          source_url: string;
+          places: Json;
+          video_url: string | null;
+          caption: string | null;
+          source_type: "reel" | "post" | "story" | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          normalized_source_url: string;
-          items?: Json;
+          source_url: string;
+          places?: Json;
+          video_url?: string | null;
+          caption?: string | null;
+          source_type?: "reel" | "post" | "story" | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          normalized_source_url?: string;
-          items?: Json;
+          source_url?: string;
+          places?: Json;
+          video_url?: string | null;
+          caption?: string | null;
+          source_type?: "reel" | "post" | "story" | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -174,9 +186,9 @@ export interface Database {
           id: string;
           owner_user_id: string;
           source_url: string;
-          normalized_source_url: string;
           result_id: string | null;
           status: string;
+          options: Json;
           started_at: string | null;
           finished_at: string | null;
           error_message: string | null;
@@ -188,9 +200,9 @@ export interface Database {
           id?: string;
           owner_user_id: string;
           source_url: string;
-          normalized_source_url: string;
           result_id?: string | null;
           status?: string;
+          options?: Json;
           started_at?: string | null;
           finished_at?: string | null;
           error_message?: string | null;
@@ -202,9 +214,9 @@ export interface Database {
           id?: string;
           owner_user_id?: string;
           source_url?: string;
-          normalized_source_url?: string;
           result_id?: string | null;
           status?: string;
+          options?: Json;
           started_at?: string | null;
           finished_at?: string | null;
           error_message?: string | null;
@@ -214,15 +226,12 @@ export interface Database {
         };
         Relationships: [];
       };
-      user_places: {
+      saved_places: {
         Row: {
           id: string;
           owner_user_id: string;
           place_id: string;
-          personal_note: string | null;
-          recommendations: Json;
-          saved_from_source_url: string | null;
-          source_instagram_username: string | null;
+          notes: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -230,10 +239,7 @@ export interface Database {
           id?: string;
           owner_user_id: string;
           place_id: string;
-          personal_note?: string | null;
-          recommendations?: Json;
-          saved_from_source_url?: string | null;
-          source_instagram_username?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -241,10 +247,7 @@ export interface Database {
           id?: string;
           owner_user_id?: string;
           place_id?: string;
-          personal_note?: string | null;
-          recommendations?: Json;
-          saved_from_source_url?: string | null;
-          source_instagram_username?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -254,7 +257,7 @@ export interface Database {
         Row: {
           id: string;
           owner_user_id: string;
-          user_place_id: string;
+          saved_place_id: string;
           visited_at: string;
           note: string | null;
           created_at: string;
@@ -263,7 +266,7 @@ export interface Database {
         Insert: {
           id?: string;
           owner_user_id: string;
-          user_place_id: string;
+          saved_place_id: string;
           visited_at: string;
           note?: string | null;
           created_at?: string;
@@ -272,7 +275,7 @@ export interface Database {
         Update: {
           id?: string;
           owner_user_id?: string;
-          user_place_id?: string;
+          saved_place_id?: string;
           visited_at?: string;
           note?: string | null;
           created_at?: string;

@@ -1,0 +1,47 @@
+---
+description: Rules for writing OpenAPI endpoint descriptions in this project
+globs: **/openapi.ts
+alwaysApply: false
+---
+
+# OpenAPI Endpoint Descriptions
+
+Descriptions are read by **client developers and AI agents building integrations**. Write for them — not for someone reading the backend source code.
+
+## Principles
+
+- **What, not how**: Describe what the endpoint does from the caller's perspective. Never mention implementation details (database tables, internal service names, queue workers).
+- **Input/output clarity**: State what the caller must send and what they get back. If a field is nullable, say when it is null.
+- **Behaviour callers care about**: idempotency, error codes, ordering, rate limits, async patterns.
+- **Cross-references**: Link related endpoints by path (e.g. `GET /recognitions/{id}`).
+- **No internal storage concepts**: Do not expose internal data model distinctions (e.g. "global place", "user-specific place", "saved collection"). The client only knows about IDs returned by API responses — use plain language like "your saved places" or "the place" instead.
+
+## Format
+
+- Use plain prose for simple endpoints (1–2 sentences).
+- Use `### Heading` + bullet lists only when there are genuinely distinct modes or multiple steps a caller must understand.
+- Keep descriptions under ~20 lines unless the endpoint has complex branching behaviour.
+
+## ❌ Bad (backend internals leaking)
+
+```ts
+description: "Calls Google Places Details API if the place row is missing; upserts into places table."
+description: "Removes from saved_places. Global place data shared across users is not affected."
+description: "Returns the ID of your personal save, not the canonical place identifier."
+```
+
+## ✅ Good (client-facing)
+
+```ts
+description: "Saves a place. Full details are fetched automatically — no extra call needed from the client."
+description: "Removes this place from your saved places and any lists it was added to."
+description: "Returns a single saved place. Use the `place_id` returned by `POST /places` or `GET /places`."
+```
+
+## Checklist before committing an openapi.ts change
+
+- [ ] No mention of table names, column names, or internal service names
+- [ ] Async flows explain how to poll or subscribe for results
+- [ ] Discriminated-union request bodies explain each variant
+- [ ] Nullable fields say when they are null
+- [ ] Error codes (409, 422…) beyond the common set are documented

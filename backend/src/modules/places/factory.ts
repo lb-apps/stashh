@@ -1,9 +1,15 @@
 import type { Request, Response } from "express";
 import { createSupabaseClientForRequest, createSupabaseServiceClient } from "../../db/supabaseClient.js";
 import { sendError } from "../../http/response.js";
+import { config } from "../../config.js";
+import { rootLogger } from "../../lib/logger.js";
+import { GooglePlacesClient } from "../../services/google/google-places-client.js";
+import { GooglePhotoMediaClient } from "../../services/google/google-photo-media-client.js";
 import { RecognitionRepository } from "../recognitions/repository.js";
 import { PlacesRepository } from "./repository.js";
 import { PlacesService } from "./service.js";
+
+const placesLog = rootLogger.child({ module: "places" });
 
 /**
  * Builds PlacesService with user-scoped + service-role Supabase (for canonical `places` writes).
@@ -11,7 +17,15 @@ import { PlacesService } from "./service.js";
 export function createPlacesServiceFromRequest(req: Request): PlacesService {
   const userSb = createSupabaseClientForRequest(req);
   const serviceSb = createSupabaseServiceClient();
-  return new PlacesService(new PlacesRepository(userSb, serviceSb), new RecognitionRepository(userSb));
+  const googlePlacesClient = new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY, placesLog);
+  const googlePhotoMediaClient = new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY, placesLog);
+  return new PlacesService(
+    new PlacesRepository(userSb, serviceSb),
+    new RecognitionRepository(userSb),
+    googlePlacesClient,
+    googlePhotoMediaClient,
+    placesLog,
+  );
 }
 
 /**
@@ -21,7 +35,15 @@ export function createPlacesServiceFromRequest(req: Request): PlacesService {
  */
 export function createPlacesAuthOnlyServiceFromRequest(req: Request): PlacesService {
   const userSb = createSupabaseClientForRequest(req);
-  return new PlacesService(new PlacesRepository(userSb, userSb), new RecognitionRepository(userSb));
+  const googlePlacesClient = new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY, placesLog);
+  const googlePhotoMediaClient = new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY, placesLog);
+  return new PlacesService(
+    new PlacesRepository(userSb, userSb),
+    new RecognitionRepository(userSb),
+    googlePlacesClient,
+    googlePhotoMediaClient,
+    placesLog,
+  );
 }
 
 /** Returns null and sends 503 if service-role Supabase is not configured. */

@@ -8,7 +8,7 @@ import { config } from "./config.js";
 import { listsRouter } from "./modules/lists/routes.js";
 import { placesRouter } from "./modules/places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
-import { listLogFiles, readLogFile } from "./logger.js";
+import { rootLogger } from "./lib/logger.js";
 import { requireAuth } from "./middleware/auth.js";
 import { apiRateLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -22,41 +22,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 let server: http.Server | null = null;
-let apiShutdownHandlersRegistered = false;
-
-function isMainModule(): boolean {
-  const entry = process.argv[1];
-  if (!entry) return false;
-  return resolve(entry) === resolve(fileURLToPath(import.meta.url));
-}
-
-function registerApiShutdownHandlers(): void {
-  if (process.env["APP_ROLE"]?.toLowerCase() === "combined") {
-    return;
-  }
-  if (apiShutdownHandlersRegistered) return;
-  apiShutdownHandlersRegistered = true;
-
-  let closing = false;
-  const onSignal = () => {
-    if (closing) return;
-    closing = true;
-    void closeHttpServer()
-      .then(() => process.exit(0))
-      .catch(() => process.exit(1));
-  };
-  process.once("SIGTERM", onSignal);
-  process.once("SIGINT", onSignal);
-}
 
 /** Starts the HTTP server idempotently. */
 export function startHttpServer(): http.Server {
   if (server) {
     return server;
   }
-  registerApiShutdownHandlers();
   server = app.listen(config.PORT, () => {
-    console.log(`Discovery API running on http://localhost:${config.PORT}`);
+    rootLogger.info({ port: config.PORT }, "Discovery API started");
   });
   return server;
 }
@@ -127,40 +100,6 @@ app.get("/health", (req, res) => {
   sendSuccess(res, req, 200, { status: "ok", timestamp: new Date().toISOString() });
 });
 
-// ── Logs (protected) ──────────────────────────────────────────────────────────
-
-app.get("/api/v1/logs", requireAuth, async (req, res, next) => {
-  try {
-    const files = await listLogFiles();
-    sendSuccess(res, req, 200, { count: files.length, files });
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.get("/api/v1/logs/latest", requireAuth, async (req, res, next) => {
-  try {
-    const files = await listLogFiles();
-    if (!files.length) {
-      sendError(res, req, 404, "NOT_FOUND", "No logs yet");
-      return;
-    }
-    sendSuccess(res, req, 200, await readLogFile(files[0]!));
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.get("/api/v1/logs/:id", requireAuth, async (req, res) => {
-  try {
-    const id = String(req.params["id"] ?? "");
-    const filename = id.endsWith(".jsonl") ? id : `${id}.jsonl`;
-    sendSuccess(res, req, 200, await readLogFile(filename));
-  } catch {
-    sendError(res, req, 404, "NOT_FOUND", "Log not found");
-  }
-});
-
 // ── Lists (protected + rate limited) ────────────────────────────────────────
 
 app.use("/api/v1/lists", requireAuth, apiRateLimiter, listsRouter);
@@ -177,8 +116,25 @@ await mountDocs(app);
 
 app.use(errorHandler);
 
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return resolve(entry) === resolve(fileURLToPath(import.meta.url));
+}
+
 if (isMainModule()) {
   startHttpServer();
+
+  let closing = false;
+  const onSignal = () => {
+    if (closing) return;
+    closing = true;
+    void closeHttpServer()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  };
+  process.once("SIGTERM", onSignal);
+  process.once("SIGINT", onSignal);
 }
 
 export { app };

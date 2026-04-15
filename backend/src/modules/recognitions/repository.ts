@@ -33,8 +33,11 @@ interface FailRecognitionParams {
 }
 
 interface UpsertRecognitionResultParams {
-  normalizedSourceUrl: string;
-  items: Json;
+  sourceUrl: string;
+  places: Json;
+  videoUrl: string;
+  caption: string | null;
+  sourceType: "reel" | "post" | "story";
 }
 
 export class RecognitionRepository {
@@ -54,7 +57,7 @@ export class RecognitionRepository {
   async getRecognitionByIdForOwner(
     recognitionId: string,
     ownerUserId: string,
-  ): Promise<{ task: RecognitionTaskRow; items: Json | null } | null> {
+  ): Promise<{ task: RecognitionTaskRow; places: Json | null } | null> {
     const { data: task, error } = await this.supabaseClient
       .from("recognition_tasks")
       .select("*")
@@ -66,17 +69,17 @@ export class RecognitionRepository {
     if (!task) return null;
 
     if (!task.result_id) {
-      return { task, items: null };
+      return { task, places: null };
     }
 
     const { data: result, error: resultError } = await this.supabaseClient
       .from("recognition_results")
-      .select("items")
+      .select("places")
       .eq("id", task.result_id)
       .maybeSingle();
     if (resultError) throw resultError;
 
-    return { task, items: result?.items ?? null };
+    return { task, places: result?.places ?? null };
   }
 
   /**
@@ -111,7 +114,10 @@ export class RecognitionRepository {
       p_claim_limit: params.claimBatchSize,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[recognition-repo] claim_recognitions RPC error: ${error.message} (code=${error.code})`);
+      throw error;
+    }
     return (data ?? []) as RecognitionTaskRow[];
   }
 
@@ -125,13 +131,13 @@ export class RecognitionRepository {
     return (data ?? []) as RecognitionTaskRow[];
   }
 
-  async getRecognitionResultByNormalizedSourceUrl(
-    normalizedSourceUrl: string,
+  async getRecognitionResultBySourceUrl(
+    sourceUrl: string,
   ): Promise<RecognitionResultRow | null> {
     const { data, error } = await this.supabaseClient
       .from("recognition_results")
       .select("*")
-      .eq("normalized_source_url", normalizedSourceUrl)
+      .eq("source_url", sourceUrl)
       .maybeSingle();
     if (error) throw error;
     return data;
@@ -142,10 +148,13 @@ export class RecognitionRepository {
       .from("recognition_results")
       .upsert(
         {
-          normalized_source_url: params.normalizedSourceUrl,
-          items: params.items,
+          source_url: params.sourceUrl,
+          places: params.places,
+          video_url: params.videoUrl,
+          caption: params.caption,
+          source_type: params.sourceType,
         },
-        { onConflict: "normalized_source_url" },
+        { onConflict: "source_url" },
       )
       .select("*")
       .single();

@@ -1,17 +1,7 @@
 import { GoogleGenAI, Type, createPartFromUri } from "@google/genai";
-import { config } from "../config.js";
-import type { AIAnalysisResult, VenueRecommendation, VenueRecommendationKind } from "../types/schemas.js";
-
-const DEBUG_TRACE = process.env["RECOGNITIONS_DEBUG_TRACE"] === "true";
-
-function trace(label: string, data?: unknown): void {
-  if (!DEBUG_TRACE) return;
-  if (data === undefined) {
-    console.log(`[recognitions:trace] ${label}`);
-    return;
-  }
-  console.log(`[recognitions:trace] ${label}`, data);
-}
+import { config } from "../../config.js";
+import type { Logger } from "../../lib/logger.js";
+import type { AIAnalysisResult, VenueRecommendation, VenueRecommendationKind } from "../../types/schemas.js";
 
 const venueRecommendationKindValues: VenueRecommendationKind[] = [
   "dish",
@@ -33,12 +23,6 @@ function captionContainsInstagramMention(caption: string, handle: string): boole
   return new RegExp(`@${escaped}(?![a-z0-9._])`, "i").test(caption);
 }
 
-/**
- * Only accept a handle when the post caption text proves an @mention (same token rules as Instagram).
- * If we have no caption string from the scraper, we cannot verify mentions — always null (Gemini will
- * still guess from video; we discard). On-screen-only @ without caption in HTML is unsupported until
- * we parse caption from another source or add trusted vision.
- */
 function enforceInstagramUsernamePolicy(
   modelHandle: string | null | undefined,
   caption: string | null | undefined,
@@ -66,15 +50,6 @@ function normalizeRecommendations(
 }
 
 const genai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
-
-interface ProgressEvent {
-  step: "download" | "upload" | "analyze";
-  status: "running" | "done";
-  duration?: number;
-  meta?: Record<string, unknown>;
-}
-
-type ProgressCallback = (event: ProgressEvent) => void;
 
 const SYSTEM_PROMPT = `You extract featured venues from one Instagram post (caption + video).
 
@@ -148,76 +123,101 @@ const responseSchema = {
   required: ["places"],
 };
 
+const INLINE_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+
 async function uploadVideoToGemini(
   videoUrl: string,
-  onProgress: ProgressCallback,
-): Promise<{ uri: string; name: string }> {
-  // Step: download
-  onProgress({ step: "download", status: "running" });
+  log: Logger,
+): Promise<{ fileRef: { uri: string; name: string } | null; inlineData: { data: string; mimeType: string } | null }> {
   const t0 = Date.now();
   const res = await fetch(videoUrl);
-  if (!res.ok) throw new Error(`Failed to fetch video: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to fetch video: HTTP ${res.status} ${res.statusText}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  const sizeMb = (buffer.length / 1024 / 1024).toFixed(1);
-  onProgress({ step: "download", status: "done", duration: Date.now() - t0, meta: { sizeMb } });
-  console.log(`[ai-analyzer] Downloaded ${sizeMb}MB in ${Date.now() - t0}ms`);
+  if (buffer.length === 0) throw new Error(`Video response body was empty`);
+  const size = Math.round(buffer.length / 1024);
+  const downloadMs = Date.now() - t0;
+  log.info({ size, duration: downloadMs }, "video downloaded");
 
-  // Step: upload
-  onProgress({ step: "upload", status: "running" });
+  if (buffer.length <= INLINE_VIDEO_MAX_BYTES) {
+    log.debug({ size }, "using inline data (under 20MB)");
+    return {
+      fileRef: null,
+      inlineData: { data: buffer.toString("base64"), mimeType: "video/mp4" },
+    };
+  }
+
   const t1 = Date.now();
   const blob = new Blob([buffer], { type: "video/mp4" });
-  const uploadedFile = await genai.files.upload({
-    file: blob,
-    config: { mimeType: "video/mp4", displayName: "instagram-reel" },
-  });
+  let uploadedFile;
+  try {
+    uploadedFile = await genai.files.upload({
+      file: blob,
+      config: { mimeType: "video/mp4", displayName: "instagram-reel" },
+    });
+  } catch (uploadError) {
+    const detail = uploadError instanceof Error ? uploadError.message : String(uploadError);
+    throw new Error(`Gemini file upload failed: ${detail}`);
+  }
 
   let file = uploadedFile;
   while (file.state === "PROCESSING") {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     file = await genai.files.get({ name: file.name! });
   }
-  if (file.state !== "ACTIVE") throw new Error(`Gemini file processing failed: state=${file.state}`);
+  if (file.state !== "ACTIVE") throw new Error(`Gemini file processing finished with state="${file.state}"`);
 
-  onProgress({ step: "upload", status: "done", duration: Date.now() - t1 });
-  console.log(`[ai-analyzer] Uploaded & processed in ${Date.now() - t1}ms`);
-
-  return { uri: file.uri!, name: file.name! };
+  log.info({ duration: Date.now() - t1 }, "video uploaded to Gemini");
+  return { fileRef: { uri: file.uri!, name: file.name! }, inlineData: null };
 }
 
 export async function analyzeContent(
   videoUrl: string,
   caption: string | null,
-  onProgress: ProgressCallback = () => {},
+  log: Logger,
 ): Promise<AIAnalysisResult> {
-  trace("analyzeContent.start", {
+  log.debug({
     hasCaption: Boolean(caption?.trim()),
     captionHasAt: Boolean(caption?.includes("@")),
     captionLength: caption?.length ?? 0,
-  });
-  const { uri: fileUri, name: fileName } = await uploadVideoToGemini(videoUrl, onProgress);
+  }, "analyze start");
 
-  onProgress({ step: "analyze", status: "running" });
+  const { fileRef, inlineData } = await uploadVideoToGemini(videoUrl, log);
+
   const t = Date.now();
 
   const userText = caption
     ? `Extract featured venues and any concrete per-venue recommendations from this Instagram post.\n\nPost caption:\n${caption}\n\nFor instagram_username: only if that @handle appears in this caption or as clear @ on-screen for that venue in the video.`
     : "Extract featured venues and any concrete per-venue recommendations visible or audible in this Instagram video.\n\nFor instagram_username: only if an @handle for that venue is clearly visible on screen in the video.";
 
-  const response = await genai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [{ role: "user", parts: [createPartFromUri(fileUri, "video/mp4"), { text: userText }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-      responseSchema,
-      maxOutputTokens: 2048,
-      temperature: 0.2,
-    },
-  });
+  const videoPart = inlineData
+    ? { inlineData }
+    : createPartFromUri(fileRef!.uri, "video/mp4");
+
+  let response;
+  try {
+    response = await genai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [videoPart, { text: userText }] }],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        responseSchema,
+        maxOutputTokens: 8192,
+        temperature: 0.2,
+      },
+    });
+  } catch (geminiError) {
+    const detail = geminiError instanceof Error ? geminiError.message : String(geminiError);
+    throw new Error(`Gemini generateContent failed: ${detail}`);
+  }
 
   const text = response.text;
+  const finishReason = response.candidates?.[0]?.finishReason;
+  if (finishReason && finishReason !== "STOP") {
+    log.warn({ finishReason }, "Gemini non-STOP finish reason");
+  }
   if (!text) throw new Error("Gemini returned an empty response");
-  trace("gemini.response.raw", text);
+  log.debug({ responseLength: text.length }, "raw response");
 
   let parsed: {
     places: Array<{
@@ -232,46 +232,38 @@ export async function analyzeContent(
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch (error) {
-    trace("gemini.response.parse_error", {
-      message: error instanceof Error ? error.message : String(error),
-      responseText: text,
-    });
-    throw error;
+    const truncationNote = finishReason === "MAX_TOKENS" ? " (truncated)" : "";
+    log.debug({ finishReason, responseLength: text.length, responseTail: text.slice(-200) }, "parse error context");
+    throw new Error(`Failed to parse Gemini JSON response: ${error instanceof Error ? error.message : String(error)}${truncationNote}`);
   }
-  trace("gemini.response.parsed_places", parsed.places.map((p) => ({
-    name: p.name,
-    instagram_username: p.instagram_username ?? null,
-    source: p.source,
-    confidence_score: p.confidence_score,
-  })));
 
-  onProgress({ step: "analyze", status: "done", duration: Date.now() - t, meta: { count: parsed.places.length } });
-  console.log(`[ai-analyzer] Analyzed in ${Date.now() - t}ms — ${parsed.places.length} places`);
-
-  genai.files.delete({ name: fileName }).catch(() => {});
+  const analyzeMs = Date.now() - t;
+  void analyzeMs;
+  if (fileRef) {
+    genai.files.delete({ name: fileRef.name }).catch(() => {});
+  }
 
   return {
     places: parsed.places.map((p) => {
       const raw = p.instagram_username?.trim().replace(/^@/, "") ?? "";
-      const instagramUsername = enforceInstagramUsernamePolicy(raw || null, caption);
-      trace("instagram_username.policy", {
+      const instagram_username = enforceInstagramUsernamePolicy(raw || null, caption);
+      log.debug({
         venue: p.name,
         modelRaw: raw || null,
-        accepted: instagramUsername,
-        captionHasAt: Boolean(caption?.includes("@")),
-      });
-      if (raw && !instagramUsername) {
+        accepted: instagram_username,
+      }, "username policy");
+      if (raw && !instagram_username) {
         const reason = caption?.trim()
           ? "handle not found as @mention in caption"
-          : "no caption text from Instagram fetch (cannot verify @)";
-        console.log(`[ai-analyzer] instagram_username dropped (${reason}; model="${raw}")`);
+          : "no caption text (cannot verify @)";
+        log.info({ venue: p.name, modelHandle: raw, reason }, "instagram_username dropped");
       }
       return {
         name: p.name,
-        locationHint: p.location_hint ?? null,
-        instagramUsername,
+        location_hint: p.location_hint ?? null,
+        instagram_username,
         recommendations: normalizeRecommendations(p.recommendations),
-        confidenceScore: p.confidence_score,
+        confidence_score: p.confidence_score,
         source: p.source,
       };
     }),

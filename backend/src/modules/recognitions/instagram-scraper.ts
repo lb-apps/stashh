@@ -1,6 +1,5 @@
-import type { InstagramContent } from "../types/schemas.js";
-
-const DEBUG_TRACE = process.env["RECOGNITIONS_DEBUG_TRACE"] === "true";
+import type { Logger } from "../../lib/logger.js";
+import type { InstagramContent } from "../../types/schemas.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -52,27 +51,22 @@ const BROWSER_HEADERS = {
 };
 
 function extractVideoUrl(html: string): string | null {
-  // Pattern 1: video_versions array (most common in embedded JSON)
   const p1 = html.match(
     /"video_versions"\s*:\s*\[\s*\{\s*"width"\s*:\s*\d+\s*,\s*"height"\s*:\s*\d+\s*,\s*"url"\s*:\s*"([^"]+)"/,
   );
   if (p1?.[1]) return JSON.parse(`"${p1[1]}"`);
 
-  // Pattern 2: video_url field
   const p2 = html.match(/"video_url"\s*:\s*"([^"]+\.mp4[^"]*)"/);
   if (p2?.[1]) return JSON.parse(`"${p2[1]}"`);
 
-  // Pattern 3: contentUrl in schema.org JSON-LD
   const p3 = html.match(/"contentUrl"\s*:\s*"([^"]+\.mp4[^"]*)"/);
   if (p3?.[1]) return JSON.parse(`"${p3[1]}"`);
 
-  // Pattern 4: og:video meta tag
   const p4 = html.match(
     /<meta\s+property="og:video(?::(?:url|secure_url))?"\s+content="([^"]+)"/,
   );
   if (p4?.[1]) return decodeHtmlEntities(p4[1]!);
 
-  // Pattern 5: bare mp4 URL in JSON blob
   const p5 = html.match(/https:\\\/\\\/[^"']+\.mp4[^"'\\]*/);
   if (p5?.[0]) return p5[0].replace(/\\\//g, "/");
 
@@ -84,7 +78,6 @@ function extractCaption(html: string): string | null {
   if (!match) return null;
 
   const raw = decodeHtmlEntities(match[1]!);
-  // Format: "X likes, Y comments - username on Month DD, YYYY: "caption""
   const colonIdx = raw.indexOf(": ");
   const caption =
     colonIdx !== -1
@@ -94,62 +87,75 @@ function extractCaption(html: string): string | null {
   return caption.trim() || null;
 }
 
-async function fetchInstagramHtml(shortcode: string): Promise<string> {
+async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<string> {
   const urls = [
     `https://www.instagram.com/reel/${shortcode}/`,
     `https://www.instagram.com/p/${shortcode}/`,
   ];
 
+  let lastStatus = 0;
+  let gotLoginPage = false;
+  let lastFetchError: string | null = null;
+
   for (const url of urls) {
     try {
       const res = await fetch(url, { headers: BROWSER_HEADERS });
-      if (!res.ok) continue;
+      lastStatus = res.status;
+      if (!res.ok) {
+        log.warn({ url, status: res.status }, "HTTP error");
+        continue;
+      }
       const html = await res.text();
-      // Sanity check — if we got redirected to login we won't find video data
+
+      if (html.includes("loginForm") || html.includes("/accounts/login/")) {
+        gotLoginPage = true;
+      }
+
       if (html.includes("video_versions") || html.includes("og:video") || html.includes("video_url")) {
         return html;
       }
-      // Still return even if no video patterns — caption might be there
       if (html.includes("og:description")) return html;
-    } catch {
+    } catch (fetchError) {
+      lastFetchError = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      log.warn({ url, err: lastFetchError }, "fetch error");
       continue;
     }
   }
 
-  throw new Error(`Could not fetch Instagram page for shortcode: ${shortcode}`);
+  if (gotLoginPage) {
+    throw new Error(
+      `Instagram returned a login page for shortcode "${shortcode}". The post may be private or Instagram is requiring authentication for server-side requests.`,
+    );
+  }
+
+  const suffix = lastFetchError ? ` Last network error: ${lastFetchError}` : "";
+  throw new Error(
+    `Could not fetch Instagram page for shortcode "${shortcode}" (last HTTP status: ${lastStatus}).${suffix} The post may have been deleted or the URL is invalid.`,
+  );
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export async function fetchInstagramContent(
   url: string,
+  log: Logger,
 ): Promise<InstagramContent> {
-  const t0 = Date.now();
   const shortcode = extractShortcode(url);
 
-  const html = await fetchInstagramHtml(shortcode);
-  console.log(`[instagram] Fetched HTML in ${Date.now() - t0}ms`);
+  const html = await fetchInstagramHtml(shortcode, log);
 
   const videoUrl = extractVideoUrl(html);
   const caption = extractCaption(html);
 
-  console.log(`[instagram] Video URL found: ${videoUrl ? "yes" : "NO"}`);
-  console.log(`[instagram] Caption: ${caption ? caption.slice(0, 80) : "none"}`);
-  if (DEBUG_TRACE) {
-    console.log("[recognitions:trace] instagram.caption.full", caption ?? "<null>");
-    console.log("[recognitions:trace] instagram.caption.has_at", Boolean(caption?.includes("@")));
-    console.log("[recognitions:trace] instagram.shortcode", shortcode);
-  }
-
   if (!videoUrl) {
     throw new Error(
-      "Could not extract video URL from Instagram page. The post may be private or Instagram changed their HTML structure.",
+      `Could not extract video URL from Instagram page (shortcode: ${shortcode}). The post may be private, image-only, or Instagram changed their HTML structure.`,
     );
   }
 
   return {
-    videoUrl,
+    video_url: videoUrl,
     caption,
-    sourceType: detectSourceType(url),
+    source_type: detectSourceType(url),
   };
 }

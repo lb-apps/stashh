@@ -1,5 +1,6 @@
 import { AppHttpError } from "../../errors/appHttpError.js";
 import { isPostgrestError } from "../../errors/supabaseHttp.js";
+import type { Logger } from "../../lib/logger.js";
 import type { PlacesService } from "../places/service.js";
 import { buildPaginationMeta, decodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
@@ -17,7 +18,7 @@ export interface ListSummaryDto {
 
 export interface ListPlaceItemDto {
   list_place_id: string;
-  user_place_id: string;
+  place_id: string;
   created_at: string;
   place: {
     id: string;
@@ -31,6 +32,7 @@ export class ListsService {
   constructor(
     private readonly repo: ListsRepository,
     private readonly placesService: PlacesService,
+    private readonly log: Logger,
   ) {}
 
   async listLists(ownerUserId: string): Promise<ListSummaryDto[]> {
@@ -69,13 +71,30 @@ export class ListsService {
       title: body.title,
       description: body.description ?? null,
     });
+
+    const placeIds = body.place_ids ?? [];
+
+    if (placeIds.length > 0) {
+      const savedPlaceIds = await Promise.all(
+        placeIds.map((canonicalId) => this.placesService.resolveSavedPlaceId(canonicalId, ownerUserId)),
+      );
+      await this.repo.insertListPlaceBatch(
+        savedPlaceIds.map((savedPlaceId) => ({
+          list_id: row.id,
+          owner_user_id: ownerUserId,
+          saved_place_id: savedPlaceId,
+        })),
+      );
+    }
+
+    this.log.info({ listId: row.id, title: body.title, placeCount: placeIds.length }, "list created");
     return {
       id: row.id,
       title: row.title,
       description: row.description,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      place_count: 0,
+      place_count: placeIds.length,
     };
   }
 
@@ -92,6 +111,7 @@ export class ListsService {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
     const place_count = await this.repo.countListPlacesForList(ownerUserId, listId);
+    this.log.info({ listId }, "list updated");
     return {
       id: updated.id,
       title: updated.title,
@@ -107,6 +127,7 @@ export class ListsService {
     if (!deleted) {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
+    this.log.info({ listId }, "list deleted");
     return { id: listId, deleted: true };
   }
 
@@ -133,13 +154,13 @@ export class ListsService {
   }
 
   private mapListPlaceRow(row: ListPlaceWithPlace): ListPlaceItemDto {
-    const place = row.user_places?.places;
+    const place = row.saved_places?.places;
     if (!place?.id) {
       throw new AppHttpError(500, "Place data missing for list entry", "INTERNAL");
     }
     return {
       list_place_id: row.id,
-      user_place_id: row.user_place_id,
+      place_id: place.id,
       created_at: row.created_at,
       place: {
         id: place.id,
@@ -157,7 +178,7 @@ export class ListsService {
   ): Promise<{
     list_place_id: string;
     list_id: string;
-    user_place_id: string;
+    place_id: string;
     created_at: string;
   }> {
     const list = await this.repo.getListForOwner(listId, ownerUserId);
@@ -165,22 +186,24 @@ export class ListsService {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
 
-    await this.placesService.assertUserPlaceOwnership(body.user_place_id, ownerUserId);
+    const savedPlaceId = await this.placesService.resolveSavedPlaceId(body.place_id, ownerUserId);
 
     try {
       const inserted = await this.repo.insertListPlace({
         list_id: listId,
         owner_user_id: ownerUserId,
-        user_place_id: body.user_place_id,
+        saved_place_id: savedPlaceId,
       });
+      this.log.info({ listId, placeId: body.place_id }, "place added to list");
       return {
         list_place_id: inserted.id,
         list_id: inserted.list_id,
-        user_place_id: inserted.user_place_id,
+        place_id: body.place_id,
         created_at: inserted.created_at,
       };
     } catch (e: unknown) {
       if (isPostgrestError(e) && e.code === "23505") {
+        this.log.debug({ listId, placeId: body.place_id }, "duplicate place in list");
         throw new AppHttpError(409, "Place already in list", "USER_LIST_PLACE_DUPLICATE");
       }
       throw e;
@@ -201,6 +224,7 @@ export class ListsService {
     if (!removed) {
       throw new AppHttpError(404, "List place not found", "USER_LIST_PLACE_NOT_FOUND");
     }
+    this.log.info({ listId, listPlaceId }, "place removed from list");
     return { list_place_id: listPlaceId, deleted: true };
   }
 }

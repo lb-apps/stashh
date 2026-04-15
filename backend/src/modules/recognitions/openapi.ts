@@ -26,7 +26,7 @@ const recognitionStatusSchema = z
     status: z.string(),
     source_url: z.string().url(),
     result_id: z.string().uuid().nullable(),
-    items: z.unknown().nullable(),
+    places: z.unknown().nullable(),
     error_message: z.string().nullable(),
     retry_count: z.number().int(),
     started_at: z.string().nullable(),
@@ -47,8 +47,11 @@ const recognitionCommitSchema = z
 const recognitionResultSchema = z
   .object({
     result_id: z.string().uuid(),
-    normalized_source_url: z.string(),
-    items: z.unknown(),
+    source_url: z.string(),
+    video_url: z.string().nullable(),
+    caption: z.string().nullable(),
+    source_type: z.enum(["reel", "post", "story"]).nullable(),
+    places: z.unknown(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
   })
@@ -61,7 +64,11 @@ registry.registerPath({
   path: "/recognitions",
   tags: ["Recognitions"],
   summary: "Enqueue recognition",
-  description: "Starts an async Instagram URL recognition job; poll `GET /recognitions/{id}` or subscribe via Supabase Realtime.",
+  description: `Submit an Instagram URL (Reel, Post, or Story) to identify places mentioned or shown in the content.
+
+The job runs asynchronously. Use GET /recognitions/{id} to poll for completion, or subscribe to the \`recognition_tasks\` Supabase Realtime channel for push updates.
+
+Once the job reaches \`completed\` status, the full result (extracted places, caption, video URL) is accessible via GET /recognitions/result?id={result_id} — the \`result_id\` is included in the status response.`,
   request: {
     body: {
       content: { "application/json": { schema: createRecognitionRequestSchema.openapi("CreateRecognitionRequest") } },
@@ -81,7 +88,11 @@ registry.registerPath({
   path: "/recognitions/result",
   tags: ["Recognitions"],
   summary: "Get result",
-  description: "Fetches a persisted recognition result document by query parameters (see schema).",
+  description: `Fetch a completed recognition result by its \`result_id\` (available in the status response once the job is \`completed\`).
+
+The \`places\` array contains each place extracted from the content. Each entry includes the place name, location, matched Google Place ID (if found), and any recommendations extracted from the post.
+
+Fields \`video_url\`, \`caption\`, and \`source_type\` reflect the original Instagram content that was analysed; they may be \`null\` if the content was unavailable at processing time.`,
   request: {
     query: recognitionResultQuerySchema.openapi("RecognitionResultQuery"),
   },
@@ -99,7 +110,15 @@ registry.registerPath({
   path: "/recognitions/{id}",
   tags: ["Recognitions"],
   summary: "Get status",
-  description: "Recognition job status: pipeline progress, optional inline items, error and retry metadata.",
+  description: `Poll the status of a recognition job by its \`recognition_id\`.
+
+**Status values:**
+- \`pending\` — queued, not yet started
+- \`processing\` — AI analysis in progress
+- \`completed\` — places extracted; \`result_id\` is set and the full result is available via \`GET /recognitions/result?id={result_id}\`
+- \`failed\` — processing failed; see \`error_message\` and \`retry_count\`
+
+The \`places\` field is a lightweight inline preview of extracted places (may differ from the full result document).`,
   request: {
     params: recognitionIdentifierSchema.openapi("RecognitionIdentifier"),
   },
@@ -117,7 +136,9 @@ registry.registerPath({
   path: "/recognitions/{id}/commit",
   tags: ["Recognitions"],
   summary: "Commit recognition",
-  description: "Marks a completed recognition as committed. Only completed recognitions can be committed.",
+  description: `Mark a completed recognition as committed, signalling that the client has processed the result (e.g. the user confirmed which places to save).
+
+Only recognitions in the \`completed\` state can be committed. Attempting to commit a \`pending\` or \`failed\` job returns **409**. Calling this endpoint more than once on the same recognition is safe — the response is idempotent.`,
   request: {
     params: recognitionIdentifierSchema,
   },

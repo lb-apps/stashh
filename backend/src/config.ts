@@ -6,9 +6,8 @@ const envSchema = z.object({
   GOOGLE_PLACES_API_KEY: z.string().min(1, "GOOGLE_PLACES_API_KEY is required"),
   PORT: z.coerce.number().default(3000),
   TEMP_DIR: z.string().default("/tmp/discovery"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   SUPABASE_URL: z.string().url("SUPABASE_URL is required"),
-  /** Direct Postgres connection string for LISTEN/NOTIFY wakeups (optional). */
-  SUPABASE_DB_URL: z.string().url().optional(),
   /** Dashboard publishable key (`sb_publishable_...`). Preferred. */
   SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
   /** Legacy anon JWT key — same privilege class as publishable during migration. */
@@ -25,14 +24,6 @@ const envSchema = z.object({
   RECOGNITIONS_POLL_MAX_MS: z.coerce.number().int().min(1000).default(5000),
   RECOGNITIONS_CLAIM_TIMEOUT_MS: z.coerce.number().int().min(60000).default(900000),
   RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS: z.coerce.number().int().min(5000).default(30000),
-  /** Dev only: skip recognition_results URL cache so Gemini+policy always re-run (set RECOGNITIONS_BYPASS_RESULT_CACHE=true). */
-  RECOGNITIONS_BYPASS_RESULT_CACHE: z
-    .preprocess(
-      (value) => value === "1" || value === "true" || value === "yes",
-      z.boolean(),
-    )
-    .optional()
-    .default(false),
   PLACE_THUMBNAILS_BUCKET: z.string().default("place-thumbnails"),
 });
 

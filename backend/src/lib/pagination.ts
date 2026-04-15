@@ -14,8 +14,7 @@ export const paginationQuerySchema = z
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 
-/** Invalid or missing cursor decodes to offset 0 (first page). */
-export interface OffsetCursorPayload {
+interface OffsetCursorPayload {
   o: number;
 }
 

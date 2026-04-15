@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 
-export type DevPasswordSignInResult =
+type DevPasswordSignInResult =
   | { ok: true; access_token: string }
   | {
       ok: false;

@@ -13,7 +13,7 @@ import {
 
 // ── Response data schemas (documentation-only) ───────────────────────────────
 
-const placeDtoSchema = z
+const savedPlaceSchema = z
   .object({
     id: z.string().uuid(),
     google_place_id: z.string().nullable(),
@@ -26,7 +26,7 @@ const placeDtoSchema = z
     location: z.unknown().nullable(),
     category: z.string().nullable(),
     rating: z.number().nullable(),
-    user_rating_count: z.number().nullable(),
+    rating_count: z.number().nullable(),
     price_level: z.number().nullable(),
     thumbnail_url: z.string().nullable(),
     website_url: z.string().nullable(),
@@ -34,27 +34,17 @@ const placeDtoSchema = z
     google_maps_uri: z.string().nullable(),
     business_status: z.string().nullable(),
     types: z.unknown().nullable(),
-    regular_opening_hours: z.unknown().nullable(),
-    created_at: z.string().datetime(),
-    updated_at: z.string().datetime(),
-  })
-  .openapi("PlaceDto");
-
-const savedPlaceListItemSchema = z
-  .object({
-    user_place_id: z.string().uuid(),
-    place_id: z.string().uuid(),
-    created_at: z.string().datetime(),
-    personal_note: z.string().nullable(),
+    opening_hours: z.unknown().nullable(),
+    instagram_username: z.string().nullable(),
     recommendations: z.unknown(),
-    source_instagram_username: z.string().nullable(),
-    place: placeDtoSchema,
+    notes: z.string().nullable(),
+    saved_at: z.string().datetime(),
   })
-  .openapi("SavedPlaceListItem");
+  .openapi("SavedPlace");
 
 const savedPlaceListDataSchema = z
   .object({
-    items: z.array(savedPlaceListItemSchema),
+    items: z.array(savedPlaceSchema),
     total_count: z.number().int(),
   })
   .openapi("SavedPlaceListData");
@@ -63,8 +53,7 @@ const addPlaceResultEntrySchema = z
   .object({
     google_place_id: z.string(),
     place_id: z.string().uuid(),
-    user_place_id: z.string().uuid(),
-    created: z.boolean(),
+    created: z.boolean().describe("true if a new entry was created in your saved places; false if the place was already saved"),
   })
   .openapi("AddPlaceResultEntry");
 
@@ -78,11 +67,7 @@ const placePhotosDataSchema = z
 
 // ── Path params ──────────────────────────────────────────────────────────────
 
-const userPlaceIdParamsSchema = z.object({
-  userPlaceId: z.string().uuid(),
-});
-
-const canonicalPlaceIdParamsSchema = z.object({
+const placeIdParamsSchema = z.object({
   placeId: z.string().uuid(),
 });
 
@@ -93,7 +78,7 @@ registry.registerPath({
   path: "/places",
   tags: ["Places"],
   summary: "List places",
-  description: `${PAGINATION_OPERATION_DESCRIPTION} Each item joins \`user_places\` with the canonical \`places\` row.`,
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns all places the authenticated user has saved. Each item is a flat object combining place details (name, address, rating, photos, etc.) with your personal metadata (notes, saved date).`,
   request: {
     query: paginationQuerySchema,
   },
@@ -112,8 +97,15 @@ registry.registerPath({
   path: "/places",
   tags: ["Places"],
   summary: "Add places",
-  description:
-    "Links Google Place IDs (or recognition-derived IDs) to the user. Missing canonical rows may be upserted from Places API or recognition payloads.",
+  description: `Save one or more places to the authenticated user's collection. The request body is a **discriminated union** on \`source\`.
+
+### \`source: "google"\`
+Provide a list of Google Place IDs to save directly. Full place details (name, address, rating, photos…) are fetched automatically — the client does not need to supply them.
+
+### \`source: "recognition"\`
+Provide a \`recognition_result_id\` and the subset of Google Place IDs from that result that the user wants to save. Place details are taken from the recognition result already on the server, so no extra lookup is required from the client.
+
+**Both variants are idempotent**: saving a place you already have returns the same \`place_id\` with \`created: false\`. The \`place_id\` in the response is the canonical identifier you use for all subsequent operations (\`GET /places/{placeId}\`, \`PATCH\`, \`DELETE\`, photos, list membership).`,
   request: {
     body: {
       content: { "application/json": { schema: addPlacesBodySchema.openapi("AddPlacesBody") } },
@@ -133,9 +125,9 @@ registry.registerPath({
   path: "/places/photos/{placeId}",
   tags: ["Places"],
   summary: "Photo URLs",
-  description: "`placeId` is the canonical `places.id`. Returns URLs suitable for on-demand gallery loading.",
+  description: "Returns a list of photo URLs for any place. No ownership required — any authenticated user can fetch photos for any place ID. Ideal for lazy-loading a photo gallery after the main place details have been displayed.",
   request: {
-    params: canonicalPlaceIdParamsSchema.openapi("CanonicalPlaceIdParams"),
+    params: placeIdParamsSchema.openapi("PlaceIdPhotosParams"),
     query: placePhotosQuerySchema.openapi("PlacePhotosQuery"),
   },
   responses: {
@@ -149,17 +141,17 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/places/{userPlaceId}",
+  path: "/places/{placeId}",
   tags: ["Places"],
   summary: "Get place",
-  description: "Path id is `user_places.id` (your saved copy), not the canonical place id.",
+  description: "Returns a single saved place with full details and your personal metadata. Use the `id` returned by `POST /places` or `GET /places`.",
   request: {
-    params: userPlaceIdParamsSchema.openapi("UserPlaceIdParams"),
+    params: placeIdParamsSchema.openapi("PlaceIdParams"),
   },
   responses: {
     200: {
       description: "Saved place details",
-      content: { "application/json": { schema: successEnvelope(savedPlaceListItemSchema, "SavedPlace") } },
+      content: { "application/json": { schema: successEnvelope(savedPlaceSchema, "SavedPlace") } },
     },
     ...commonErrorResponses,
   },
@@ -167,12 +159,12 @@ registry.registerPath({
 
 registry.registerPath({
   method: "patch",
-  path: "/places/{userPlaceId}",
+  path: "/places/{placeId}",
   tags: ["Places"],
   summary: "Update place",
-  description: "Partial update of fields on the saved place (e.g. personal note, recommendations).",
+  description: "Update personal notes on a saved place. All fields are optional — only provided fields are updated.",
   request: {
-    params: userPlaceIdParamsSchema,
+    params: placeIdParamsSchema,
     body: {
       content: { "application/json": { schema: patchSavedPlaceBodySchema.openapi("PatchSavedPlaceBody") } },
     },
@@ -180,7 +172,7 @@ registry.registerPath({
   responses: {
     200: {
       description: "Updated saved place",
-      content: { "application/json": { schema: successEnvelope(savedPlaceListItemSchema, "PatchSavedPlace") } },
+      content: { "application/json": { schema: successEnvelope(savedPlaceSchema, "PatchSavedPlace") } },
     },
     ...commonErrorResponses,
   },
@@ -188,12 +180,12 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/places/{userPlaceId}",
+  path: "/places/{placeId}",
   tags: ["Places"],
   summary: "Delete place",
-  description: "Deletes your `user_places` row; canonical `places` data may remain for other users.",
+  description: "Removes this place from your saved places. It is also automatically removed from any lists it was added to.",
   request: {
-    params: userPlaceIdParamsSchema,
+    params: placeIdParamsSchema,
   },
   responses: {
     204: { description: "Place deleted" },

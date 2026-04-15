@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Request } from "express";
+import WebSocket from "ws";
 import { config } from "../config.js";
 import type { Database } from "../types/database.js";
 
@@ -53,6 +54,25 @@ export function createSupabaseServiceClient(): SupabaseClient<Database> {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+  });
+}
+
+/**
+ * Realtime client for postgres_changes subscriptions in Node.js.
+ * WebSocket transport must be set explicitly (no native WebSocket in Node).
+ */
+export function createSupabaseRealtimeClient(): SupabaseClient<Database> | null {
+  const key = config.supabasePublishableKey;
+  if (!key) return null;
+  return createClient<Database>(config.SUPABASE_URL, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    realtime: {
+      transport: WebSocket as unknown as typeof globalThis.WebSocket,
     },
   });
 }

@@ -31,14 +31,14 @@ export function backfillPlacesInsertFromApi(partial: PlacesInsert, api: PlacesIn
     "location",
     "category",
     "rating",
-    "user_rating_count",
+    "rating_count",
     "price_level",
     "phone_number",
     "website_url",
     "google_maps_uri",
     "business_status",
     "types",
-    "regular_opening_hours",
+    "opening_hours",
     "thumbnail_url",
   ];
 

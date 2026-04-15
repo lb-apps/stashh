@@ -32,46 +32,161 @@
     }
 
     * { box-sizing: border-box; }
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
       background: var(--page-background);
       color: var(--text-primary);
-      min-height: 100vh;
-      padding: 16px;
-      width: 100%;
     }
 
     .page {
       width: 100%;
+      height: 100%;
       max-width: none;
       margin: 0;
+      padding: 16px;
       display: grid;
-      grid-template-columns: minmax(220px, 22%) minmax(280px, 1fr) minmax(260px, 30%);
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
-      align-items: start;
     }
 
     @media (max-width: 1200px) {
+      body { overflow: auto; }
       .page {
         grid-template-columns: 1fr;
+        height: auto;
       }
     }
 
     .saved-places-panel {
-      position: sticky;
-      top: 24px;
-      max-height: calc(100vh - 48px);
       display: flex;
       flex-direction: column;
-      min-height: 200px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .left-column {
+      order: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .left-column > .panel {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .lists-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .lists-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      margin-top: 8px;
+      padding-right: 4px;
+    }
+
+    .list-compact {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.35;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .list-compact + .list-compact {
+      margin-top: 8px;
+    }
+
+    .list-compact-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .list-compact-name {
+      font-weight: 600;
+      margin-bottom: 2px;
+      word-break: break-word;
+    }
+
+    .list-compact-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .list-compact-delete {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .list-compact-delete:hover {
+      color: var(--error-color);
+      border-color: var(--error-color);
+    }
+
+    .list-compact-delete:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .create-list-form {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .create-list-form input {
+      margin-bottom: 0;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .create-list-form-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .create-list-form-actions button {
+      width: 100%;
+      padding: 8px 14px;
+      font-size: 13px;
     }
 
     @media (max-width: 1200px) {
-      .saved-places-panel {
-        position: relative;
-        top: auto;
-        max-height: none;
+      .saved-places-panel,
+      .lists-panel {
+        max-height: 50vh;
       }
     }
 
@@ -84,7 +199,19 @@
     }
 
     .workspace-main {
+      order: 1;
       min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .workspace-main-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
     }
 
     .panel {
@@ -332,7 +459,10 @@
     .saved-place-compact {
       border: 1px solid var(--border-color);
       border-radius: 10px;
-      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
       font-size: 13px;
       line-height: 1.35;
     }
@@ -341,9 +471,32 @@
       margin-top: 8px;
     }
 
+    .saved-place-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 4px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--border-color);
+    }
+
+    .saved-place-thumb-slot {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      background: var(--page-background);
+      border: 1px dashed var(--border-color);
+    }
+
+    .saved-place-body {
+      flex: 1;
+      min-width: 0;
+    }
+
     .saved-place-name {
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       word-break: break-word;
     }
 
@@ -352,21 +505,147 @@
       color: var(--text-secondary);
     }
 
+    .saved-place-delete {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .saved-place-delete:hover {
+      color: var(--error-color);
+      border-color: var(--error-color);
+    }
+
+    .saved-place-delete:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .saved-place-add-list {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      margin-right: 4px;
+    }
+
+    .saved-place-add-list:hover {
+      color: var(--accent-color, #4f8ef7);
+      border-color: var(--accent-color, #4f8ef7);
+    }
+
+    .saved-place-add-list:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Add-to-list popover */
+    .add-list-popover {
+      position: fixed;
+      z-index: 999;
+      background: var(--panel-background);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      min-width: 200px;
+      max-width: 260px;
+      padding: 6px 0;
+      overflow: hidden;
+    }
+
+    .add-list-popover-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      padding: 4px 12px 6px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 4px;
+    }
+
+    .add-list-popover-empty {
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 8px 12px;
+    }
+
+    .add-list-popover-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.12s ease;
+      user-select: none;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+    }
+
+    .add-list-popover-item:hover {
+      background: var(--border-color);
+    }
+
+    .add-list-popover-item .pop-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      color: var(--text-secondary);
+    }
+
+    .add-list-popover-item .pop-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .add-list-popover-item.adding {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .add-list-popover-item.done .pop-icon {
+      color: var(--success-color);
+    }
+
     .network-log-panel {
-      position: sticky;
-      top: 24px;
-      max-height: calc(100vh - 48px);
+      order: 3;
       display: flex;
       flex-direction: column;
-      min-height: 280px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     @media (max-width: 1200px) {
       .network-log-panel {
-        position: relative;
-        top: auto;
-        max-height: none;
-        min-height: 220px;
+        max-height: 50vh;
       }
     }
 
@@ -398,27 +677,91 @@
       border-color: var(--accent-color);
     }
 
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border-color);
+      border-radius: 13px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-track::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: var(--accent-color);
+    }
+
+    .toggle-switch input:checked + .toggle-track::after {
+      transform: translateX(18px);
+    }
+
     .network-log-scroll {
       flex: 1;
       min-height: 0;
-      overflow: auto;
+      overflow: hidden;
       border: 1px solid var(--border-color);
       border-radius: 10px;
-      padding: 10px;
       background: var(--page-background);
+      display: flex;
+      flex-direction: column;
     }
 
     .network-log-pair {
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 0;
     }
 
     .network-log-section {
-      border-radius: 10px;
+      border-radius: 0;
       overflow: hidden;
-      border: 1px solid var(--border-color);
+      border: none;
+      border-bottom: 1px solid var(--border-color);
       background: var(--panel-background);
+    }
+
+    .network-log-section:last-child {
+      border-bottom: none;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .network-log-section-head {
@@ -449,8 +792,9 @@
       white-space: pre-wrap;
       word-break: break-word;
       color: var(--text-primary);
-      max-height: min(42vh, 480px);
       overflow: auto;
+      flex: 1;
+      min-height: 0;
     }
 
     .workspace-main h1 {
@@ -460,41 +804,64 @@
 </head>
 <body>
   <div class="page">
-    <section class="panel saved-places-panel">
-      <h1 style="font-size:18px;margin-bottom:4px">My places</h1>
-      <div
-        class="meta-line"
-        id="saved-places-account"
-        style="margin-top:0;margin-bottom:8px;font-size:13px"
-      >
-        Hesap: —
-      </div>
-      <div class="field-label" style="margin-bottom:0">
-        <span id="saved-places-count-label">Kayıtlı mekanlar</span>
-      </div>
-      <div class="saved-places-scroll" id="saved-places-container">
-        <ul class="places-list" id="saved-places-list" style="margin-top:8px">
-          <li class="place-item muted">Yükleniyor…</li>
-        </ul>
-      </div>
-    </section>
+    <div class="left-column">
+      <section class="panel saved-places-panel">
+        <h1 style="font-size:18px;margin-bottom:4px">My places</h1>
+        <div class="field-label" style="margin-bottom:0">
+          <span id="saved-places-count-label">Kayıtlı mekanlar</span>
+        </div>
+        <div class="saved-places-scroll" id="saved-places-container">
+          <ul class="places-list" id="saved-places-list" style="margin-top:8px">
+            <li class="place-item muted">Yükleniyor…</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel lists-panel">
+        <h1 style="font-size:18px;margin-bottom:4px">My lists</h1>
+        <div class="field-label" style="margin-bottom:0">
+          <span id="lists-count-label">Listeler</span>
+        </div>
+        <div class="lists-scroll">
+          <ul class="places-list" id="lists-list" style="margin-top:8px">
+            <li class="place-item muted">Yükleniyor…</li>
+          </ul>
+        </div>
+        <div class="create-list-form">
+          <input id="create-list-input" type="text" placeholder="Liste adı…" />
+          <input id="create-list-desc-input" type="text" placeholder="Açıklama (opsiyonel)" />
+          <div class="create-list-form-actions">
+            <button id="create-list-button" type="button">Oluştur</button>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <section class="panel workspace-main">
       <h1>Recognition</h1>
       <div class="field-label">Instagram URL</div>
       <input id="source-url-input" type="url" placeholder="https://www.instagram.com/reel/..." />
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="bypass-cache-toggle" />
+          <span class="toggle-track"></span>
+        </label>
+        <span>Cache'i atla (her seferinde yeniden işle)</span>
+      </div>
       <button id="start-recognition-button">Start Recognition</button>
       <div class="meta-line" id="recognition-id-line">recognition_id: —</div>
-      <div class="meta-line" id="connection-line">Realtime: disconnected</div>
+      <div class="meta-line" id="connection-line">Polling: idle</div>
       <div class="meta-line" id="duration-line">Total duration: —</div>
       <div class="error-text" id="error-line"></div>
 
-      <div class="field-label" style="margin-top:20px">Lifecycle</div>
-      <ul class="status-list" id="status-list"></ul>
-      <div class="field-label" style="margin-top:16px">Places (GET /recognitions/result)</div>
-      <ul class="places-list" id="places-list">
-        <li class="place-item muted">—</li>
-      </ul>
+      <div class="workspace-main-scroll">
+        <div class="field-label" style="margin-top:20px">Lifecycle</div>
+        <ul class="status-list" id="status-list"></ul>
+        <div class="field-label" style="margin-top:16px">Places (GET /recognitions/result)</div>
+        <ul class="places-list" id="places-list">
+          <li class="place-item muted">—</li>
+        </ul>
+      </div>
     </section>
 
     <section class="panel network-log-panel" aria-label="Network log">
@@ -521,8 +888,6 @@
   </div>
 
   <script type="module">
-    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
     const networkLogRequestEl = document.getElementById("network-log-request");
     const networkLogResponseEl = document.getElementById("network-log-response");
     const networkLogScrollEl = document.getElementById("network-log-scroll");
@@ -549,7 +914,7 @@
       try {
         const u = new URL(urlString, window.location.origin);
         const m = (method ?? "GET").toUpperCase();
-        return m === "GET" && u.pathname === "/api/v1/places";
+        return m === "GET" && (u.pathname === "/api/v1/places" || u.pathname === "/api/v1/lists");
       } catch {
         return false;
       }
@@ -636,6 +1001,7 @@
 
     const sourceUrlInput = document.getElementById("source-url-input");
     const startRecognitionButton = document.getElementById("start-recognition-button");
+    const bypassCacheToggle = document.getElementById("bypass-cache-toggle");
     const recognitionIdentifierLine = document.getElementById("recognition-id-line");
     const connectionLine = document.getElementById("connection-line");
     const durationLine = document.getElementById("duration-line");
@@ -643,15 +1009,18 @@
     const statusList = document.getElementById("status-list");
     const placesList = document.getElementById("places-list");
     const savedPlacesList = document.getElementById("saved-places-list");
-    const savedPlacesAccountLine = document.getElementById("saved-places-account");
     const savedPlacesCountLabel = document.getElementById("saved-places-count-label");
+    const listsList = document.getElementById("lists-list");
+    const listsCountLabel = document.getElementById("lists-count-label");
+    const createListInput = document.getElementById("create-list-input");
+    const createListDescInput = document.getElementById("create-list-desc-input");
+    const createListButton = document.getElementById("create-list-button");
 
     let authToken = "";
     let devUserEmail = "";
-    let supabaseClient = null;
-    let activeSubscription = null;
     let activeRecognitionId = null;
     let lastFetchedResultId = null;
+    let _cachedLists = [];
     /** Son gösterilen recognition satırları (+ butonunu yeniden çizmek için). */
     let lastRecognitionItems = null;
     /** Kayıtlı mekanların google_place_id kümesi (tekrar + basımını engellemek için). */
@@ -738,25 +1107,407 @@
         return;
       }
       for (const it of items) {
-        const p = it && typeof it === "object" && it !== null ? it.place : null;
         const name =
-          p && typeof p.name === "string" && p.name.length > 0 ? p.name : "(unnamed)";
+          it && typeof it.name === "string" && it.name.length > 0 ? it.name : "(unnamed)";
         const li = document.createElement("li");
         li.className = "saved-place-compact";
+
+        const thumbUrl =
+          it && typeof it.thumbnail_url === "string" && it.thumbnail_url.length > 0
+            ? it.thumbnail_url
+            : null;
+        if (thumbUrl) {
+          const img = document.createElement("img");
+          img.className = "saved-place-thumb";
+          img.src = thumbUrl;
+          img.alt = "";
+          img.loading = "lazy";
+          img.referrerPolicy = "no-referrer";
+          li.appendChild(img);
+        } else {
+          const slot = document.createElement("div");
+          slot.className = "saved-place-thumb-slot";
+          slot.setAttribute("aria-hidden", "true");
+          li.appendChild(slot);
+        }
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "saved-place-body";
+
         const nameEl = document.createElement("div");
         nameEl.className = "saved-place-name";
         nameEl.textContent = name;
-        li.appendChild(nameEl);
-        const addr = p && typeof p.address === "string" && p.address.length > 0 ? p.address : "";
+        bodyEl.appendChild(nameEl);
+
+        const addr = it && typeof it.address === "string" && it.address.length > 0 ? it.address : "";
         if (addr) {
-          const meta = document.createElement("div");
-          meta.className = "saved-place-meta";
-          meta.textContent = addr;
-          li.appendChild(meta);
+          const addrEl = document.createElement("div");
+          addrEl.className = "saved-place-meta";
+          addrEl.textContent = addr;
+          bodyEl.appendChild(addrEl);
         }
+
+        const rating =
+          it && typeof it.rating === "number" && !Number.isNaN(it.rating) ? it.rating : null;
+        if (rating !== null) {
+          const ratingEl = document.createElement("div");
+          ratingEl.className = "saved-place-meta";
+          ratingEl.innerHTML = `<span class="place-rating">★ ${rating.toFixed(1)}</span>`;
+          bodyEl.appendChild(ratingEl);
+        }
+
+        li.appendChild(bodyEl);
+
+        const placeId =
+          it && typeof it.id === "string" && it.id.length > 0 ? it.id : null;
+        if (placeId) {
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "saved-place-add-list";
+          addBtn.setAttribute("aria-label", "Add to list");
+          addBtn.title = "Listeye ekle";
+          addBtn.innerHTML = "&#43;";
+          addBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAddToListPopover(placeId, addBtn);
+          });
+          li.appendChild(addBtn);
+
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "saved-place-delete";
+          delBtn.setAttribute("aria-label", "Remove from my places");
+          delBtn.title = "Sil";
+          delBtn.textContent = "×";
+          delBtn.addEventListener("click", () => {
+            void deleteUserPlace(placeId, delBtn);
+          });
+          li.appendChild(delBtn);
+        }
+
         savedPlacesList.appendChild(li);
       }
     }
+
+    async function deleteUserPlace(placeId, buttonEl) {
+      try {
+        await ensureDevelopmentToken();
+        buttonEl.disabled = true;
+        const response = await fetch(`/api/v1/places/${encodeURIComponent(placeId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          const errMsg =
+            body.error?.message ??
+            (typeof body.error === "string" ? body.error : null) ??
+            "Mekan silinemedi";
+          throw new Error(errMsg);
+        }
+        setError("");
+        await Promise.all([fetchUserPlaces(), fetchUserLists()]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setError(message);
+        buttonEl.disabled = false;
+      }
+    }
+
+    // ── Add-to-list popover ───────────────────────────────────────────────
+    let _activePopover = null;
+
+    function closeActivePopover() {
+      if (_activePopover) {
+        _activePopover.remove();
+        _activePopover = null;
+      }
+    }
+
+    document.addEventListener("click", (e) => {
+      if (_activePopover && !_activePopover.contains(e.target)) {
+        closeActivePopover();
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeActivePopover();
+    });
+
+    function showAddToListPopover(placeId, anchorBtn) {
+      if (_activePopover) {
+        closeActivePopover();
+        return;
+      }
+
+      const popover = document.createElement("div");
+      popover.className = "add-list-popover";
+
+      const title = document.createElement("div");
+      title.className = "add-list-popover-title";
+      title.textContent = "Listeye ekle";
+      popover.appendChild(title);
+
+      // Position relative to button
+      function positionPopover() {
+        const rect = anchorBtn.getBoundingClientRect();
+        const vpH = window.innerHeight;
+        const popH = 200;
+        const top = rect.bottom + 4 + popH > vpH
+          ? rect.top - popH - 4
+          : rect.bottom + 4;
+        popover.style.top = `${top}px`;
+        popover.style.left = `${Math.min(rect.left, window.innerWidth - 268)}px`;
+      }
+
+      // Load and render lists
+      const cachedLists = _cachedLists && _cachedLists.length > 0 ? _cachedLists : null;
+      if (cachedLists) {
+        renderPopoverLists(popover, cachedLists, placeId);
+      } else {
+        const loading = document.createElement("div");
+        loading.className = "add-list-popover-empty";
+        loading.textContent = "Yükleniyor…";
+        popover.appendChild(loading);
+        ensureDevelopmentToken().then(async () => {
+          const resp = await fetch("/api/v1/lists", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const body = await resp.json().catch(() => ({}));
+          const lists = Array.isArray(body?.data) ? body.data : [];
+          loading.remove();
+          renderPopoverLists(popover, lists, placeId);
+          positionPopover();
+        }).catch(() => {
+          loading.textContent = "Listeler yüklenemedi.";
+        });
+      }
+
+      document.body.appendChild(popover);
+      _activePopover = popover;
+      positionPopover();
+    }
+
+    function renderPopoverLists(popover, lists, placeId) {
+      if (!lists || lists.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "add-list-popover-empty";
+        empty.textContent = "Henüz liste yok.";
+        popover.appendChild(empty);
+        return;
+      }
+      for (const lst of lists) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "add-list-popover-item";
+
+        const icon = document.createElement("span");
+        icon.className = "pop-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = "☰";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "pop-name";
+        nameSpan.textContent = lst.title || "(isimsiz)";
+
+        btn.appendChild(icon);
+        btn.appendChild(nameSpan);
+
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          btn.classList.add("adding");
+          try {
+            await addPlaceToList(lst.id, placeId);
+            icon.textContent = "✓";
+            btn.classList.remove("adding");
+            btn.classList.add("done");
+            await fetchUserLists();
+            setTimeout(() => closeActivePopover(), 600);
+          } catch (err) {
+            btn.classList.remove("adding");
+            nameSpan.textContent = "Hata: " + (err instanceof Error ? err.message : String(err));
+          }
+        });
+
+        popover.appendChild(btn);
+      }
+    }
+
+    async function addPlaceToList(listId, placeId) {
+      await ensureDevelopmentToken();
+      const response = await fetch(`/api/v1/lists/${encodeURIComponent(listId)}/places`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ place_id: placeId }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const errMsg =
+          body.error?.message ??
+          (typeof body.error === "string" ? body.error : null) ??
+          "Listeye eklenemedi";
+        throw new Error(errMsg);
+      }
+    }
+
+    // ── End popover ───────────────────────────────────────────────────────
+
+    function renderListsList(items) {
+      if (listsCountLabel) {
+        const n = Array.isArray(items) ? items.length : 0;
+        listsCountLabel.textContent = `Listeler (${n})`;
+      }
+      listsList.innerHTML = "";
+      if (!Array.isArray(items) || items.length === 0) {
+        const li = document.createElement("li");
+        li.className = "place-item muted";
+        li.textContent = "Henüz liste yok.";
+        listsList.appendChild(li);
+        return;
+      }
+      for (const it of items) {
+        const name =
+          it && typeof it.title === "string" && it.title.length > 0 ? it.title : "(unnamed)";
+        const li = document.createElement("li");
+        li.className = "list-compact";
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "list-compact-body";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "list-compact-name";
+        nameEl.textContent = name;
+        bodyEl.appendChild(nameEl);
+
+        const desc =
+          it && typeof it.description === "string" && it.description.length > 0
+            ? it.description
+            : null;
+        if (desc) {
+          const descEl = document.createElement("div");
+          descEl.className = "list-compact-meta";
+          descEl.textContent = desc;
+          bodyEl.appendChild(descEl);
+        }
+
+        const placeCount =
+          it && typeof it.place_count === "number" ? it.place_count : null;
+        if (placeCount !== null) {
+          const metaEl = document.createElement("div");
+          metaEl.className = "list-compact-meta";
+          metaEl.textContent = `${placeCount} mekan`;
+          bodyEl.appendChild(metaEl);
+        }
+
+        li.appendChild(bodyEl);
+
+        const listId = it && typeof it.id === "string" && it.id.length > 0 ? it.id : null;
+        if (listId) {
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "list-compact-delete";
+          delBtn.setAttribute("aria-label", "Delete list");
+          delBtn.title = "Sil";
+          delBtn.textContent = "×";
+          delBtn.addEventListener("click", () => {
+            void deleteUserList(listId, delBtn);
+          });
+          li.appendChild(delBtn);
+        }
+
+        listsList.appendChild(li);
+      }
+    }
+
+    async function fetchUserLists() {
+      if (!authToken) return;
+      try {
+        const response = await fetch("/api/v1/lists", {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error?.message ?? "Listeler yüklenemedi");
+        }
+        if (!body.ok || body.data == null) {
+          throw new Error("Geçersiz lists yanıtı");
+        }
+        const items = Array.isArray(body.data) ? body.data : [];
+        _cachedLists = items;
+        renderListsList(items);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        listsList.innerHTML = "";
+        const li = document.createElement("li");
+        li.className = "place-item muted";
+        li.textContent = message;
+        listsList.appendChild(li);
+      }
+    }
+
+    async function createUserList() {
+      const name = createListInput.value.trim();
+      if (!name) return;
+      const desc = createListDescInput.value.trim();
+      try {
+        await ensureDevelopmentToken();
+        createListButton.disabled = true;
+        const payload = { title: name };
+        if (desc) payload.description = desc;
+        const response = await fetch("/api/v1/lists", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error?.message ?? "Liste oluşturulamadı");
+        }
+        createListInput.value = "";
+        createListDescInput.value = "";
+        setError("");
+        await fetchUserLists();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setError(message);
+      } finally {
+        createListButton.disabled = false;
+      }
+    }
+
+    async function deleteUserList(listId, buttonEl) {
+      try {
+        await ensureDevelopmentToken();
+        buttonEl.disabled = true;
+        const response = await fetch(`/api/v1/lists/${encodeURIComponent(listId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error?.message ?? "Liste silinemedi");
+        }
+        setError("");
+        await fetchUserLists();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setError(message);
+        buttonEl.disabled = false;
+      }
+    }
+
+    createListButton.addEventListener("click", () => { void createUserList(); });
+    createListInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        void createUserList();
+      }
+    });
 
     async function fetchUserPlaces() {
       if (!authToken) return;
@@ -801,10 +1552,9 @@
         }
         userSavedGooglePlaceIds.clear();
         for (const row of allItems) {
-          const p = row && typeof row === "object" && row !== null ? row.place : null;
           const gid =
-            p && typeof p.google_place_id === "string" && p.google_place_id.length > 0
-              ? p.google_place_id
+            row && typeof row.google_place_id === "string" && row.google_place_id.length > 0
+              ? row.google_place_id
               : null;
           if (gid) userSavedGooglePlaceIds.add(gid);
         }
@@ -869,26 +1619,25 @@
         placesList.appendChild(li);
         return;
       }
-      for (const entry of items) {
+      for (const place of items) {
         const li = document.createElement("li");
         li.className = "place-item";
         const row = document.createElement("div");
         row.className = "place-row";
 
-        const thumbUrl =
-          entry &&
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof entry.thumbnailUrl === "string" &&
-          entry.thumbnailUrl.length > 0
-            ? entry.thumbnailUrl
+        const googlePlaceId =
+          place &&
+          typeof place.google_place_id === "string" &&
+          place.google_place_id.length > 0
+            ? place.google_place_id
             : null;
-        const hasPhotoRef =
-          entry &&
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof entry.firstPhotoName === "string" &&
-          entry.firstPhotoName.length > 0;
+
+        const thumbUrl =
+          place &&
+          typeof place.thumbnail_url === "string" &&
+          place.thumbnail_url.length > 0
+            ? place.thumbnail_url
+            : null;
 
         if (thumbUrl) {
           const img = document.createElement("img");
@@ -902,19 +1651,9 @@
           const slot = document.createElement("div");
           slot.className = "place-thumb-slot";
           slot.setAttribute("aria-hidden", "true");
-          if (hasPhotoRef) {
-            slot.title = "Photo available after save (not shown in dev UI)";
-          }
           row.appendChild(slot);
         }
 
-        const place = entry && typeof entry === "object" && entry !== null ? entry.place : null;
-        const googlePlaceId =
-          place &&
-          typeof place.googlePlaceId === "string" &&
-          place.googlePlaceId.length > 0
-            ? place.googlePlaceId
-            : null;
         const name =
           place && typeof place.name === "string" && place.name.length > 0 ? place.name : "(unnamed)";
         const addr =
@@ -922,41 +1661,11 @@
 
         const body = document.createElement("div");
         body.className = "place-body";
+
         const titleEl = document.createElement("div");
         titleEl.className = "place-title";
         titleEl.textContent = name;
         body.appendChild(titleEl);
-
-        const rating =
-          place && typeof place.rating === "number" && !Number.isNaN(place.rating) ? place.rating : null;
-        const priceLevelRaw =
-          place && typeof place.priceLevel === "number" && !Number.isNaN(place.priceLevel)
-            ? place.priceLevel
-            : null;
-        const priceLabel =
-          priceLevelRaw !== null && priceLevelRaw >= 1 && priceLevelRaw <= 4
-            ? "$".repeat(priceLevelRaw)
-            : null;
-
-        if (rating !== null || priceLabel !== null) {
-          const metaEl = document.createElement("div");
-          metaEl.className = "place-meta";
-          if (rating !== null) {
-            const ratingSpan = document.createElement("span");
-            ratingSpan.className = "place-rating";
-            ratingSpan.textContent = `★ ${rating.toFixed(1)}`;
-            ratingSpan.setAttribute("title", "Google rating");
-            metaEl.appendChild(ratingSpan);
-          }
-          if (priceLabel !== null) {
-            const priceSpan = document.createElement("span");
-            priceSpan.className = "place-price";
-            priceSpan.textContent = priceLabel;
-            priceSpan.setAttribute("title", "Price level");
-            metaEl.appendChild(priceSpan);
-          }
-          body.appendChild(metaEl);
-        }
 
         if (addr) {
           const addrEl = document.createElement("div");
@@ -965,13 +1674,25 @@
           body.appendChild(addrEl);
         }
 
+        const rating =
+          place && typeof place.rating === "number" && !Number.isNaN(place.rating) ? place.rating : null;
+
+        if (rating !== null) {
+          const metaEl = document.createElement("div");
+          metaEl.className = "place-meta";
+          const ratingSpan = document.createElement("span");
+          ratingSpan.className = "place-rating";
+          ratingSpan.textContent = `★ ${rating.toFixed(1)}`;
+          ratingSpan.setAttribute("title", "Google rating");
+          metaEl.appendChild(ratingSpan);
+          body.appendChild(metaEl);
+        }
+
         const igRaw =
-          entry &&
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof entry.instagramUsername === "string" &&
-          entry.instagramUsername.trim().length > 0
-            ? entry.instagramUsername.trim().replace(/^@+/, "")
+          place &&
+          typeof place.instagram_username === "string" &&
+          place.instagram_username.trim().length > 0
+            ? place.instagram_username.trim().replace(/^@+/, "")
             : null;
 
         if (igRaw) {
@@ -1043,7 +1764,7 @@
           throw new Error(body.error?.message ?? "Invalid result response");
         }
         setError("");
-        renderPlacesList(body.data.items);
+        renderPlacesList(body.data.places);
       } catch (error) {
         lastRecognitionItems = null;
         const message = error instanceof Error ? error.message : String(error);
@@ -1073,58 +1794,70 @@
         data.dev_user_email && typeof data.dev_user_email === "string"
           ? data.dev_user_email
           : "";
-      if (savedPlacesAccountLine) {
-        savedPlacesAccountLine.textContent = devUserEmail
-          ? `Hesap (DEV_TEST_*): ${devUserEmail}`
-          : "Hesap: giriş yapıldı";
-      }
-      supabaseClient = createClient(data.supabase_url, data.supabase_publishable_key, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        global: { headers: { Authorization: `Bearer ${authToken}` } },
-      });
-      await supabaseClient.realtime.setAuth(authToken);
     }
 
-    async function subscribeToRecognitionUpdates(recognitionId) {
-      if (!supabaseClient) throw new Error("Supabase client is not initialized");
-      if (activeSubscription) {
-        await supabaseClient.removeChannel(activeSubscription);
-        activeSubscription = null;
-      }
+    const TERMINAL_STATUSES = new Set([
+      "completed", "failed", "committed", "cancelled", "expired",
+    ]);
+    const POLL_INTERVAL_MS = 3000;
+    let pollingIntervalId = null;
 
-      connectionLine.textContent = "Realtime: connecting...";
-      activeSubscription = supabaseClient
-        .channel(`recognition-${recognitionId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "recognition_tasks",
-            filter: `id=eq.${recognitionId}`,
-          },
-          (payload) => {
-            const row = payload.new;
-            if (!row || row.id !== activeRecognitionId) return;
-            renderStatusList(row.status);
-            if (["completed", "failed", "committed", "cancelled", "expired"].includes(row.status)) {
-              finalizeDurationTracking();
-            }
-            const resultId = row.result_id;
-            if (
-              row.status === "completed" &&
-              resultId &&
-              typeof resultId === "string" &&
-              resultId !== lastFetchedResultId
-            ) {
-              lastFetchedResultId = resultId;
-              void fetchRecognitionPlaces(resultId);
-            }
-          },
-        )
-        .subscribe((status) => {
-          connectionLine.textContent = `Realtime: ${status.toLowerCase()}`;
+    function stopPolling() {
+      if (pollingIntervalId !== null) {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+      }
+    }
+
+    function handleRecognitionUpdate(row) {
+      renderStatusList(row.status);
+      if (row.error_message) {
+        setError(row.error_message);
+      }
+      if (TERMINAL_STATUSES.has(row.status)) {
+        stopPolling();
+        finalizeDurationTracking();
+        connectionLine.textContent = `Polling: stopped (${row.status})`;
+      }
+      const resultId = row.result_id;
+      if (
+        row.status === "completed" &&
+        resultId &&
+        typeof resultId === "string" &&
+        resultId !== lastFetchedResultId
+      ) {
+        lastFetchedResultId = resultId;
+        void fetchRecognitionPlaces(resultId);
+      }
+    }
+
+    async function pollRecognitionTick() {
+      if (!activeRecognitionId) return;
+      try {
+        const response = await fetch(
+          `/api/v1/recognitions/${encodeURIComponent(activeRecognitionId)}`,
+          { headers: { Authorization: `Bearer ${authToken}` } },
+        );
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.ok || !body.data) return;
+        const data = body.data;
+        handleRecognitionUpdate({
+          id: data.recognition_id,
+          status: data.status,
+          result_id: data.result_id ?? null,
+          error_message: data.error_message ?? null,
         });
+      } catch {
+        // best-effort; next tick will retry
+      }
+    }
+
+    function startPollingRecognition(recognitionId) {
+      stopPolling();
+      activeRecognitionId = recognitionId;
+      connectionLine.textContent = `Polling: active (every ${POLL_INTERVAL_MS / 1000}s)`;
+      void pollRecognitionTick();
+      pollingIntervalId = setInterval(() => { void pollRecognitionTick(); }, POLL_INTERVAL_MS);
     }
 
     async function startRecognition() {
@@ -1132,18 +1865,23 @@
       if (!sourceUrl) return;
 
       setError("");
+      stopPolling();
       startRecognitionButton.disabled = true;
       startRecognitionButton.textContent = "Starting...";
 
       try {
         await ensureDevelopmentToken();
         await fetchUserPlaces();
+        const headers = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authToken}`,
+        };
+        if (bypassCacheToggle && bypassCacheToggle.checked) {
+          headers["X-Bypass-Cache"] = "true";
+        }
         const response = await fetch("/api/v1/recognitions", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${authToken}`,
-          },
+          headers,
           body: JSON.stringify({ source_url: sourceUrl }),
         });
 
@@ -1173,7 +1911,7 @@
         recognitionIdentifierLine.textContent = `recognition_id: ${activeRecognitionId}`;
         renderStatusList(data.status);
 
-        await subscribeToRecognitionUpdates(activeRecognitionId);
+        startPollingRecognition(activeRecognitionId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setError(message);
@@ -1194,7 +1932,7 @@
     void (async () => {
       try {
         await ensureDevelopmentToken();
-        await fetchUserPlaces();
+        await Promise.all([fetchUserPlaces(), fetchUserLists()]);
       } catch {
         savedPlacesList.innerHTML = "";
         const li = document.createElement("li");

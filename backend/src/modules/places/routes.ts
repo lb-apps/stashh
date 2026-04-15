@@ -11,11 +11,7 @@ import {
 
 export const placesRouter = Router();
 
-const userPlaceIdParamsSchema = z.object({
-  userPlaceId: z.string().uuid(),
-});
-
-const canonicalPlaceIdParamsSchema = z.object({
+const placeIdParamsSchema = z.object({
   placeId: z.string().uuid(),
 });
 
@@ -64,9 +60,8 @@ placesRouter.post("/", async (req, res, next) => {
   }
 });
 
-/** On-demand photo URLs for a canonical place (user must have saved it). */
 placesRouter.get("/photos/:placeId", async (req, res, next) => {
-  const parsedParams = canonicalPlaceIdParamsSchema.safeParse(req.params);
+  const parsedParams = placeIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid place id", parsedParams.error.flatten().fieldErrors);
     return;
@@ -88,7 +83,6 @@ placesRouter.get("/photos/:placeId", async (req, res, next) => {
     const service = tryCreatePlacesServiceFromRequestOr503(req, res);
     if (!service) return;
     const data = await service.getPlacePhotoUrls(
-      ownerUserId,
       parsedParams.data.placeId,
       parsedQuery.data.limit,
       parsedQuery.data.max_width_px,
@@ -99,10 +93,10 @@ placesRouter.get("/photos/:placeId", async (req, res, next) => {
   }
 });
 
-placesRouter.patch("/:userPlaceId", async (req, res, next) => {
-  const parsedParams = userPlaceIdParamsSchema.safeParse(req.params);
+placesRouter.patch("/:placeId", async (req, res, next) => {
+  const parsedParams = placeIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
-    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid saved place id", parsedParams.error.flatten().fieldErrors);
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid place id", parsedParams.error.flatten().fieldErrors);
     return;
   }
   const parsedBody = patchSavedPlaceBodySchema.safeParse(req.body);
@@ -118,17 +112,17 @@ placesRouter.patch("/:userPlaceId", async (req, res, next) => {
   try {
     const service = tryCreatePlacesServiceFromRequestOr503(req, res);
     if (!service) return;
-    const data = await service.patchSavedPlace(ownerUserId, parsedParams.data.userPlaceId, parsedBody.data);
+    const data = await service.patchSavedPlace(ownerUserId, parsedParams.data.placeId, parsedBody.data);
     sendSuccess(res, req, 200, data);
   } catch (err) {
     next(err);
   }
 });
 
-placesRouter.delete("/:userPlaceId", async (req, res, next) => {
-  const parsedParams = userPlaceIdParamsSchema.safeParse(req.params);
+placesRouter.delete("/:placeId", async (req, res, next) => {
+  const parsedParams = placeIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
-    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid saved place id", parsedParams.error.flatten().fieldErrors);
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid place id", parsedParams.error.flatten().fieldErrors);
     return;
   }
   const ownerUserId = req.user?.sub;
@@ -139,17 +133,17 @@ placesRouter.delete("/:userPlaceId", async (req, res, next) => {
   try {
     const service = tryCreatePlacesServiceFromRequestOr503(req, res);
     if (!service) return;
-    await service.deleteSavedPlace(ownerUserId, parsedParams.data.userPlaceId);
+    await service.deleteSavedPlace(ownerUserId, parsedParams.data.placeId);
     sendNoContent(res);
   } catch (err) {
     next(err);
   }
 });
 
-placesRouter.get("/:userPlaceId", async (req, res, next) => {
-  const parsedParams = userPlaceIdParamsSchema.safeParse(req.params);
+placesRouter.get("/:placeId", async (req, res, next) => {
+  const parsedParams = placeIdParamsSchema.safeParse(req.params);
   if (!parsedParams.success) {
-    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid saved place id", parsedParams.error.flatten().fieldErrors);
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid place id", parsedParams.error.flatten().fieldErrors);
     return;
   }
   const ownerUserId = req.user?.sub;
@@ -160,7 +154,7 @@ placesRouter.get("/:userPlaceId", async (req, res, next) => {
   try {
     const service = tryCreatePlacesServiceFromRequestOr503(req, res);
     if (!service) return;
-    const data = await service.getSavedPlace(ownerUserId, parsedParams.data.userPlaceId);
+    const data = await service.getSavedPlace(ownerUserId, parsedParams.data.placeId);
     sendSuccess(res, req, 200, data);
   } catch (err) {
     next(err);

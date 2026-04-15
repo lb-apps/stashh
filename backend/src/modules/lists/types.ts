@@ -13,6 +13,7 @@ export const listPlaceParamsSchema = z.object({
 export const createListBodySchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(5000).nullable().optional(),
+  place_ids: z.array(z.string().uuid()).max(100).optional(),
 });
 
 export const patchListBodySchema = z
@@ -25,7 +26,7 @@ export const patchListBodySchema = z
   });
 
 export const addListPlaceBodySchema = z.object({
-  user_place_id: z.string().uuid(),
+  place_id: z.string().uuid(),
 });
 
 export { paginationQuerySchema as listPlacesQuerySchema } from "../../lib/pagination.js";

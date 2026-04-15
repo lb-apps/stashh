@@ -92,14 +92,14 @@ export class ListsRepository {
     return (count ?? 0) > 0;
   }
 
-  async getUserPlaceForOwner(
-    userPlaceId: string,
+  async getSavedPlaceForOwner(
+    savedPlaceId: string,
     ownerUserId: string,
   ): Promise<{ id: string; place_id: string } | null> {
     const { data, error } = await this.supabase
-      .from("user_places")
+      .from("saved_places")
       .select("id, place_id")
-      .eq("id", userPlaceId)
+      .eq("id", savedPlaceId)
       .eq("owner_user_id", ownerUserId)
       .maybeSingle();
 
@@ -111,6 +111,16 @@ export class ListsRepository {
     const { data, error } = await this.supabase.from("list_places").insert(row).select("*").single();
     if (error) throw error;
     return data;
+  }
+
+  async insertListPlaceBatch(rows: ListPlaceInsert[]): Promise<ListPlaceRow[]> {
+    if (rows.length === 0) return [];
+    const { data, error } = await this.supabase
+      .from("list_places")
+      .insert(rows)
+      .select("*");
+    if (error) throw error;
+    return data ?? [];
   }
 
   async deleteListPlace(listPlaceId: string, listId: string, ownerUserId: string): Promise<boolean> {
@@ -141,9 +151,9 @@ export class ListsRepository {
         `
         id,
         list_id,
-        user_place_id,
+        saved_place_id,
         created_at,
-        user_places (
+        saved_places (
           id,
           place_id,
           places (
@@ -170,9 +180,9 @@ export class ListsRepository {
 export interface ListPlaceWithPlace {
   id: string;
   list_id: string;
-  user_place_id: string;
+  saved_place_id: string;
   created_at: string;
-  user_places: null | {
+  saved_places: null | {
     id: string;
     place_id: string;
     places: null | {

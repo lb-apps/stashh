@@ -29,7 +29,7 @@ const listSummarySchema = z
 const listPlaceItemSchema = z
   .object({
     list_place_id: z.string().uuid(),
-    user_place_id: z.string().uuid(),
+    place_id: z.string().uuid(),
     created_at: z.string().datetime(),
     place: z.object({
       id: z.string().uuid(),
@@ -48,7 +48,7 @@ const addListPlaceResultSchema = z
   .object({
     list_place_id: z.string().uuid(),
     list_id: z.string().uuid(),
-    user_place_id: z.string().uuid(),
+    place_id: z.string().uuid(),
     created_at: z.string().datetime(),
   })
   .openapi("AddListPlaceResult");
@@ -68,7 +68,7 @@ registry.registerPath({
   path: "/lists",
   tags: ["Lists"],
   summary: "List lists",
-  description: "All lists owned by the user, with `place_count` per list.",
+  description: "Returns all lists owned by the authenticated user. Each list includes a `place_count` for quick display without fetching the full list.",
   responses: {
     200: {
       description: "Array of list summaries",
@@ -83,7 +83,11 @@ registry.registerPath({
   path: "/lists",
   tags: ["Lists"],
   summary: "Create list",
-  description: "Creates an empty list; add places via `POST /lists/{listId}/places`.",
+  description: `Creates a new list, optionally pre-populated with places in a single request.
+
+Pass an optional \`place_ids\` array of place IDs (the \`id\` returned by \`POST /places\` or \`GET /places\`) to add places at creation time. Each place must already be in your saved places. The response \`place_count\` reflects however many places were seeded.
+
+Omitting \`place_ids\` (or passing an empty array) creates an empty list — you can populate it later via \`POST /lists/{listId}/places\`.`,
   request: {
     body: {
       content: { "application/json": { schema: createListBodySchema.openapi("CreateListBody") } },
@@ -103,7 +107,7 @@ registry.registerPath({
   path: "/lists/{listId}",
   tags: ["Lists"],
   summary: "Get list",
-  description: "Returns one list summary if it belongs to the current user.",
+  description: "Returns the metadata for a single list you own. To get the places in the list, use `GET /lists/{listId}/places`.",
   request: {
     params: listIdParamsSchema.openapi("ListIdParams"),
   },
@@ -121,7 +125,7 @@ registry.registerPath({
   path: "/lists/{listId}",
   tags: ["Lists"],
   summary: "Update list",
-  description: "At least one of title or description must be provided.",
+  description: "Update the title or description of a list. At least one field must be provided.",
   request: {
     params: listIdParamsSchema,
     body: {
@@ -142,7 +146,7 @@ registry.registerPath({
   path: "/lists/{listId}",
   tags: ["Lists"],
   summary: "Delete list",
-  description: "Deletes the list and its `list_places` links; does not delete canonical places or user saves.",
+  description: "Permanently deletes this list. Places you had saved remain intact — only the list and its memberships are removed.",
   request: {
     params: listIdParamsSchema,
   },
@@ -160,7 +164,7 @@ registry.registerPath({
   path: "/lists/{listId}/places",
   tags: ["Lists"],
   summary: "List places",
-  description: `${PAGINATION_OPERATION_DESCRIPTION} Places in this list with embedded canonical place fields.`,
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns the places in this list, each including the essential place fields (name, address, thumbnail) needed to render a list item.`,
   request: {
     params: listIdParamsSchema,
     query: paginationQuerySchema,
@@ -180,7 +184,7 @@ registry.registerPath({
   path: "/lists/{listId}/places",
   tags: ["Lists"],
   summary: "Add place",
-  description: "Body references an existing `user_place_id` you own; duplicates return 409.",
+  description: "Add a place to this list. The `place_id` is the place's `id` (obtained from `POST /places` or `GET /places`). The place must already be in your saved places. Adding the same place twice returns **409**.",
   request: {
     params: listIdParamsSchema,
     body: {
@@ -205,7 +209,7 @@ registry.registerPath({
   path: "/lists/{listId}/places/{listPlaceId}",
   tags: ["Lists"],
   summary: "Remove place",
-  description: "Removes the place from this list only (not your saved place).",
+  description: "Remove a place from this list. The place remains in your saved places and any other lists — only the membership in this specific list is deleted.",
   request: {
     params: listPlaceParamsSchema.openapi("ListPlaceParams"),
   },

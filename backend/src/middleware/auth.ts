@@ -4,7 +4,7 @@ import type { JWTPayload } from "jose";
 import { config } from "../config.js";
 import { sendError } from "../http/response.js";
 
-export interface SupabaseJWTPayload extends JWTPayload {
+interface SupabaseJWTPayload extends JWTPayload {
   sub: string;
   email?: string;
   role: string;

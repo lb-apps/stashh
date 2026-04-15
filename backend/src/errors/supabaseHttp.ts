@@ -1,6 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 
-export interface SupabaseHttpResponse {
+interface SupabaseHttpResponse {
   status: number;
   body: { error: string; error_code: string };
 }

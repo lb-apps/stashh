@@ -1,9 +1,9 @@
 // ── Instagram content result ───────────────────────────────
 
 export interface InstagramContent {
-  videoUrl: string;           // CDN URL from APIhut — passed directly to Gemini
+  video_url: string;          // CDN URL from APIhut — passed directly to Gemini
   caption: string | null;     // Post caption from og:description
-  sourceType: "reel" | "post" | "story";
+  source_type: "reel" | "post" | "story";
 }
 
 // ── AI extraction result ───────────────────────────────────
@@ -26,12 +26,12 @@ export interface VenueRecommendation {
 
 export interface ExtractedPlace {
   name: string;
-  locationHint: string | null;
+  location_hint: string | null;
   /** Venue Instagram handle when visible in caption (@tag) or video; omit leading @ */
-  instagramUsername: string | null;
+  instagram_username: string | null;
   /** Explicit must-try / ordering tips for this venue from the post */
   recommendations: VenueRecommendation[];
-  confidenceScore: number;
+  confidence_score: number;
   source: "caption" | "video" | "both";
 }
 
@@ -42,31 +42,33 @@ export interface AIAnalysisResult {
 // ── Google Places enrichment ───────────────────────────────
 
 export interface MatchedPlace {
-  googlePlaceId: string;
+  google_place_id: string;
   name: string;
   address: string;
+  location: { latitude: number; longitude: number } | null;
   rating: number | null;
   /**
    * First Places API photo resource name (e.g. places/.../photos/...).
    * Persist to storage only when the user saves the place via POST /places.
    */
-  firstPhotoName: string | null;
+  first_photo_name: string | null;
 }
 
 // ── Final API response ─────────────────────────────────────
 
 export interface ExtractedPlaceWithMatch {
-  rawName: string;
-  locationHint: string | null;
-  instagramUsername: string | null;
+  raw_name: string;
+  location_hint: string | null;
+  instagram_username: string | null;
   recommendations: VenueRecommendation[];
-  confidenceScore: number;
+  confidence_score: number;
   source: "caption" | "video" | "both";
-  matchedPlace: MatchedPlace | null;
+  matched_place: MatchedPlace | null;
 }
 
 export interface RecognitionPipelineResponse {
   status: "completed" | "failed";
-  sourceUrl: string;
-  extractedPlaces: ExtractedPlaceWithMatch[];
+  source_url: string;
+  instagram_content: InstagramContent;
+  extracted_places: ExtractedPlaceWithMatch[];
 }

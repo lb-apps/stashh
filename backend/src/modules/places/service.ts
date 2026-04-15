@@ -1,31 +1,25 @@
+import { createSupabaseServiceClient } from "../../db/supabaseClient.js";
+import { config } from "../../config.js";
+import { uploadPlaceThumbnail } from "../../lib/thumbnailUploader.js";
+import type { Logger } from "../../lib/logger.js";
+import type { IGooglePlacesClient } from "../../services/google/google-places-client.js";
+import type { IGooglePhotoMediaClient } from "../../services/google/google-photo-media-client.js";
 import type { Json } from "../../types/database.js";
 import { AppHttpError } from "../../errors/appHttpError.js";
-import {
-  fetchGooglePlaceDetails,
-  fetchGooglePlacePhotosField,
-  mapGooglePlaceV1ToPlacesInsert,
-} from "../../services/googlePlaceDetails.js";
-import { uploadPlaceThumbnail, resolvePhotoUri } from "../../services/place-thumbnail.js";
 import type { RecognitionRepository } from "../recognitions/repository.js";
-import type { RecognitionResultItem } from "../recognitions/service.js";
-import { recognitionItemToPlacesInsert } from "./mapper.js";
+import type { RecognitionResultPlace } from "../recognitions/service.js";
+import { recognitionItemToPlacesInsert, mapGooglePlaceV1ToPlacesInsert } from "./mapper.js";
 import { backfillPlacesInsertFromApi } from "./mergePlacesInsert.js";
 import type { PlaceInsert, PlacesRepository, PlaceRow } from "./repository.js";
 import type { AddPlacesBody, PatchSavedPlaceBody, PlacesListQuery } from "./types.js";
 import { decodeOffsetCursor, encodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
 
-export interface SavedPlaceListItemDto {
-  user_place_id: string;
-  place_id: string;
-  created_at: string;
-  personal_note: string | null;
-  recommendations: Json;
-  source_instagram_username: string | null;
-  place: PlaceDto;
-}
-
-export interface PlaceDto {
+/**
+ * Flat-merged DTO: canonical place fields + user-specific saved metadata.
+ * `id` is always `places.id` (the canonical identifier). Internal `saved_places.id` never leaks.
+ */
+export interface SavedPlaceDto {
   id: string;
   google_place_id: string | null;
   name: string;
@@ -37,7 +31,7 @@ export interface PlaceDto {
   location: Json | null;
   category: string | null;
   rating: number | null;
-  user_rating_count: number | null;
+  rating_count: number | null;
   price_level: number | null;
   thumbnail_url: string | null;
   website_url: string | null;
@@ -45,42 +39,52 @@ export interface PlaceDto {
   google_maps_uri: string | null;
   business_status: string | null;
   types: Json | null;
-  regular_opening_hours: Json | null;
-  created_at: string;
-  updated_at: string;
+  opening_hours: Json | null;
+  instagram_username: string | null;
+  recommendations: Json;
+  notes: string | null;
+  saved_at: string;
 }
 
-function toPlaceDto(row: PlaceRow): PlaceDto {
+function toSavedPlaceDto(
+  place: PlaceRow,
+  saved: { notes: string | null; created_at: string },
+): SavedPlaceDto {
   return {
-    id: row.id,
-    google_place_id: row.google_place_id,
-    name: row.name,
-    address: row.address,
-    short_formatted_address: row.short_formatted_address,
-    city: row.city,
-    district: row.district,
-    country: row.country,
-    location: row.location,
-    category: row.category,
-    rating: row.rating,
-    user_rating_count: row.user_rating_count,
-    price_level: row.price_level,
-    thumbnail_url: row.thumbnail_url,
-    website_url: row.website_url,
-    phone_number: row.phone_number,
-    google_maps_uri: row.google_maps_uri,
-    business_status: row.business_status,
-    types: row.types,
-    regular_opening_hours: row.regular_opening_hours,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    id: place.id,
+    google_place_id: place.google_place_id,
+    name: place.name,
+    address: place.address,
+    short_formatted_address: place.short_formatted_address,
+    city: place.city,
+    district: place.district,
+    country: place.country,
+    location: place.location,
+    category: place.category,
+    rating: place.rating,
+    rating_count: place.rating_count,
+    price_level: place.price_level,
+    thumbnail_url: place.thumbnail_url,
+    website_url: place.website_url,
+    phone_number: place.phone_number,
+    google_maps_uri: place.google_maps_uri,
+    business_status: place.business_status,
+    types: place.types,
+    opening_hours: place.opening_hours,
+    instagram_username: place.instagram_username,
+    recommendations: place.recommendations,
+    notes: saved.notes,
+    saved_at: saved.created_at,
   };
 }
 
 export interface AddPlaceResultEntry {
   google_place_id: string;
   place_id: string;
-  user_place_id: string;
+  /**
+   * true  → a new saved_places row was inserted for this user
+   * false → user already had this place saved; no-op
+   */
   created: boolean;
 }
 
@@ -88,28 +92,25 @@ export class PlacesService {
   constructor(
     private readonly placesRepo: PlacesRepository,
     private readonly recognitionRepo: RecognitionRepository,
+    private readonly googlePlacesClient: IGooglePlacesClient,
+    private readonly googlePhotoMediaClient: IGooglePhotoMediaClient,
+    private readonly log: Logger,
   ) {}
 
   async listSavedPlaces(
     ownerUserId: string,
     query: PlacesListQuery,
   ): Promise<{
-    data: { items: SavedPlaceListItemDto[]; total_count: number };
+    data: { items: SavedPlaceDto[]; total_count: number };
     pagination: ApiPaginationMeta;
   }> {
     const offset = decodeOffsetCursor(query.cursor);
-    const total = await this.placesRepo.countUserPlaces(ownerUserId);
-    const rows = await this.placesRepo.listUserPlacesPage(ownerUserId, offset, query.limit);
+    const total = await this.placesRepo.countSavedPlaces(ownerUserId);
+    const rows = await this.placesRepo.listSavedPlacesPage(ownerUserId, offset, query.limit);
     const hasMore = offset + rows.length < total;
-    const items: SavedPlaceListItemDto[] = rows.map((r) => ({
-      user_place_id: r.user_place.id,
-      place_id: r.place.id,
-      created_at: r.user_place.created_at,
-      personal_note: r.user_place.personal_note,
-      recommendations: r.user_place.recommendations,
-      source_instagram_username: r.user_place.source_instagram_username,
-      place: toPlaceDto(r.place),
-    }));
+    const items: SavedPlaceDto[] = rows.map((r) =>
+      toSavedPlaceDto(r.place, r.saved_place),
+    );
     const pagination: ApiPaginationMeta = {
       limit: query.limit,
       next_cursor: hasMore ? encodeOffsetCursor(offset + query.limit) : null,
@@ -121,75 +122,75 @@ export class PlacesService {
     };
   }
 
-  async getSavedPlace(ownerUserId: string, userPlaceId: string): Promise<SavedPlaceListItemDto> {
-    const row = await this.placesRepo.getUserPlaceForOwner(userPlaceId, ownerUserId);
+  async getSavedPlace(ownerUserId: string, placeId: string): Promise<SavedPlaceDto> {
+    const row = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
     if (!row) {
       throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
     }
-    return {
-      user_place_id: row.user_place.id,
-      place_id: row.place.id,
-      created_at: row.user_place.created_at,
-      personal_note: row.user_place.personal_note,
-      recommendations: row.user_place.recommendations,
-      source_instagram_username: row.user_place.source_instagram_username,
-      place: toPlaceDto(row.place),
-    };
+    return toSavedPlaceDto(row.place, row.saved_place);
   }
 
   async patchSavedPlace(
     ownerUserId: string,
-    userPlaceId: string,
+    placeId: string,
     body: PatchSavedPlaceBody,
-  ): Promise<SavedPlaceListItemDto> {
+  ): Promise<SavedPlaceDto> {
+    const existing = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
+    if (!existing) {
+      throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
+    }
     const patch: Record<string, unknown> = {};
-    if (body.personal_note !== undefined) patch["personal_note"] = body.personal_note;
-    if (body.recommendations !== undefined) patch["recommendations"] = body.recommendations as Json;
-    const updated = await this.placesRepo.updateUserPlace(userPlaceId, ownerUserId, patch);
+    if (body.notes !== undefined) patch["notes"] = body.notes;
+    const updated = await this.placesRepo.updateSavedPlace(existing.saved_place.id, ownerUserId, patch);
     if (!updated) {
       throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
     }
-    return this.getSavedPlace(ownerUserId, userPlaceId);
+    return this.getSavedPlace(ownerUserId, placeId);
   }
 
-  async deleteSavedPlace(ownerUserId: string, userPlaceId: string): Promise<{ deleted: boolean }> {
-    const ok = await this.placesRepo.deleteUserPlace(userPlaceId, ownerUserId);
+  async deleteSavedPlace(ownerUserId: string, placeId: string): Promise<{ deleted: boolean }> {
+    const existing = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
+    if (!existing) {
+      throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
+    }
+    const ok = await this.placesRepo.deleteSavedPlace(existing.saved_place.id, ownerUserId);
     if (!ok) {
       throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
     }
+    this.log.info({ placeId }, "saved place deleted");
     return { deleted: true };
   }
 
   /**
-   * Returns fresh photo URLs for a canonical place the user has saved (on-demand; not persisted).
+   * Returns fresh photo URLs for any canonical place (no ownership required).
    */
   async getPlacePhotoUrls(
-    ownerUserId: string,
     placeId: string,
     limit: number,
     maxWidthPx: number,
   ): Promise<{ urls: string[] }> {
-    const owns = await this.placesRepo.userOwnsPlace(ownerUserId, placeId);
-    if (!owns) {
-      throw new AppHttpError(403, "Forbidden", "FORBIDDEN");
-    }
     const place = await this.placesRepo.getPlaceById(placeId);
-    if (!place?.google_place_id) {
+    if (!place) {
       throw new AppHttpError(404, "Place not found", "PLACE_NOT_FOUND");
     }
-    const names = await fetchGooglePlacePhotosField(place.google_place_id);
+    if (!place.google_place_id) {
+      throw new AppHttpError(404, "Place not found", "PLACE_NOT_FOUND");
+    }
+    const names = await this.googlePlacesClient.getPlacePhotos(place.google_place_id);
     const slice = names.slice(0, limit);
     const urls: string[] = [];
     for (const name of slice) {
-      const u = await resolvePhotoUri(name, maxWidthPx);
+      const u = await this.googlePhotoMediaClient.resolvePhotoUri(name, maxWidthPx);
       if (u) urls.push(u);
     }
+    this.log.debug({ placeId, photoCount: urls.length }, "photo urls resolved");
     return { urls };
   }
 
   async addPlaces(ownerUserId: string, body: AddPlacesBody): Promise<{ results: AddPlaceResultEntry[] }> {
     const ids = [...new Set(body.place_ids)];
-    let itemsByGoogleId: Map<string, RecognitionResultItem> | null = null;
+    this.log.info({ source: body.source, placeCount: ids.length }, "add places");
+    let itemsByGoogleId: Map<string, RecognitionResultPlace> | null = null;
 
     if (body.source === "recognition") {
       const result = await this.recognitionRepo.getRecognitionResultByIdForOwner(
@@ -199,9 +200,9 @@ export class PlacesService {
       if (!result) {
         throw new AppHttpError(403, "Result not found or access denied", "RESULT_FORBIDDEN");
       }
-      const raw = result.items;
-      const list = Array.isArray(raw) ? (raw as unknown as RecognitionResultItem[]) : [];
-      itemsByGoogleId = new Map(list.map((it) => [it.place.googlePlaceId, it]));
+      const raw = result.places;
+      const list = Array.isArray(raw) ? (raw as unknown as RecognitionResultPlace[]) : [];
+      itemsByGoogleId = new Map(list.map((p) => [p.google_place_id, p]));
       for (const googlePlaceId of ids) {
         if (!itemsByGoogleId.has(googlePlaceId)) {
           throw new AppHttpError(
@@ -222,50 +223,66 @@ export class PlacesService {
     return { results };
   }
 
-  /** Used by lists API to validate user_place ownership. */
-  async assertUserPlaceOwnership(userPlaceId: string, ownerUserId: string): Promise<void> {
-    const row = await this.placesRepo.getUserPlaceForOwner(userPlaceId, ownerUserId);
+  /** Validates that the user has saved the place identified by canonical places.id. */
+  async assertSavedPlaceOwnership(placeId: string, ownerUserId: string): Promise<void> {
+    const row = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
     if (!row) {
-      throw new AppHttpError(400, "Invalid user place", "INVALID_USER_PLACE");
+      throw new AppHttpError(400, "Place not saved or access denied", "INVALID_SAVED_PLACE");
     }
+  }
+
+  /**
+   * Resolves a canonical places.id to the internal saved_places.id for the given owner.
+   * Used by lists service when inserting into list_places.
+   */
+  async resolveSavedPlaceId(placeId: string, ownerUserId: string): Promise<string> {
+    const row = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
+    if (!row) {
+      throw new AppHttpError(400, "Place not saved or access denied", "INVALID_SAVED_PLACE");
+    }
+    return row.saved_place.id;
   }
 
   private async resolveAndSavePlace(
     googlePlaceId: string,
     ownerUserId: string,
     body: AddPlacesBody,
-    itemsByGoogleId: Map<string, RecognitionResultItem> | null,
+    itemsByGoogleId: Map<string, RecognitionResultPlace> | null,
   ): Promise<AddPlaceResultEntry> {
     const fromRecognition =
       body.source === "recognition" ? (itemsByGoogleId!.get(googlePlaceId) ?? null) : null;
 
     const existingCanonical = await this.placesRepo.getPlaceByGooglePlaceId(googlePlaceId);
     let placeRow: PlaceRow;
+    let place_source: AddPlaceResultEntry["place_source"];
 
     if (existingCanonical) {
       placeRow = await this.enrichExistingPlace(existingCanonical, googlePlaceId);
+      place_source = "existing";
+      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: reused existing canonical place");
     } else if (body.source === "google") {
       placeRow = await this.createPlaceFromGoogle(googlePlaceId);
+      place_source = "google";
+      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from Google API");
     } else {
       placeRow = await this.createPlaceFromRecognition(googlePlaceId, fromRecognition!);
+      place_source = "recognition";
+      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from recognition result");
     }
 
-    const recJson = fromRecognition
-      ? (fromRecognition.recommendations as unknown as Json)
-      : ([] as unknown as Json);
-
-    const { row: userPlaceRow, created } = await this.placesRepo.tryInsertUserPlace({
+    const { created } = await this.placesRepo.tryInsertSavedPlace({
       owner_user_id: ownerUserId,
       place_id: placeRow.id,
-      recommendations: recJson,
-      source_instagram_username: fromRecognition?.instagramUsername ?? null,
-      saved_from_source_url: null,
     });
+
+    this.log.info(
+      { googlePlaceId, placeId: placeRow.id, place_source, saved_created: created },
+      created ? "places: saved_places row inserted" : "places: saved_places row already existed",
+    );
 
     return {
       google_place_id: googlePlaceId,
       place_id: placeRow.id,
-      user_place_id: userPlaceRow.id,
       created,
     };
   }
@@ -279,7 +296,7 @@ export class PlacesService {
 
     if (!needsEnrichment) return existing;
 
-    const apiDetails = await fetchGooglePlaceDetails(googlePlaceId);
+    const apiDetails = await this.googlePlacesClient.getPlaceDetails(googlePlaceId);
     if (!apiDetails?.id) return existing;
 
     const apiInsert = mapGooglePlaceV1ToPlacesInsert(apiDetails);
@@ -292,22 +309,24 @@ export class PlacesService {
     if (Object.keys(patch).length === 0) return existing;
 
     await this.placesRepo.updatePlace(existing.id, patch);
+    this.log.debug({ googlePlaceId, patchKeys: Object.keys(patch) }, "enriched place");
     return { ...existing, ...patch };
   }
 
   private async createPlaceFromGoogle(googlePlaceId: string): Promise<PlaceRow> {
-    const details = await fetchGooglePlaceDetails(googlePlaceId);
+    const details = await this.googlePlacesClient.getPlaceDetails(googlePlaceId);
     if (!details?.id) {
       throw new AppHttpError(400, `Could not resolve place ${googlePlaceId}`, "PLACE_RESOLVE_FAILED");
     }
     const insert = mapGooglePlaceV1ToPlacesInsert(details);
-    const photoName = details.photos?.[0]?.name ?? null;
 
     const placeRow = await this.placesRepo.upsertPlace({
       ...insert,
       thumbnail_url: insert.thumbnail_url ?? null,
     });
 
+    const photos = await this.googlePlacesClient.getPlacePhotos(googlePlaceId);
+    const photoName = photos[0] ?? null;
     if (photoName) {
       this.uploadThumbnailAsync(placeRow.id, googlePlaceId, photoName);
     }
@@ -316,10 +335,10 @@ export class PlacesService {
 
   private async createPlaceFromRecognition(
     googlePlaceId: string,
-    item: RecognitionResultItem,
+    item: RecognitionResultPlace,
   ): Promise<PlaceRow> {
     const partial = recognitionItemToPlacesInsert(item);
-    const apiDetails = await fetchGooglePlaceDetails(googlePlaceId);
+    const apiDetails = await this.googlePlacesClient.getPlaceDetails(googlePlaceId);
 
     let insert: PlaceInsert;
     if (!apiDetails?.id) {
@@ -328,30 +347,23 @@ export class PlacesService {
       insert = backfillPlacesInsertFromApi(partial, mapGooglePlaceV1ToPlacesInsert(apiDetails));
     }
 
-    const photoName =
-      item.firstPhotoName ?? apiDetails?.photos?.[0]?.name ?? null;
-
-    const placeRow = await this.placesRepo.upsertPlace({
+    return this.placesRepo.upsertPlace({
       ...insert,
       thumbnail_url: insert.thumbnail_url ?? null,
     });
-
-    if (photoName) {
-      this.uploadThumbnailAsync(placeRow.id, googlePlaceId, photoName);
-    }
-    return placeRow;
   }
 
   /** Fire-and-forget thumbnail upload — does not block the response. */
   private uploadThumbnailAsync(placeId: string, googlePlaceId: string, photoName: string): void {
-    uploadPlaceThumbnail(googlePlaceId, photoName)
+    const supabase = createSupabaseServiceClient();
+    uploadPlaceThumbnail(googlePlaceId, photoName, config.PLACE_THUMBNAILS_BUCKET, supabase, this.googlePhotoMediaClient)
       .then((url) => {
         if (url) {
           return this.placesRepo.updatePlace(placeId, { thumbnail_url: url });
         }
       })
       .catch((err) => {
-        console.error(`[thumbnail] async upload failed for ${googlePlaceId}:`, err);
+        this.log.warn({ googlePlaceId, err }, "async thumbnail upload failed");
       });
   }
 }
