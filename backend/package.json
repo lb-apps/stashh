@@ -1,7 +1,7 @@
 {
-  "name": "discovery-backend",
+  "name": "stashh-backend",
   "version": "0.1.0",
-  "description": "Discovery — Instagram place recognition API",
+  "description": "Stashh — Instagram place recognition API",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,6 +22,7 @@
     "@scalar/express-api-reference": "^0.8.48",
     "@supabase/supabase-js": "^2.102.1",
     "@types/fluent-ffmpeg": "^2.1.28",
+    "btch-downloader": "^6.3.6",
     "cors": "^2.8.6",
     "dotenv": "^16.4.0",
     "express": "^5.1.0",

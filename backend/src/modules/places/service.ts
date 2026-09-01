@@ -11,9 +11,10 @@ import type { RecognitionResultPlace } from "../recognitions/service.js";
 import { recognitionItemToPlacesInsert, mapGooglePlaceV1ToPlacesInsert } from "./mapper.js";
 import { backfillPlacesInsertFromApi } from "./mergePlacesInsert.js";
 import type { PlaceInsert, PlacesRepository, PlaceRow } from "./repository.js";
-import type { AddPlacesBody, PatchSavedPlaceBody, PlacesListQuery } from "./types.js";
+import type { AddPlacesBody, NearbyPlacesQuery, PatchSavedPlaceBody, PlacesListQuery } from "./types.js";
 import { decodeOffsetCursor, encodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
+import type { NearbyPlaceRow } from "./repository.js";
 
 /**
  * Flat-merged DTO: canonical place fields + user-specific saved metadata.
@@ -44,10 +45,19 @@ export interface SavedPlaceDto {
   recommendations: Json;
   notes: string | null;
   saved_at: string;
+  /** Distance in metres from the requested coordinate. Only present for nearby queries. */
+  distance_m?: number;
 }
 
+/**
+ * The subset of a `places` row this mapper actually reads. Nearby results come from
+ * an RPC that omits PostGIS-only columns (`geo_location`), so requiring a full
+ * `PlaceRow` here would reject a perfectly valid row.
+ */
+type SavedPlaceSource = Omit<PlaceRow, "geo_location">;
+
 function toSavedPlaceDto(
-  place: PlaceRow,
+  place: SavedPlaceSource,
   saved: { notes: string | null; created_at: string },
 ): SavedPlaceDto {
   return {
@@ -105,12 +115,88 @@ export class PlacesService {
     pagination: ApiPaginationMeta;
   }> {
     const offset = decodeOffsetCursor(query.cursor);
-    const total = await this.placesRepo.countSavedPlaces(ownerUserId);
-    const rows = await this.placesRepo.listSavedPlacesPage(ownerUserId, offset, query.limit);
+    const filterOptions = { district: query.district, category: query.category };
+
+    // Parallelize count + page fetch — both are independent queries (async-parallel)
+    const [total, rows] = await Promise.all([
+      this.placesRepo.countSavedPlaces(ownerUserId, filterOptions),
+      this.placesRepo.listSavedPlacesPage(ownerUserId, offset, query.limit, {
+        sort: query.sort,
+        ...filterOptions,
+      }),
+    ]);
+
     const hasMore = offset + rows.length < total;
     const items: SavedPlaceDto[] = rows.map((r) =>
       toSavedPlaceDto(r.place, r.saved_place),
     );
+    const pagination: ApiPaginationMeta = {
+      limit: query.limit,
+      next_cursor: hasMore ? encodeOffsetCursor(offset + query.limit) : null,
+      has_more: hasMore,
+    };
+    return {
+      data: { items, total_count: total },
+      pagination,
+    };
+  }
+
+  async listNearbyPlaces(
+    ownerUserId: string,
+    query: NearbyPlacesQuery,
+  ): Promise<{
+    data: { items: SavedPlaceDto[]; total_count: number };
+    pagination: ApiPaginationMeta;
+  }> {
+    const offset = decodeOffsetCursor(query.cursor);
+    const rpcParams = {
+      ownerUserId,
+      longitude: query.longitude,
+      latitude: query.latitude,
+      radiusM: query.radius_m,
+      category: query.category,
+    };
+
+    // Parallelize count + page fetch (async-parallel)
+    const [total, rows] = await Promise.all([
+      this.placesRepo.countNearbyPlaces(rpcParams),
+      this.placesRepo.listNearbyPlaces({ ...rpcParams, limit: query.limit, offset }),
+    ]);
+
+    const hasMore = offset + rows.length < total;
+    const items: SavedPlaceDto[] = rows.map((r: NearbyPlaceRow) => ({
+      ...toSavedPlaceDto(
+        {
+          id: r.id,
+          google_place_id: r.google_place_id,
+          name: r.name,
+          address: r.address,
+          short_formatted_address: r.short_formatted_address,
+          city: r.city,
+          district: r.district,
+          country: r.country,
+          location: r.location,
+          category: r.category,
+          rating: r.rating,
+          rating_count: r.rating_count,
+          price_level: r.price_level,
+          thumbnail_url: r.thumbnail_url,
+          website_url: r.website_url,
+          phone_number: r.phone_number,
+          google_maps_uri: r.google_maps_uri,
+          business_status: r.business_status,
+          types: r.types,
+          opening_hours: r.opening_hours,
+          instagram_username: r.instagram_username,
+          recommendations: r.recommendations,
+          created_at: r.saved_at,
+          updated_at: r.saved_at,
+        },
+        { notes: r.notes, created_at: r.saved_at },
+      ),
+      distance_m: r.distance_m,
+    }));
+
     const pagination: ApiPaginationMeta = {
       limit: query.limit,
       next_cursor: hasMore ? encodeOffsetCursor(offset + query.limit) : null,
@@ -254,7 +340,7 @@ export class PlacesService {
 
     const existingCanonical = await this.placesRepo.getPlaceByGooglePlaceId(googlePlaceId);
     let placeRow: PlaceRow;
-    let place_source: AddPlaceResultEntry["place_source"];
+    let place_source: string;
 
     if (existingCanonical) {
       placeRow = await this.enrichExistingPlace(existingCanonical, googlePlaceId);

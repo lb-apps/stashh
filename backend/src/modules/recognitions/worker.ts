@@ -5,7 +5,7 @@ import { createSupabaseServiceClient, createSupabaseRealtimeClient } from "../..
 import { config } from "../../config.js";
 import { rootLogger, type Logger } from "../../lib/logger.js";
 import { createTaskLogger } from "./task-logger.js";
-import { fetchInstagramContent } from "./instagram-scraper.js";
+import { fetchSourceContent } from "./source-content.js";
 import { analyzeContent } from "./ai-analyzer.js";
 import { matchPlaces } from "./place-text-search.js";
 import { GooglePlacesClient } from "../../services/google/google-places-client.js";
@@ -101,13 +101,18 @@ async function processRecognition(
     }
 
     const content = await tl.step("content fetched", async (stepLog) => {
-      const result = await fetchInstagramContent(recognition.source_url, stepLog);
+      const result = await fetchSourceContent(recognition.source_url, stepLog);
       return { videoFound: true, captionLength: result.caption?.length ?? 0, _content: result };
     });
-    const instagramContent = (content as Record<string, unknown>)["_content"] as Awaited<ReturnType<typeof fetchInstagramContent>>;
+    const sourceContent = (content as Record<string, unknown>)["_content"] as Awaited<ReturnType<typeof fetchSourceContent>>;
 
     const analysis = await tl.step("video analyzed", async (stepLog) => {
-      const result = await analyzeContent(instagramContent.video_url, instagramContent.caption, stepLog);
+      const result = await analyzeContent(
+        sourceContent.video_url,
+        sourceContent.caption,
+        stepLog,
+        sourceContent.platform,
+      );
       return { placeCount: result.places.length, _analysis: result };
     });
     const analysisResult = (analysis as Record<string, unknown>)["_analysis"] as Awaited<ReturnType<typeof analyzeContent>>;
@@ -164,13 +169,13 @@ async function processRecognition(
         matched_place: placeMatches.get(place.name) ?? null,
       }));
       const places = recognitionService.mapPipelineResultToStoredPlaces(
-        { status: "completed", source_url: recognition.source_url, instagram_content: instagramContent, extracted_places: extractedPlaces },
+        { status: "completed", source_url: recognition.source_url, source_content: sourceContent, extracted_places: extractedPlaces },
         urls,
       );
       const id = await recognitionService.upsertRecognitionResult(
         recognition.source_url,
         places,
-        instagramContent,
+        sourceContent,
       );
       return { resultId: id, placeCount: places.length };
     });

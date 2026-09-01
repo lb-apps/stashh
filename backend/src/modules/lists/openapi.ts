@@ -20,6 +20,7 @@ const listSummarySchema = z
     id: z.string().uuid(),
     title: z.string(),
     description: z.string().nullable(),
+    emoji: z.string().nullable().describe("Emoji character displayed on the list card. null if not set."),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
     place_count: z.number().int(),
@@ -125,7 +126,7 @@ registry.registerPath({
   path: "/lists/{listId}",
   tags: ["Lists"],
   summary: "Update list",
-  description: "Update the title or description of a list. At least one field must be provided.",
+  description: "Update the title, description, or emoji of a list. At least one field must be provided.",
   request: {
     params: listIdParamsSchema,
     body: {

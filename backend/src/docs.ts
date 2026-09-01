@@ -6,6 +6,7 @@ import { signInDevTestUser } from "./lib/devSupabasePasswordSignIn.js";
 // Side-effect imports: register all module paths before spec generation
 import "./modules/places/openapi.js";
 import "./modules/lists/openapi.js";
+import "./modules/library/openapi.js";
 import "./modules/recognitions/openapi.js";
 
 export async function mountDocs(app: Express): Promise<void> {

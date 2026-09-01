@@ -1,4 +1,4 @@
--- Discovery greenfield schema: users, lists, places, user library, visits, recognitions.
+-- Stashh greenfield schema: users, lists, places, user library, visits, recognitions.
 
 create extension if not exists "pgcrypto";
 

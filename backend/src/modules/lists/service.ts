@@ -11,6 +11,7 @@ export interface ListSummaryDto {
   id: string;
   title: string;
   description: string | null;
+  emoji: string | null;
   created_at: string;
   updated_at: string;
   place_count: number;
@@ -43,6 +44,7 @@ export class ListsService {
       id: r.id,
       title: r.title,
       description: r.description,
+      emoji: r.emoji,
       created_at: r.created_at,
       updated_at: r.updated_at,
       place_count: counts.get(r.id) ?? 0,
@@ -59,6 +61,7 @@ export class ListsService {
       id: row.id,
       title: row.title,
       description: row.description,
+      emoji: row.emoji,
       created_at: row.created_at,
       updated_at: row.updated_at,
       place_count,
@@ -70,6 +73,7 @@ export class ListsService {
       owner_user_id: ownerUserId,
       title: body.title,
       description: body.description ?? null,
+      emoji: body.emoji ?? null,
     });
 
     const placeIds = body.place_ids ?? [];
@@ -92,6 +96,7 @@ export class ListsService {
       id: row.id,
       title: row.title,
       description: row.description,
+      emoji: row.emoji,
       created_at: row.created_at,
       updated_at: row.updated_at,
       place_count: placeIds.length,
@@ -106,6 +111,7 @@ export class ListsService {
     const updated = await this.repo.updateList(listId, ownerUserId, {
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.emoji !== undefined ? { emoji: body.emoji } : {}),
     });
     if (!updated) {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
@@ -116,6 +122,7 @@ export class ListsService {
       id: updated.id,
       title: updated.title,
       description: updated.description,
+      emoji: updated.emoji,
       created_at: updated.created_at,
       updated_at: updated.updated_at,
       place_count,

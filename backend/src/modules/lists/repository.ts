@@ -153,7 +153,7 @@ export class ListsRepository {
         list_id,
         saved_place_id,
         created_at,
-        saved_places (
+        saved_places!list_places_user_place_id_fkey (
           id,
           place_id,
           places (

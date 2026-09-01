@@ -54,6 +54,10 @@ DerivedData/
 # SwiftPM
 .build/
 
+# --- iOS runtime config (real URLs, keys, credentials) ---
+ios/Config/*.plist
+!ios/Config/*.plist.example
+
 # --- Supabase CLI (local) ---
 supabase/.temp/
 supabase/.branches/

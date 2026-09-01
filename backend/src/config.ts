@@ -5,7 +5,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   GOOGLE_PLACES_API_KEY: z.string().min(1, "GOOGLE_PLACES_API_KEY is required"),
   PORT: z.coerce.number().default(3000),
-  TEMP_DIR: z.string().default("/tmp/discovery"),
+  TEMP_DIR: z.string().default("/tmp/stashh"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   SUPABASE_URL: z.string().url("SUPABASE_URL is required"),
   /** Dashboard publishable key (`sb_publishable_...`). Preferred. */

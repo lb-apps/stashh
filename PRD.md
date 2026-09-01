@@ -1,4 +1,4 @@
-# PRD: Discovery (iOS)
+# PRD: Stashh (iOS)
 
 **Versiyon:** 1.0 — Taslak
 **Tarih:** 26 Mart 2026

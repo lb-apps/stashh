@@ -13,6 +13,7 @@ export const listPlaceParamsSchema = z.object({
 export const createListBodySchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(5000).nullable().optional(),
+  emoji: z.string().emoji().max(8).nullable().optional(),
   place_ids: z.array(z.string().uuid()).max(100).optional(),
 });
 
@@ -20,9 +21,10 @@ export const patchListBodySchema = z
   .object({
     title: z.string().min(1).max(500).optional(),
     description: z.string().max(5000).nullable().optional(),
+    emoji: z.string().emoji().max(8).nullable().optional(),
   })
-  .refine((b) => b.title !== undefined || b.description !== undefined, {
-    message: "At least one of title, description is required",
+  .refine((b) => b.title !== undefined || b.description !== undefined || b.emoji !== undefined, {
+    message: "At least one of title, description, emoji is required",
   });
 
 export const addListPlaceBodySchema = z.object({

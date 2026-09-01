@@ -1,0 +1,216 @@
+/*
+ * Stashh Web — global stylesheet.
+ *
+ * Import order is load-bearing: Tailwind v4 must come first, HeroUI second.
+ * HeroUI's stylesheet defines every design token (oklch CSS variables) and the
+ * BEM component classes, so it has to be able to layer over Tailwind's reset.
+ *
+ * Design tokens are owned by @heroui/styles — do NOT redefine colour, radius,
+ * or spacing scales here. To adjust the theme, override HeroUI's variables in
+ * the block below rather than inventing a parallel set.
+ */
+
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* HeroUI switches its token values on `.dark` OR `[data-theme="dark"]`
+   (themes/default/variables.css). Tailwind's `dark:` variant has to match the
+   same selectors, otherwise utilities and component tokens disagree. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* CSS's built-in easings are too weak to read as intentional. Expo-out is the
+     curve the console leans on — it moves immediately, which is where the eye
+     is. Never `ease-in` on UI: it delays the first frame. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Cobalt is a *background* colour — as text on a dark surface it measures
+     2.75:1, well under WCAG AA. `text-accent-strong` is the readable sibling:
+     same hue, lifted lightness. Use it for any accent-coloured text. */
+  --color-accent-strong: var(--console-accent-text);
+}
+
+/*
+ * Brand overrides.
+ *
+ * HeroUI tokens are semantic: a bare name is a background (--accent), the
+ * `-foreground` suffix is the text colour on it (--accent-foreground).
+ * Values use oklch. Keep this list short and intentional.
+ */
+:root {
+  /* Electric cobalt — DESIGN.md `colors.primary` #0138FF, converted to oklch. */
+  --accent: oklch(0.4909 0.2871 264.09);
+  --accent-foreground: oklch(1 0 0);
+
+  --brand-primary: oklch(0.4909 0.2871 264.09); /* #0138FF */
+  --brand-primary-pressed: oklch(0.4297 0.2517 264.13); /* #012DD6 */
+  --brand-primary-subtle: oklch(0.9612 0.0182 269.09); /* #EDF2FF */
+  --brand-secondary: oklch(0.6234 0.2052 283.45); /* #7C6DFC */
+
+  /* On light surfaces the brand cobalt is already readable as text. */
+  --console-accent-text: var(--brand-primary);
+}
+
+/*
+ * Console surface stack.
+ *
+ * The console commits to dark: it is a developer tool, read for long stretches,
+ * next to a terminal. Depth is what separates panels here — not 1px borders on a
+ * flat plane. Each surface is a slight vertical gradient with a bright top edge,
+ * so it reads as a lit physical layer rather than a rectangle.
+ *
+ * Deliberately not pure #000 — black clips OLED subpixels and makes motion smear.
+ */
+[data-theme="dark"] {
+  --console-bg: oklch(0.1683 0.0243 265.75);
+  --console-surface: oklch(0.2168 0.0261 264.6);
+  --console-surface-raised: oklch(0.2543 0.0288 264.4);
+  --console-hairline: oklch(1 0 0 / 0.07);
+  --console-edge-light: oklch(1 0 0 / 0.1);
+  --console-glow: oklch(0.4909 0.2871 264.09 / 0.1);
+  /* Lifted cobalt so accent text clears 4.5:1 against the panel surfaces. */
+  --console-accent-text: oklch(0.78 0.1418 264.09);
+}
+
+.console-shell {
+  background:
+    radial-gradient(
+      90% 40% at 50% -8%,
+      var(--console-glow) 0%,
+      transparent 60%
+    ),
+    var(--console-bg);
+}
+
+.surface-panel {
+  background: linear-gradient(
+    to bottom,
+    var(--console-surface-raised),
+    var(--console-surface)
+  );
+  border: 1px solid var(--console-hairline);
+  box-shadow:
+    inset 0 1px 0 0 var(--console-edge-light),
+    0 1px 2px oklch(0 0 0 / 0.3),
+    0 8px 24px -12px oklch(0 0 0 / 0.6);
+}
+
+/* Bigger surfaces read as thicker — deeper shadow, stronger top edge. */
+.surface-hero {
+  background: linear-gradient(
+    to bottom,
+    var(--console-surface-raised),
+    var(--console-surface)
+  );
+  border: 1px solid var(--console-hairline);
+  box-shadow:
+    inset 0 1px 0 0 var(--console-edge-light),
+    0 2px 4px oklch(0 0 0 / 0.35),
+    0 24px 48px -20px oklch(0 0 0 / 0.75);
+}
+
+/* Press feedback belongs on pointer-down, and it has to be instant. */
+.press {
+  transition: transform 120ms var(--ease-out-strong);
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* One-shot entrance for appended rows. Keyframes are fine here: these mount once
+   and are never retargeted mid-flight (unlike toasts, which need transitions). */
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-enter-rise {
+  animation: enter-rise 300ms var(--ease-expo) both;
+}
+
+/* Slow breathing pulse on the active pipeline node. Kept well away from the
+   ~0.2Hz band that triggers motion discomfort, and it only ever runs on one
+   element at a time. */
+@keyframes node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--console-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.animate-node-pulse {
+  animation: node-pulse 1.8s var(--ease-in-out-strong) infinite;
+}
+
+/* Indeterminate sweep for the active phase rail. */
+@keyframes rail-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.animate-rail-sweep {
+  animation: rail-sweep 1.4s var(--ease-in-out-strong) infinite;
+}
+
+/* Reduced motion means gentler, not none — the fade still says "something new
+   arrived"; only the movement and the looping pulses go away. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .animate-node-pulse,
+  .animate-rail-sweep {
+    animation: none;
+  }
+  .press:active {
+    transform: none;
+  }
+}
+
+/* Frostier and flatter when the user asks for less transparency / more contrast. */
+@media (prefers-reduced-transparency: reduce) {
+  .console-shell {
+    background: var(--console-bg);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .surface-panel,
+  .surface-hero {
+    border-color: oklch(1 0 0 / 0.35);
+    background: var(--console-surface);
+  }
+}
+
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Large numerals: tracking goes negative as type grows, leading goes tight.
+   A single letter-spacing value across sizes is wrong somewhere. */
+.numerals-display {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}

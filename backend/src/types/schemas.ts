@@ -1,9 +1,19 @@
-// ── Instagram content result ───────────────────────────────
+// ── Source content result ──────────────────────────────────
 
-export interface InstagramContent {
-  video_url: string;          // CDN URL from APIhut — passed directly to Gemini
-  caption: string | null;     // Post caption from og:description
-  source_type: "reel" | "post" | "story";
+/** Platform a recognition source URL belongs to. */
+export type SourcePlatform = "instagram" | "tiktok";
+
+/** Post shape. Instagram distinguishes reel/post/story; TikTok has one form. */
+export type SourceType = "reel" | "post" | "story" | "tiktok";
+
+/** Normalised scrape result, whichever platform it came from. */
+export interface SourceContent {
+  /** Directly fetchable video URL, handed to Gemini. */
+  video_url: string;
+  /** Post caption. Instagram: og:description. TikTok: the post title. */
+  caption: string | null;
+  source_type: SourceType;
+  platform: SourcePlatform;
 }
 
 // ── AI extraction result ───────────────────────────────────
@@ -69,6 +79,6 @@ export interface ExtractedPlaceWithMatch {
 export interface RecognitionPipelineResponse {
   status: "completed" | "failed";
   source_url: string;
-  instagram_content: InstagramContent;
+  source_content: SourceContent;
   extracted_places: ExtractedPlaceWithMatch[];
 }

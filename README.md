@@ -1,4 +1,4 @@
-# discovery
+# Stashh
 
 ## Places API (saved locations)
 

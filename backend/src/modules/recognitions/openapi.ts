@@ -50,7 +50,7 @@ const recognitionResultSchema = z
     source_url: z.string(),
     video_url: z.string().nullable(),
     caption: z.string().nullable(),
-    source_type: z.enum(["reel", "post", "story"]).nullable(),
+    source_type: z.enum(["reel", "post", "story", "tiktok"]).nullable(),
     places: z.unknown(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),

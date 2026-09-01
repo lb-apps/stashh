@@ -4,6 +4,7 @@ import { sendCreated, sendError, sendNoContent, sendSuccess } from "../../http/r
 import { tryCreatePlacesServiceFromRequestOr503 } from "./factory.js";
 import {
   addPlacesBodySchema,
+  nearbyPlacesQuerySchema,
   patchSavedPlaceBodySchema,
   placePhotosQuerySchema,
   placesListQuerySchema,
@@ -24,6 +25,9 @@ placesRouter.get("/", async (req, res, next) => {
   const parsedQuery = placesListQuerySchema.safeParse({
     limit: req.query["limit"],
     cursor: typeof req.query["cursor"] === "string" ? req.query["cursor"] : undefined,
+    sort: req.query["sort"],
+    district: typeof req.query["district"] === "string" ? req.query["district"] : undefined,
+    category: typeof req.query["category"] === "string" ? req.query["category"] : undefined,
   });
   if (!parsedQuery.success) {
     sendError(res, req, 400, "VALIDATION_ERROR", "Invalid query", parsedQuery.error.flatten().fieldErrors);
@@ -135,6 +139,34 @@ placesRouter.delete("/:placeId", async (req, res, next) => {
     if (!service) return;
     await service.deleteSavedPlace(ownerUserId, parsedParams.data.placeId);
     sendNoContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+placesRouter.get("/nearby", async (req, res, next) => {
+  const ownerUserId = req.user?.sub;
+  if (!ownerUserId) {
+    sendError(res, req, 401, "UNAUTHORIZED", "Unauthorized");
+    return;
+  }
+  const parsedQuery = nearbyPlacesQuerySchema.safeParse({
+    latitude: req.query["latitude"],
+    longitude: req.query["longitude"],
+    radius_m: req.query["radius_m"],
+    limit: req.query["limit"],
+    cursor: typeof req.query["cursor"] === "string" ? req.query["cursor"] : undefined,
+    category: typeof req.query["category"] === "string" ? req.query["category"] : undefined,
+  });
+  if (!parsedQuery.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid query", parsedQuery.error.flatten().fieldErrors);
+    return;
+  }
+  try {
+    const service = tryCreatePlacesServiceFromRequestOr503(req, res);
+    if (!service) return;
+    const result = await service.listNearbyPlaces(ownerUserId, parsedQuery.data);
+    sendSuccess(res, req, 200, result.data, result.pagination);
   } catch (err) {
     next(err);
   }

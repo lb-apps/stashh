@@ -1,7 +1,12 @@
 import { GoogleGenAI, Type, createPartFromUri } from "@google/genai";
 import { config } from "../../config.js";
 import type { Logger } from "../../lib/logger.js";
-import type { AIAnalysisResult, VenueRecommendation, VenueRecommendationKind } from "../../types/schemas.js";
+import type {
+  AIAnalysisResult,
+  SourcePlatform,
+  VenueRecommendation,
+  VenueRecommendationKind,
+} from "../../types/schemas.js";
 
 const venueRecommendationKindValues: VenueRecommendationKind[] = [
   "dish",
@@ -51,7 +56,7 @@ function normalizeRecommendations(
 
 const genai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
 
-const SYSTEM_PROMPT = `You extract featured venues from one Instagram post (caption + video).
+const SYSTEM_PROMPT = `You extract featured venues from one short-form social post (caption + video).
 
 Rules:
 - Return only specific businesses likely to have a Google Maps listing.
@@ -174,6 +179,7 @@ export async function analyzeContent(
   videoUrl: string,
   caption: string | null,
   log: Logger,
+  platform: SourcePlatform = "instagram",
 ): Promise<AIAnalysisResult> {
   log.debug({
     hasCaption: Boolean(caption?.trim()),
@@ -185,9 +191,19 @@ export async function analyzeContent(
 
   const t = Date.now();
 
+  // An @handle in a TikTok caption is a TikTok handle, not an Instagram one.
+  // Writing it into `instagram_username` would store wrong data, so on TikTok we
+  // explicitly ask the model to leave the field null.
+  const handleRule =
+    platform === "instagram"
+      ? "For instagram_username: only if that @handle appears in this caption or as a clear @ on-screen for that venue in the video."
+      : "For instagram_username: always return null. This post is from TikTok, so any @handle here is a TikTok handle, not an Instagram one.";
+
+  const postNoun = platform === "tiktok" ? "TikTok video" : "Instagram post";
+
   const userText = caption
-    ? `Extract featured venues and any concrete per-venue recommendations from this Instagram post.\n\nPost caption:\n${caption}\n\nFor instagram_username: only if that @handle appears in this caption or as clear @ on-screen for that venue in the video.`
-    : "Extract featured venues and any concrete per-venue recommendations visible or audible in this Instagram video.\n\nFor instagram_username: only if an @handle for that venue is clearly visible on screen in the video.";
+    ? `Extract featured venues and any concrete per-venue recommendations from this ${postNoun}.\n\nPost caption:\n${caption}\n\n${handleRule}`
+    : `Extract featured venues and any concrete per-venue recommendations visible or audible in this ${postNoun}.\n\n${handleRule}`;
 
   const videoPart = inlineData
     ? { inlineData }

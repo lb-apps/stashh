@@ -14,8 +14,10 @@ export const createRecognitionRequestSchema = z.object({
     .string()
     .url()
     .refine(
-      (url) => /instagram\.com\/(reel|p|stories)\//i.test(url),
-      "Must be a valid Instagram Reel, Post, or Story URL",
+      (url) =>
+        /instagram\.com\/(reel|p|stories)\//i.test(url) ||
+        /(?:^|\.)tiktok\.com\//i.test(url),
+      "Must be a valid Instagram Reel, Post, or Story URL, or a TikTok video URL",
     ),
 });
 

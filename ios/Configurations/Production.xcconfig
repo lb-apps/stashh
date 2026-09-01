@@ -1,0 +1,16 @@
+// Production.xcconfig
+// App Store release build.
+// Runtime values (URLs, keys, credentials) live in ios/Config/Production.plist — NOT here.
+
+#include "Base.xcconfig"
+
+// Swift — release optimization (Canvas previews will not work; use Staging scheme to preview).
+SWIFT_OPTIMIZATION_LEVEL = -O
+
+// Build flags (no DEBUG/STAGING flag → release behaviour)
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited)
+ENABLE_TESTABILITY = NO
+
+// App identity
+APP_DISPLAY_NAME = Stashh
+BUNDLE_ID_SUFFIX =

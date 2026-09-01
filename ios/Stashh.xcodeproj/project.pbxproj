@@ -1,0 +1,657 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A1000003000000000000AAAA /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A1000002000000000000AAAA /* Supabase */; };
+		AF000001000000000000AAAA /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = AF000003000000000000AAAA /* Auth */; };
+		B1000001000000000000BBBB /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B1000005000000000000BBBB /* Supabase */; };
+		BF000001000000000000BBBB /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = BF000003000000000000BBBB /* Auth */; };
+		CF100001000000000000CCCC /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = CF100003000000000000CCCC /* IssueReporting */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		6EA19D452F926E08008164E1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6ECB9B0C2F75B84D008FD833 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6ECB9B132F75B84D008FD833;
+			remoteInfo = Stashh;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		6ECB9B142F75B84D008FD833 /* Stashh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stashh.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1000007000000000000BBBB /* StashhAPITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StashhAPITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF000001000000000000CCCC /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		CF000003000000000000CCCC /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
+		CF000004000000000000CCCC /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
+		CF000005000000000000CCCC /* Testing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Testing.xcconfig; sourceTree = "<group>"; };
+		CF000007000000000000CCCC /* Staging.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Staging.plist; sourceTree = "<group>"; };
+		CF000008000000000000CCCC /* Testing.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Testing.plist; sourceTree = "<group>"; };
+		CF000009000000000000CCCC /* Production.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Production.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A3000001000000000000AAAA /* Exceptions for "Stashh" folder in "Stashh" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6ECB9B132F75B84D008FD833 /* Stashh */;
+		};
+		B1000011000000000000BBBB /* Exceptions for "StashhAPITests" folder in "StashhAPITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B1000009000000000000BBBB /* StashhAPITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		6ECB9B162F75B84D008FD833 /* Stashh */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A3000001000000000000AAAA /* Exceptions for "Stashh" folder in "Stashh" target */,
+			);
+			path = Stashh;
+			sourceTree = "<group>";
+		};
+		B1000008000000000000BBBB /* StashhAPITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B1000011000000000000BBBB /* Exceptions for "StashhAPITests" folder in "StashhAPITests" target */,
+			);
+			path = StashhAPITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6ECB9B112F75B84D008FD833 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000003000000000000AAAA /* Supabase in Frameworks */,
+				AF000001000000000000AAAA /* Auth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000002000000000000BBBB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000001000000000000BBBB /* Supabase in Frameworks */,
+				BF000001000000000000BBBB /* Auth in Frameworks */,
+				CF100001000000000000CCCC /* IssueReporting in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6ECB9B0B2F75B84D008FD833 = {
+			isa = PBXGroup;
+			children = (
+				6ECB9B162F75B84D008FD833 /* Stashh */,
+				B1000008000000000000BBBB /* StashhAPITests */,
+				CF000006000000000000CCCC /* Configurations */,
+				CF000011000000000000CCCC /* Config */,
+				6ECB9B152F75B84D008FD833 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6ECB9B152F75B84D008FD833 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6ECB9B142F75B84D008FD833 /* Stashh.app */,
+				B1000007000000000000BBBB /* StashhAPITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CF000006000000000000CCCC /* Configurations */ = {
+			isa = PBXGroup;
+			children = (
+				CF000001000000000000CCCC /* Base.xcconfig */,
+				CF000003000000000000CCCC /* Staging.xcconfig */,
+				CF000004000000000000CCCC /* Production.xcconfig */,
+				CF000005000000000000CCCC /* Testing.xcconfig */,
+			);
+			path = Configurations;
+			sourceTree = SOURCE_ROOT;
+		};
+		CF000011000000000000CCCC /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				CF000007000000000000CCCC /* Staging.plist */,
+				CF000008000000000000CCCC /* Testing.plist */,
+				CF000009000000000000CCCC /* Production.plist */,
+			);
+			path = Config;
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6ECB9B132F75B84D008FD833 /* Stashh */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6ECB9B1F2F75B84E008FD833 /* Build configuration list for PBXNativeTarget "Stashh" */;
+			buildPhases = (
+				6ECB9B102F75B84D008FD833 /* Sources */,
+				6ECB9B112F75B84D008FD833 /* Frameworks */,
+				6ECB9B122F75B84D008FD833 /* Resources */,
+				CF000012000000000000CCCC /* Copy Config Plist */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6ECB9B162F75B84D008FD833 /* Stashh */,
+			);
+			name = Stashh;
+			packageProductDependencies = (
+				A1000002000000000000AAAA /* Supabase */,
+				AF000003000000000000AAAA /* Auth */,
+			);
+			productName = Stashh;
+			productReference = 6ECB9B142F75B84D008FD833 /* Stashh.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B1000009000000000000BBBB /* StashhAPITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B100000A000000000000BBBB /* Build configuration list for PBXNativeTarget "StashhAPITests" */;
+			buildPhases = (
+				B100000B000000000000BBBB /* Sources */,
+				B1000002000000000000BBBB /* Frameworks */,
+				B100000C000000000000BBBB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B100000D000000000000BBBB /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B1000008000000000000BBBB /* StashhAPITests */,
+			);
+			name = StashhAPITests;
+			packageProductDependencies = (
+				B1000005000000000000BBBB /* Supabase */,
+				BF000003000000000000BBBB /* Auth */,
+				CF100003000000000000CCCC /* IssueReporting */,
+			);
+			productName = StashhAPITests;
+			productReference = B1000007000000000000BBBB /* StashhAPITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6ECB9B0C2F75B84D008FD833 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					6ECB9B132F75B84D008FD833 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					B1000009000000000000BBBB = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 6ECB9B132F75B84D008FD833;
+					};
+				};
+			};
+			buildConfigurationList = 6ECB9B0F2F75B84D008FD833 /* Build configuration list for PBXProject "Stashh" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6ECB9B0B2F75B84D008FD833;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				CF100002000000000000CCCC /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6ECB9B152F75B84D008FD833 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6ECB9B132F75B84D008FD833 /* Stashh */,
+				B1000009000000000000BBBB /* StashhAPITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6ECB9B122F75B84D008FD833 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000C000000000000BBBB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		CF000012000000000000CCCC /* Copy Config Plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/Config/$(CONFIGURATION).plist",
+			);
+			name = "Copy Config Plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(WRAPPER_NAME)/AppConfig.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nSRC=\"${PROJECT_DIR}/Config/${CONFIGURATION}.plist\"\nDST=\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/AppConfig.plist\"\nif [ ! -f \"$SRC\" ]; then\n  echo \"error: Config plist not found: $SRC\"\n  exit 1\nfi\ncp \"$SRC\" \"$DST\"\necho \"Copied $CONFIGURATION.plist → AppConfig.plist\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6ECB9B102F75B84D008FD833 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000B000000000000BBBB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B100000D000000000000BBBB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6ECB9B132F75B84D008FD833 /* Stashh */;
+			targetProxy = 6EA19D452F926E08008164E1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6ECB9B1D2F75B84E008FD833 /* Testing */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Testing;
+		};
+		6ECB9B1E2F75B84E008FD833 /* Production */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Production;
+		};
+		6ECB9B202F75B84E008FD833 /* Testing */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000005000000000000CCCC /* Testing.xcconfig */;
+			buildSettings = {
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				PRODUCT_BUNDLE_IDENTIFIER = io.littlebigapps.stashh;
+			};
+			name = Testing;
+		};
+		6ECB9B212F75B84E008FD833 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000004000000000000CCCC /* Production.xcconfig */;
+			buildSettings = {
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				PRODUCT_BUNDLE_IDENTIFIER = io.littlebigapps.stashh;
+			};
+			name = Production;
+		};
+		A2000007000000000000AAAA /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Staging;
+		};
+		A2000008000000000000AAAA /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000003000000000000CCCC /* Staging.xcconfig */;
+			buildSettings = {
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				PRODUCT_BUNDLE_IDENTIFIER = io.littlebigapps.stashh;
+			};
+			name = Staging;
+		};
+		B100000E000000000000BBBB /* Testing */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000005000000000000CCCC /* Testing.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = StashhAPITests/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StashhAPITests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER).tests";
+				PRODUCT_NAME = StashhAPITests;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stashh.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Stashh";
+			};
+			name = Testing;
+		};
+		B100000F000000000000BBBB /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000004000000000000CCCC /* Production.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = StashhAPITests/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StashhAPITests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER).tests";
+				PRODUCT_NAME = StashhAPITests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stashh.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Stashh";
+			};
+			name = Production;
+		};
+		B1000010000000000000BBBB /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CF000005000000000000CCCC /* Testing.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = MF6BPKJTF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = StashhAPITests/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StashhAPITests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER).tests";
+				PRODUCT_NAME = StashhAPITests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stashh.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Stashh";
+			};
+			name = Staging;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6ECB9B0F2F75B84D008FD833 /* Build configuration list for PBXProject "Stashh" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2000007000000000000AAAA /* Staging */,
+				6ECB9B1E2F75B84E008FD833 /* Production */,
+				6ECB9B1D2F75B84E008FD833 /* Testing */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Production;
+		};
+		6ECB9B1F2F75B84E008FD833 /* Build configuration list for PBXNativeTarget "Stashh" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2000008000000000000AAAA /* Staging */,
+				6ECB9B212F75B84E008FD833 /* Production */,
+				6ECB9B202F75B84E008FD833 /* Testing */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Production;
+		};
+		B100000A000000000000BBBB /* Build configuration list for PBXNativeTarget "StashhAPITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1000010000000000000BBBB /* Staging */,
+				B100000F000000000000BBBB /* Production */,
+				B100000E000000000000BBBB /* Testing */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Production;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+		CF100002000000000000CCCC /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/xctest-dynamic-overlay";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1000002000000000000AAAA /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		AF000003000000000000AAAA /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		B1000005000000000000BBBB /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		BF000003000000000000BBBB /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000001000000000000AAAA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		CF100003000000000000CCCC /* IssueReporting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CF100002000000000000CCCC /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */;
+			productName = IssueReporting;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 6ECB9B0C2F75B84D008FD833 /* Project object */;
+}

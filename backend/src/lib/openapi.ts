@@ -93,7 +93,7 @@ export function generateOpenAPIDocument() {
   return generator.generateDocument({
     openapi: "3.1.0",
     info: {
-      title: "Discovery API",
+      title: "Stashh API",
       version: "1.0.0",
       description: "Instagram place recognition and saved places management API",
     },

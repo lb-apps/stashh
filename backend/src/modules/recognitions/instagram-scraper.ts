@@ -1,5 +1,6 @@
+import { igdl } from "btch-downloader";
 import type { Logger } from "../../lib/logger.js";
-import type { InstagramContent } from "../../types/schemas.js";
+import type { SourceContent } from "../../types/schemas.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ function detectSourceType(url: string): "reel" | "post" | "story" {
   return "post";
 }
 
-function decodeHtmlEntities(str: string): string {
+function decodeHtmlEntitiesOnce(str: string): string {
   return str
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
@@ -30,6 +31,21 @@ function decodeHtmlEntities(str: string): string {
       String.fromCharCode(parseInt(h, 16)),
     )
     .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)));
+}
+
+/**
+ * Instagram double-escapes entities in some markup variants (`&amp;amp;`), which
+ * left query strings with literal `amp;` param prefixes and broke CDN URL signatures.
+ * Decode repeatedly until the string stops changing.
+ */
+function decodeHtmlEntities(str: string): string {
+  let current = str;
+  for (let pass = 0; pass < 3; pass++) {
+    const next = decodeHtmlEntitiesOnce(current);
+    if (next === current) break;
+    current = next;
+  }
+  return current;
 }
 
 // ─── Instagram scraper ──────────────────────────────────────────────────────
@@ -68,9 +84,57 @@ function extractVideoUrl(html: string): string | null {
   if (p4?.[1]) return decodeHtmlEntities(p4[1]!);
 
   const p5 = html.match(/https:\\\/\\\/[^"']+\.mp4[^"'\\]*/);
-  if (p5?.[0]) return p5[0].replace(/\\\//g, "/");
+  if (p5?.[0]) return decodeHtmlEntities(p5[0].replace(/\\\//g, "/"));
 
   return null;
+}
+
+/**
+ * Instagram's anonymous markup sometimes yields an unsigned CDN URL (no `oh`/`oe`
+ * params), which fbcdn rejects with `403 Bad URL hash`. A ranged probe is far cheaper
+ * than discovering that after the full download in the analyzer.
+ */
+async function isVideoUrlPlayable(videoUrl: string, log: Logger): Promise<boolean> {
+  try {
+    const res = await fetch(videoUrl, {
+      headers: { ...BROWSER_HEADERS, Accept: "*/*", Range: "bytes=0-1023" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok && res.status !== 206) {
+      log.warn({ status: res.status }, "scraped video url not playable");
+      return false;
+    }
+    return true;
+  } catch (probeError) {
+    log.warn(
+      { err: probeError instanceof Error ? probeError.message : String(probeError) },
+      "video url probe failed",
+    );
+    return false;
+  }
+}
+
+/** Fallback resolver for when Instagram's HTML carries no usable video URL. */
+async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promise<string | null> {
+  try {
+    const result = await igdl(postUrl);
+    const items = Array.isArray(result) ? result : (result?.result ?? []);
+    for (const item of items) {
+      const candidate = typeof item === "string" ? item : item?.url;
+      if (typeof candidate === "string" && candidate.length > 0) {
+        log.info({ host: new URL(candidate).host }, "video url resolved via downloader");
+        return candidate;
+      }
+    }
+    log.warn("downloader returned no video url");
+    return null;
+  } catch (downloaderError) {
+    log.warn(
+      { err: downloaderError instanceof Error ? downloaderError.message : String(downloaderError) },
+      "downloader failed",
+    );
+    return null;
+  }
 }
 
 function extractCaption(html: string): string | null {
@@ -139,13 +203,23 @@ async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<strin
 export async function fetchInstagramContent(
   url: string,
   log: Logger,
-): Promise<InstagramContent> {
+): Promise<SourceContent> {
   const shortcode = extractShortcode(url);
+  const sourceType = detectSourceType(url);
 
   const html = await fetchInstagramHtml(shortcode, log);
 
-  const videoUrl = extractVideoUrl(html);
   const caption = extractCaption(html);
+  const scrapedVideoUrl = extractVideoUrl(html);
+
+  let videoUrl: string | null = null;
+  if (scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log))) {
+    videoUrl = scrapedVideoUrl;
+  } else {
+    // Anonymous Instagram markup no longer reliably embeds a signed video URL.
+    const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
+    videoUrl = await resolveVideoUrlViaDownloader(canonicalUrl, log);
+  }
 
   if (!videoUrl) {
     throw new Error(
@@ -156,6 +230,7 @@ export async function fetchInstagramContent(
   return {
     video_url: videoUrl,
     caption,
-    source_type: detectSourceType(url),
+    source_type: sourceType,
+    platform: "instagram",
   };
 }

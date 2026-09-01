@@ -1,0 +1,24 @@
+# Xcode user data
+xcuserdata/
+*.xcuserstate
+
+# Build artifacts
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# SPM
+.build/
+.swiftpm/
+
+# CocoaPods (not used, but just in case)
+Pods/
+Podfile.lock
+
+# Secrets — create a local Secrets.xcconfig that #includes the env xcconfig
+# and overrides real values. Never commit real keys.
+# Template: ios/Stashh/Configurations/Secrets.xcconfig.template (committed)
+# Actual:   ios/Stashh/Configurations/Secrets.xcconfig            (NOT committed)
+Stashh/Configurations/Secrets.xcconfig

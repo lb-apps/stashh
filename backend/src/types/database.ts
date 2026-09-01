@@ -19,6 +19,7 @@ export interface Database {
           owner_user_id: string;
           title: string;
           description: string | null;
+          emoji: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -27,6 +28,7 @@ export interface Database {
           owner_user_id: string;
           title: string;
           description?: string | null;
+          emoji?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -35,6 +37,7 @@ export interface Database {
           owner_user_id?: string;
           title?: string;
           description?: string | null;
+          emoji?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,6 +94,7 @@ export interface Database {
           short_formatted_address: string | null;
           instagram_username: string | null;
           recommendations: Json;
+          geo_location: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -117,6 +121,7 @@ export interface Database {
           short_formatted_address?: string | null;
           instagram_username?: string | null;
           recommendations?: Json;
+          geo_location?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -143,6 +148,7 @@ export interface Database {
           short_formatted_address?: string | null;
           instagram_username?: string | null;
           recommendations?: Json;
+          geo_location?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -155,7 +161,7 @@ export interface Database {
           places: Json;
           video_url: string | null;
           caption: string | null;
-          source_type: "reel" | "post" | "story" | null;
+          source_type: "reel" | "post" | "story" | "tiktok" | null;
           created_at: string;
           updated_at: string;
         };
@@ -165,7 +171,7 @@ export interface Database {
           places?: Json;
           video_url?: string | null;
           caption?: string | null;
-          source_type?: "reel" | "post" | "story" | null;
+          source_type?: "reel" | "post" | "story" | "tiktok" | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -175,7 +181,7 @@ export interface Database {
           places?: Json;
           video_url?: string | null;
           caption?: string | null;
-          source_type?: "reel" | "post" | "story" | null;
+          source_type?: "reel" | "post" | "story" | "tiktok" | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -332,6 +338,63 @@ export interface Database {
           p_claim_limit?: number;
         };
         Returns: Database["public"]["Tables"]["recognition_tasks"]["Row"][];
+      };
+      get_library_district_counts: {
+        Args: { p_user_id: string };
+        Returns: Array<{ district: string; city: string | null; place_count: number }>;
+      };
+      get_library_category_counts: {
+        Args: { p_user_id: string };
+        Returns: Array<{ category: string; place_count: number }>;
+      };
+      get_nearby_saved_places: {
+        Args: {
+          p_user_id: string;
+          p_lng: number;
+          p_lat: number;
+          p_radius_m?: number;
+          p_category?: string | null;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: Array<{
+          saved_place_id: string;
+          notes: string | null;
+          saved_at: string;
+          id: string;
+          google_place_id: string | null;
+          name: string;
+          address: string | null;
+          short_formatted_address: string | null;
+          city: string | null;
+          district: string | null;
+          country: string | null;
+          location: Json | null;
+          category: string | null;
+          rating: number | null;
+          rating_count: number | null;
+          price_level: number | null;
+          thumbnail_url: string | null;
+          website_url: string | null;
+          phone_number: string | null;
+          google_maps_uri: string | null;
+          business_status: string | null;
+          types: Json | null;
+          opening_hours: Json | null;
+          instagram_username: string | null;
+          recommendations: Json;
+          distance_m: number;
+        }>;
+      };
+      count_nearby_saved_places: {
+        Args: {
+          p_user_id: string;
+          p_lng: number;
+          p_lat: number;
+          p_radius_m?: number;
+          p_category?: string | null;
+        };
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

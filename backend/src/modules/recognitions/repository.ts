@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../../types/database.js";
+import type { SourceType } from "../../types/schemas.js";
 import type {
   RecognitionResultRow,
   RecognitionTaskInsert,
@@ -37,7 +38,7 @@ interface UpsertRecognitionResultParams {
   places: Json;
   videoUrl: string;
   caption: string | null;
-  sourceType: "reel" | "post" | "story";
+  sourceType: SourceType;
 }
 
 export class RecognitionRepository {

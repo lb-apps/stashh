@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { listsRouter } from "./modules/lists/routes.js";
+import { libraryRouter } from "./modules/library/routes.js";
 import { placesRouter } from "./modules/places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
 import { rootLogger } from "./lib/logger.js";
@@ -29,7 +30,7 @@ export function startHttpServer(): http.Server {
     return server;
   }
   server = app.listen(config.PORT, () => {
-    rootLogger.info({ port: config.PORT }, "Discovery API started");
+    rootLogger.info({ port: config.PORT }, "Stashh API started");
   });
   return server;
 }
@@ -103,6 +104,10 @@ app.get("/health", (req, res) => {
 // ── Lists (protected + rate limited) ────────────────────────────────────────
 
 app.use("/api/v1/lists", requireAuth, apiRateLimiter, listsRouter);
+
+// ── Library summary (protected + rate limited) ─────────────────────────────
+
+app.use("/api/v1/library", requireAuth, apiRateLimiter, libraryRouter);
 
 // ── Places catalog (protected + rate limited) ──────────────────────────────
 

@@ -1,0 +1,61 @@
+{
+  "configurations" : [
+    {
+      "id" : "C1000001-0000-0000-0000-000000000001",
+      "name" : "API Integration Tests",
+      "options" : {
+        "addressSanitizerEnabled" : false,
+        "codeCoverageEnabled" : true,
+        "codeCoverageTargets" : [
+          {
+            "blueprintIdentifier" : "6ECB9B132F75B84D008FD833",
+            "containerPath" : "container:Stashh.xcodeproj",
+            "identifier" : "6ECB9B132F75B84D008FD833",
+            "name" : "Stashh.app"
+          }
+        ],
+        "mainThreadCheckerEnabled" : true,
+        "targetForVariableExpansion" : {
+          "blueprintIdentifier" : "B1000009000000000000BBBB",
+          "containerPath" : "container:Stashh.xcodeproj",
+          "identifier" : "B1000009000000000000BBBB",
+          "name" : "StashhAPITests.xctest"
+        },
+        "testTimeoutsEnabled" : true,
+        "defaultTestExecutionTimeAllowance" : 120,
+        "maximumTestRepetitions" : 1,
+        "testRepetitionMode" : "none"
+      },
+      "testTargets" : [
+        {
+          "target" : {
+            "blueprintIdentifier" : "B1000009000000000000BBBB",
+            "containerPath" : "container:Stashh.xcodeproj",
+            "identifier" : "B1000009000000000000BBBB",
+            "name" : "StashhAPITests.xctest"
+          }
+        }
+      ]
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverageEnabled" : false,
+    "targetForVariableExpansion" : {
+      "blueprintIdentifier" : "B1000009000000000000BBBB",
+      "containerPath" : "container:Stashh.xcodeproj",
+      "identifier" : "B1000009000000000000BBBB",
+      "name" : "StashhAPITests.xctest"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "blueprintIdentifier" : "B1000009000000000000BBBB",
+        "containerPath" : "container:Stashh.xcodeproj",
+        "identifier" : "B1000009000000000000BBBB",
+        "name" : "StashhAPITests.xctest"
+      }
+    }
+  ],
+  "version" : 1
+}

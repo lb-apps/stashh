@@ -1,7 +1,7 @@
 import { config } from "../../config.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
-import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, InstagramContent } from "../../types/schemas.js";
+import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
 import type { RecognitionRepository } from "./repository.js";
 import type {
   RecognitionResultRow,
@@ -165,14 +165,14 @@ export class RecognitionService {
   async upsertRecognitionResult(
     sourceUrl: string,
     places: RecognitionResultPlace[],
-    instagramContent: InstagramContent,
+    sourceContent: SourceContent,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
       sourceUrl,
       places: places as unknown as Json,
-      videoUrl: instagramContent.video_url,
-      caption: instagramContent.caption,
-      sourceType: instagramContent.source_type,
+      videoUrl: sourceContent.video_url,
+      caption: sourceContent.caption,
+      sourceType: sourceContent.source_type,
     });
     return result.id;
   }

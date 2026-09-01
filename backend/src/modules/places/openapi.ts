@@ -4,11 +4,13 @@ import {
   successEnvelope,
   commonErrorResponses,
 } from "../../lib/openapi.js";
-import { PAGINATION_OPERATION_DESCRIPTION, paginationQuerySchema } from "../../lib/pagination.js";
+import { PAGINATION_OPERATION_DESCRIPTION } from "../../lib/pagination.js";
 import {
   addPlacesBodySchema,
+  nearbyPlacesQuerySchema,
   patchSavedPlaceBodySchema,
   placePhotosQuerySchema,
+  placesListQuerySchema,
 } from "./types.js";
 
 // ── Response data schemas (documentation-only) ───────────────────────────────
@@ -65,6 +67,17 @@ const placePhotosDataSchema = z
   .object({ urls: z.array(z.string().url()) })
   .openapi("PlacePhotosData");
 
+const savedPlaceWithDistanceSchema = savedPlaceSchema.extend({
+  distance_m: z.number().describe("Distance from the requested coordinate in metres").optional(),
+}).openapi("SavedPlaceWithDistance");
+
+const nearbyPlacesListDataSchema = z
+  .object({
+    items: z.array(savedPlaceWithDistanceSchema),
+    total_count: z.number().int(),
+  })
+  .openapi("NearbyPlacesListData");
+
 // ── Path params ──────────────────────────────────────────────────────────────
 
 const placeIdParamsSchema = z.object({
@@ -78,9 +91,20 @@ registry.registerPath({
   path: "/places",
   tags: ["Places"],
   summary: "List places",
-  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns all places the authenticated user has saved. Each item is a flat object combining place details (name, address, rating, photos, etc.) with your personal metadata (notes, saved date).`,
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns all places the authenticated user has saved. Each item is a flat object combining place details (name, address, rating, photos, etc.) with your personal metadata (notes, saved date).
+
+### Sorting
+
+Use the \`sort\` query parameter to control ordering:
+- \`recent\` (default) — most recently saved first
+- \`rating\` — highest rated first; unrated places appear last
+- \`category\` — alphabetical by category, then by name
+
+### Filtering
+
+Pass \`district\` and/or \`category\` to narrow results to a specific neighbourhood or place type. Both filters compose with each other and with the sort order.`,
   request: {
-    query: paginationQuerySchema,
+    query: placesListQuerySchema.openapi("PlacesListQuery"),
   },
   responses: {
     200: {
@@ -138,6 +162,29 @@ registry.registerPath({
     ...commonErrorResponses,
   },
 });
+
+registry.registerPath({
+  method: "get",
+  path: "/places/nearby",
+  tags: ["Places"],
+  summary: "Nearby places",
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns saved places within the specified radius of a coordinate, ordered by distance ascending. Only places already in your library are returned — use \`POST /places\` to save a place first.
+
+The \`distance_m\` field on each item is the geodesic distance in metres from the requested coordinate, suitable for displaying "200 m away" or "1.2 km away" labels.
+
+Radius is capped at **50 km** (50 000 m) to keep query times bounded.`,
+  request: {
+    query: nearbyPlacesQuerySchema.openapi("NearbyPlacesQuery"),
+  },
+  responses: {
+    200: {
+      description: "Paginated list of nearby saved places ordered by distance",
+      content: { "application/json": { schema: successEnvelope(nearbyPlacesListDataSchema, "NearbyPlacesList") } },
+    },
+    ...commonErrorResponses,
+  },
+  "x-pagination": "offset-cursor",
+} as Parameters<typeof registry.registerPath>[0] & { "x-pagination": string });
 
 registry.registerPath({
   method: "get",
