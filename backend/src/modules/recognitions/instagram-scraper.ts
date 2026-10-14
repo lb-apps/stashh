@@ -19,16 +19,23 @@ function detectSourceType(url: string): "reel" | "post" {
   return /\/reels?\//i.test(url) ? "reel" : "post";
 }
 
+/**
+ * A numeric entity as text. Emoji sit above U+FFFF (`&#x1F4CD;`), so this must be
+ * fromCodePoint — fromCharCode keeps only the low 16 bits and turns 📍 into U+F4CD,
+ * a private-use glyph. Out-of-range numbers stay as written.
+ */
+function codePoint(value: number, entity: string): string {
+  return Number.isInteger(value) && value >= 0 && value <= 0x10ffff ? String.fromCodePoint(value) : entity;
+}
+
 function decodeHtmlEntitiesOnce(str: string): string {
   return str
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&#x([0-9a-fA-F]+);/gi, (_, h) =>
-      String.fromCharCode(parseInt(h, 16)),
-    )
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)));
+    .replace(/&#x([0-9a-fA-F]+);/gi, (entity, h: string) => codePoint(parseInt(h, 16), entity))
+    .replace(/&#(\d+);/g, (entity, d: string) => codePoint(parseInt(d, 10), entity));
 }
 
 /**
@@ -142,7 +149,8 @@ export function extractThumbnail(html: string): string | null {
   return match ? decodeHtmlEntities(match[1]!) : null;
 }
 
-function extractCaption(html: string): string | null {
+/** The post's own text from og:description: `<likes> - <user> on <date>: "<caption>".` */
+export function extractCaption(html: string): string | null {
   const match = html.match(/<meta property="og:description" content="([^"]*)"/);
   if (!match) return null;
 
@@ -150,7 +158,7 @@ function extractCaption(html: string): string | null {
   const colonIdx = raw.indexOf(": ");
   const caption =
     colonIdx !== -1
-      ? raw.slice(colonIdx + 2).replace(/^"/, "").replace(/"$/, "")
+      ? raw.slice(colonIdx + 2).replace(/^"/, "").replace(/"\.?$/, "")
       : raw;
 
   return caption.trim() || null;
