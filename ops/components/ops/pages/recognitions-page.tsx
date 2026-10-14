@@ -26,9 +26,9 @@ import { ServiceError } from "../states";
 import { QueueTable } from "../tables";
 
 const durationConfig = {
-  processing_p50_ms: { label: "Processing p50", color: "var(--chart-1)" },
-  processing_p95_ms: { label: "Processing p95", color: "var(--chart-2)" },
-  wait_p50_ms: { label: "Queue wait p50", color: "var(--amber-500)" },
+  processing_p50_ms: { label: "Typical processing", color: "var(--chart-1)" },
+  processing_p95_ms: { label: "Slowest 5% processing", color: "var(--chart-2)" },
+  wait_p50_ms: { label: "Typical queue wait", color: "var(--amber-500)" },
 };
 
 const stepsConfig = {

@@ -31,7 +31,7 @@ const messagesConfig = {
   failed: { label: "Unanswered", color: "var(--chart-5)" },
   open: { label: "Open", color: "var(--chart-4)" },
 };
-const replyConfig = { reply_p50_ms: { label: "Reply time p50", color: "var(--chart-1)" } };
+const replyConfig = { reply_p50_ms: { label: "Typical reply time", color: "var(--chart-1)" } };
 
 function TokenPanel({ account }: { account: InstagramOps["stats"]["account"] }) {
   const now = useNow();
@@ -146,7 +146,7 @@ export function InstagramPage() {
             ]}
           />
         </Panel>
-        <Panel title="Reply time" description="From DM to reply, p50">
+        <Panel title="Reply time" description="Typical time from a DM to our reply">
           <MultiLineChart
             bucket={ig.bucket}
             config={replyConfig}

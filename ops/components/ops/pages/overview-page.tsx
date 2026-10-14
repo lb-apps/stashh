@@ -79,7 +79,7 @@ export function OverviewPage() {
           metrics={[
             { key: "requests", label: "Requests", total: formatInt(ops.stats.totals.requests), format: formatInt },
             { key: "cost_usd", label: "Cost", total: formatUsd(ops.stats.runs.cost_usd), format: formatUsd },
-            { key: "processing_p50_ms", label: "Duration p50", total: formatDuration(ops.stats.runs.processing_p50_ms), format: formatDuration },
+            { key: "processing_p50_ms", label: "Typical duration", total: formatDuration(ops.stats.runs.processing_p50_ms), format: formatDuration },
             {
               key: "tokens",
               label: "Tokens",

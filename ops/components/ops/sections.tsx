@@ -73,9 +73,9 @@ export function ProcessingKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Timer}
-      label="Processing time (p50)"
+      label="Typical processing time"
       value={formatDuration(runs.processing_p50_ms)}
-      detail={`p95 ${formatDuration(runs.processing_p95_ms)} · cache ${formatDuration(runs.cache_p50_ms)}`}
+      detail={`Slowest 5%: ${formatDuration(runs.processing_p95_ms)} · from cache ${formatDuration(runs.cache_p50_ms)}`}
       trend={trend(runs.processing_p50_ms, previous.processing_p50_ms, "down")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
       spark={series.map((p) => p.processing_p50_ms)}
@@ -167,9 +167,9 @@ export function WaitKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Hourglass}
-      label="Queue wait (p50)"
+      label="Typical queue wait"
       value={formatDuration(wait.p50_ms)}
-      detail={`p95 ${formatDuration(wait.p95_ms)}`}
+      detail={`Slowest 5%: ${formatDuration(wait.p95_ms)}`}
       spark={series.map((p) => p.wait_p50_ms)}
     />
   );
@@ -180,9 +180,9 @@ export function ModelLatencyKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Gauge}
-      label="Model latency (p50)"
+      label="Typical model time"
       value={formatDuration(runs.model_p50_ms)}
-      detail={`p95 ${formatDuration(runs.model_p95_ms)} · ${ops.process.model.replace(/^google\//, "")}`}
+      detail={`Slowest 5%: ${formatDuration(runs.model_p95_ms)} · ${ops.process.model.replace(/^google\//, "")}`}
       spark={series.map((p) => p.analysis_ms)}
     />
   );
@@ -203,9 +203,9 @@ export function DmKpis({ ig }: { ig: InstagramOps }) {
       />
       <KpiCard
         icon={Timer}
-        label="DM reply time (p50)"
+        label="Typical DM reply time"
         value={formatDuration(reply.p50_ms)}
-        detail={`p95 ${formatDuration(reply.p95_ms)}`}
+        detail={`Slowest 5%: ${formatDuration(reply.p95_ms)}`}
         trend={trend(reply.p50_ms, previous.reply_p50_ms, "down")}
         trendCaption={PREVIOUS_LABELS[ig.range]}
         spark={series.map((p) => p.reply_p50_ms)}
@@ -408,8 +408,8 @@ export function ApiHealthPanel({ ops, className }: { ops: RecognitionOps; classN
                 <TableHead>Route</TableHead>
                 <TableHead className="text-right">Requests</TableHead>
                 <TableHead className="text-right">Errors</TableHead>
-                <TableHead className="text-right">p50</TableHead>
-                <TableHead className="text-right">p95</TableHead>
+                <TableHead className="text-right">Typical</TableHead>
+                <TableHead className="text-right">Slowest 5%</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
