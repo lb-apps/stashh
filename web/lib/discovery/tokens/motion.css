@@ -1,0 +1,27 @@
+/* Discovery — motion. Spring with a slight overshoot; nothing linear. */
+:root {
+  --dur-instant: 90ms; /* @kind other */
+  --dur-fast: 140ms; /* @kind other */
+  --dur: 220ms; /* @kind other */
+  --dur-slow: 360ms; /* @kind other */
+  --dur-sheet: 420ms; /* @kind other */
+  /* default easing overshoots — this is the Discovery feel */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* @kind other */
+  --ease-spring-soft: cubic-bezier(0.32, 1.24, 0.6, 1); /* @kind other */
+  --ease-out: cubic-bezier(0.22, 0.9, 0.28, 1); /* @kind other */
+  --ease-in-out: cubic-bezier(0.5, 0, 0.5, 1); /* @kind other */
+  /* buttons shrink on press; circular icon buttons shrink harder */
+  --press-scale: 0.965; /* @kind other */
+  --press-scale-tight: 0.94; /* @kind other */
+  --enter-scale: 0.92; /* @kind other */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ease-spring: cubic-bezier(0.22, 0.9, 0.28, 1); /* @kind other */
+    --ease-spring-soft: cubic-bezier(0.22, 0.9, 0.28, 1); /* @kind other */
+    --press-scale: 1; /* @kind other */
+    --press-scale-tight: 1; /* @kind other */
+    --dur-sheet: 1ms; /* @kind other */
+  }
+}

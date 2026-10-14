@@ -1,0 +1,11 @@
+/* Discovery design system — token layer.
+   Fonts are loaded by next/font in app/fonts.ts, which sets --font-figtree
+   and --font-nunito; tokens/fonts.css consumes them. */
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radius.css";
+@import "./tokens/elevation.css";
+@import "./tokens/motion.css";
+@import "./tokens/base.css";

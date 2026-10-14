@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { callBackend } from "@/lib/backend";
+import { withConsoleGate } from "@/lib/console-gate";
 import type { RecognitionTask } from "@/lib/types";
 
-export async function POST(request: Request) {
+export const POST = withConsoleGate(async (request: Request) => {
   const body = await request.json().catch(() => null);
   const sourceUrl = typeof body?.source_url === "string" ? body.source_url.trim() : "";
   const bypassCache = body?.bypass_cache === true;
@@ -18,4 +19,4 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(call, { status: call.ok ? 200 : 502 });
-}
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Input, Label, Spinner, Switch, TextField } from "@heroui/react";
+import { Button, EmptyState, Icon, Switch } from "@/lib/discovery";
 import type {
   BackendCall,
   RecognitionResult,
@@ -9,14 +9,14 @@ import type {
   RecognitionTask,
 } from "@/lib/types";
 import { elapsedBetween } from "@/lib/format";
-import { BackendHealth } from "./_components/backend-health";
-import { CallLog } from "./_components/call-log";
-import { PhaseBreakdown } from "./_components/phase-breakdown";
-import { PlaceList } from "./_components/place-list";
-import { SourcePanel } from "./_components/source-panel";
-import { StatusHero } from "./_components/status-hero";
-import { PinIcon } from "./_components/icons";
-import { IconContext } from "@phosphor-icons/react";
+import { BackendHealth } from "./backend-health";
+import { CallLog } from "./call-log";
+import { PhaseBreakdown } from "./phase-breakdown";
+import { PlaceList } from "./place-list";
+import { SourcePanel } from "./source-panel";
+import { Spinner } from "./spinner";
+import { StatusHero } from "./status-hero";
+import { TextField } from "./text-field";
 
 const POLL_INTERVAL_MS = 1200;
 /** Stops a wedged run from polling forever. */
@@ -30,7 +30,7 @@ const TERMINAL: RecognitionStatus[] = [
   "cancelled",
 ];
 
-export default function RecognitionConsole() {
+export function RecognitionConsole() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [bypassCache, setBypassCache] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
@@ -139,75 +139,56 @@ export default function RecognitionConsole() {
   const places = result?.places ?? task?.places ?? [];
 
   return (
-    // One icon family, one weight, set once. Bold reads correctly at the 12-14px
-    // sizes this console uses; regular goes mushy below ~16px.
-    <IconContext.Provider value={{ weight: "bold", size: "1em" }}>
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-5 pb-20 pt-10 sm:pt-16">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[26px] font-semibold leading-none tracking-[-0.02em]">
+          <h1 className="ds-title-2">
             Recognition Console
           </h1>
-          <p className="text-[13px] text-muted">
+          <p className="text-caption text-grey-800">
             Instagram or TikTok link in, pipeline timings and venues out.
           </p>
         </div>
         <BackendHealth />
       </header>
 
-      <section className="surface-panel flex flex-col gap-4 rounded-2xl p-4">
+      <section className="surface-panel flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <TextField
-            className="min-w-0 flex-1"
-            isDisabled={isRunning}
+            disabled={isRunning}
+            label="Source URL"
             name="source_url"
-            onChange={setSourceUrl}
+            onChange={(event) => setSourceUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void run();
+            }}
+            placeholder="instagram.com/reel/… or tiktok.com/@user/video/…"
+            style={{ flex: 1, minWidth: 0 }}
             type="url"
             value={sourceUrl}
-          >
-            <Label className="text-[12px] font-medium text-muted">
-              Source URL
-            </Label>
-            <Input
-              className="w-full font-mono text-sm"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void run();
-              }}
-              placeholder="instagram.com/reel/… or tiktok.com/@user/video/…"
-            />
-          </TextField>
+          />
 
           <Button
-            className="press h-11 shrink-0 px-6"
-            isDisabled={!sourceUrl.trim() || isRunning}
-            onPress={() => void run()}
-            variant="primary"
+            disabled={!sourceUrl.trim() || isRunning}
+            leadingIcon={isRunning ? <Spinner label="Running" size={18} /> : null}
+            onClick={() => void run()}
+            size="lg"
+            style={{ flexShrink: 0 }}
           >
-            {isRunning ? (
-              <>
-                <Spinner size="sm" />
-                Running
-              </>
-            ) : (
-              "Run pipeline"
-            )}
+            {isRunning ? "Running" : "Run pipeline"}
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--console-hairline)] pt-3">
-          <Switch
-            isDisabled={isRunning}
-            isSelected={bypassCache}
-            onChange={setBypassCache}
-          >
-            <Switch.Content className="text-[13px]">
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              Bypass result cache
-            </Switch.Content>
-          </Switch>
-          <p className="text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-grey-200 pt-4">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-caption font-semibold">
+            <Switch
+              checked={bypassCache}
+              disabled={isRunning}
+              onChange={setBypassCache}
+            />
+            Bypass result cache
+          </label>
+          <p className="text-micro text-grey-800">
             Forces a genuine scrape, analysis, and match run.
           </p>
         </div>
@@ -215,9 +196,10 @@ export default function RecognitionConsole() {
 
       {fatalError ? (
         <div
-          className="animate-enter-rise rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          className="animate-enter-rise flex items-start gap-2 rounded-card bg-red-500/10 px-4 py-3 text-caption text-ink-primary"
           role="alert"
         >
+          <Icon className="mt-0.5 text-red-500" name="circle-alert" size={16} />
           {fatalError}
         </div>
       ) : null}
@@ -231,7 +213,7 @@ export default function RecognitionConsole() {
           wallClockMs={wallClockMs}
         />
       ) : (
-        <EmptyState />
+        <NoRunYet />
       )}
 
       {task ? <PhaseBreakdown isRunning={isRunning} task={task} /> : null}
@@ -246,28 +228,32 @@ export default function RecognitionConsole() {
 
       {calls.length > 0 ? <CallLog calls={calls} /> : null}
     </main>
-    </IconContext.Provider>
   );
 }
 
-function EmptyState() {
+function NoRunYet() {
   return (
-    <section className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--console-hairline)] px-6 py-14 text-center">
-      <span className="flex size-11 items-center justify-center rounded-full bg-white/5 text-muted/60">
-        <PinIcon className="size-5" />
-      </span>
-      <p className="text-sm font-medium">No run yet</p>
-      <p className="max-w-xs text-[13px] leading-relaxed text-muted">
-        Paste an Instagram or TikTok link above. Each stage, every request, and the
-        extracted venues appear here as the run progresses.
-      </p>
-    </section>
+    <EmptyState
+      className="rounded-card border-2 border-dashed border-bone-400"
+      headline="No run yet"
+      object={
+        <span className="flex size-14 items-center justify-center rounded-full bg-bone-300 text-cobalt-500">
+          <Icon name="map-pin" size={24} />
+        </span>
+      }
+      sub={
+        <span className="text-grey-800">
+          Paste an Instagram or TikTok link above. Each stage, every request,
+          and the extracted venues appear here as the run progresses.
+        </span>
+      }
+    />
   );
 }
 
 function EmptyPlaces() {
   return (
-    <section className="animate-enter-rise surface-panel rounded-2xl px-4 py-6 text-center text-sm text-muted">
+    <section className="animate-enter-rise surface-panel px-4 py-6 text-center text-caption text-grey-800">
       Pipeline completed but extracted no venues from this post.
     </section>
   );

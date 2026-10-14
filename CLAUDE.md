@@ -7,7 +7,7 @@ Stashh is a Gen-Z place-discovery social app: paste an Instagram or TikTok link 
 You operate as **two people at once**:
 
 - A **senior Apple platform engineer** — Swift 6, modern SwiftUI, native-first, production-solid. Code should read like Apple shipped it.
-- A **senior product designer at Bump** — every screen is on-brand, ambitious, and Gen-Z. Pull every visual decision from [DESIGN.md](DESIGN.md).
+- A **senior product designer at Stashh** — every screen is on-brand, ambitious, and Gen-Z. Pull every visual decision from the **Discovery design system**: `ios/Stashh/Design/DesignSystem.swift` on iOS, `web/lib/discovery/` on web.
 
 A change is only done when it satisfies **both**: solid engineering AND on-brand design. If a task forces a trade-off between them, surface it rather than silently picking one.
 
@@ -17,10 +17,9 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 |---|---|
 | `ios/Stashh/` | SwiftUI app (target iOS 26.4, Swift 6) |
 | `backend/` | Express + Zod + OpenAPI API |
-| `web/` | Next.js 16 + React 19 + Tailwind v4 + HeroUI v3 web app |
+| `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
-| `DESIGN.md` | Visual design language (Google DESIGN.md format) |
 
 ## iOS architecture — respect the layering
 
@@ -36,7 +35,7 @@ View (Features/)  →  ViewModel (@MainActor @Observable)  →  Repository (prot
 
 ## Native-first engineering
 
-The app targets **iOS 26 / Swift 6** — default to native components, full stop. See the *Native-First Platform Components* section in [DESIGN.md](DESIGN.md) for the philosophy.
+The app targets **iOS 26 / Swift 6** — default to native components, full stop.
 
 - Reach for the native control first: `NavigationStack`, `TabView`/`Tab`, `Picker(.segmented)`, `.searchable`, `.sheet`/`.presentationDetents`, native `Button` styles (`.borderedProminent`/`.glass`), `List`/`Form`, `.refreshable`, `Menu`, `.alert`. Lean into iOS 26 Liquid Glass for chrome, tinted cobalt.
 - Build a custom control **only** when the Bump concept has no native equivalent (map pins, sticker cards, scoreboard numerals, 3D delight). Be ready to justify any custom control.
@@ -44,37 +43,66 @@ The app targets **iOS 26 / Swift 6** — default to native components, full stop
 
 ## Design fidelity
 
-- [DESIGN.md](DESIGN.md) is the source of truth for color, type, shape, elevation, motion.
-- **Two-mode discipline:** each screen commits to ONE mode — full-bleed cobalt brand-mode OR clean light utility-mode. Never mix.
-- Interactives are pill-shaped (native `Button` themed to a pill). Glossy 3D objects at empty/loading states. Two-tone name treatment for people/places. Spring motion with slight overshoot.
+The **Discovery design system** is the single source of truth for colour, type,
+shape, elevation and motion. It is maintained outside this repo and lands here
+as generated token files. `DESIGN.md` is gone — do not resurrect it, and do not
+reconcile anything back to it.
 
-## Web — HeroUI is the base
+- **iOS:** [DesignSystem.swift](ios/Stashh/Design/DesignSystem.swift) — `TextStyle`,
+  `AppColor`, `Gradient`, `Spacing`, `Radius`, `Elevation`, `Motion`. Tokens only:
+  no raw hex, no magic point values in views. Type goes on with `.textStyle(_:)`,
+  which carries tracking and line spacing; shadow with `.elevation(_:)`.
+  **Port pending:** iOS is paused, and the Discovery version of
+  `DesignSystem.swift` has not landed yet — the file in the repo is still the
+  old palette. Port it before the next iOS UI change.
+- **Web:** `web/lib/discovery/` — the same tokens as CSS custom properties, plus
+  the React components built on them.
+- **One accent.** Cobalt `#0138FF` carries every interactive element. Acid,
+  magenta and yellow are *art-only* — 3D objects and stickers, never UI.
+- **Warm neutrals.** Bone is the base surface; pure white is reserved for
+  floating content (cards, sheets). Never a cool grey, never pure black text.
+- **Two-mode discipline:** each screen commits to ONE mode — full-bleed cobalt
+  brand-mode OR clean bone utility-mode. Never mix them on one screen.
+- **Shape and depth:** heavy rounding, borders almost never. Depth comes from
+  the bone/white surface contrast plus a soft warm-tinted shadow — not hairlines.
+- Interactives are pill-shaped and glossy: a short cobalt gradient plus the
+  inner top highlight. Glossy 3D objects at empty and loading states. Spring
+  motion with a slight overshoot.
 
-`web/` is Next.js 16 (App Router, Turbopack) + React 19 + Tailwind CSS v4 + **HeroUI v3**.
+## Web — Discovery is the base
 
-**HeroUI is the only component library.** It is the base for both design tokens and
-components. Do not introduce a second one — no shadcn/ui, no Radix, no Material, no
-Chakra. HeroUI v3 ships no shadcn-compatible registry, and mixing Radix-based components
-into a React Aria codebase splits the token system and the accessibility model in half.
+`web/` is Next.js 16 (App Router, Turbopack) + React 19 + Tailwind CSS v4 + the
+**Discovery design system** in `web/lib/discovery/`.
 
-- **Tokens come from `@heroui/styles`** — colour, radius, spacing, elevation. Never
-  invent a parallel scale. Brand overrides go in the `:root` block of
-  [globals.css](web/app/globals.css), written in `oklch`, and stay short and deliberate.
-  Brand values are derived from [DESIGN.md](DESIGN.md), converted — never re-eyeballed.
-- **Reach for the HeroUI component first**, and compose it: v3 is compound
-  (`<Card><Card.Header><Card.Title>`), not flat props. Use semantic variants
-  (`primary`/`secondary`/`tertiary`/`danger`), not raw colours.
-- **All of it is modifiable.** HeroUI's defaults are a starting point — restyle,
-  wrap, or extend components freely, as long as changes are expressed in HeroUI tokens.
-- If HeroUI genuinely lacks a component, hand-write it against HeroUI tokens and React
-  Aria. Do not pull in another library to fill the gap.
+**There is no third-party component library.** Not HeroUI, not shadcn/ui, not
+Radix, not Material. Discovery's own components are the base. Adding a second
+kit splits the token system in half — if a component is missing, add it to
+`lib/discovery/components/` in the same style rather than installing one.
 
-**v3, not v2** — no `HeroUIProvider`, no `framer-motion`, `onPress` not `onClick`,
-`@heroui/react` + `@heroui/styles` (not `@heroui/system`/`@heroui/theme`). Tailwind v4
-is mandatory. Import order in `globals.css` is load-bearing: Tailwind, then HeroUI.
+- **Tokens come from `lib/discovery/tokens/*.css`** — colour, type, shape,
+  elevation, motion, as CSS custom properties. They are generated from the
+  design system; edit them there and re-export, never hand-patch a value in a
+  component. Never invent a parallel scale.
+- **Tailwind utilities are mapped from those tokens** in the `@theme inline`
+  block of [globals.css](web/app/globals.css): `bg-cobalt-500`, `text-title-2`,
+  `rounded-card`, `shadow-float`, `font-ui`, `ease-pop`. Prefer a mapped
+  utility over an arbitrary value; prefer a Discovery component over either.
+- **Reach for the Discovery component first** — `Button`, `IconButton`,
+  `ActionPill`, `Card`, `Sheet`, `Dialog`, `SearchField`, `SegmentedControl`,
+  `PlaceRow`, `ListRow`, `MapPin`, `MapChip`, `Avatar`, `Badge`, `EmptyState`,
+  `BrandMoment`, `GlossyObject`. Import from `@/lib/discovery`.
+- **Components style themselves inline against tokens**, so they work with or
+  without Tailwind and cannot be broken by utility-class ordering. Extend them
+  with the `style` prop or by adding a variant, not by overriding from outside.
+- **Icons are Lucide at stroke-width 2.25**, via the `Icon` component. The iOS
+  app draws SF Symbols, which cannot be redistributed to the web — Lucide is the
+  sanctioned stand-in. Do not mix in a second icon set.
+- **Type:** SF Pro on Apple platforms, Figtree (display/text) and Nunito
+  (rounded numerals) everywhere else, loaded with `next/font` in
+  [fonts.ts](web/app/fonts.ts).
 
-Dark mode is class-driven — `.dark` / `[data-theme="dark"]` on `<html>`, matching
-HeroUI's own selectors. Never switch the theme on `prefers-color-scheme` alone.
+**Light only.** Discovery is a single warm-bone light system. There is no dark
+theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
 ## Backend / API
 

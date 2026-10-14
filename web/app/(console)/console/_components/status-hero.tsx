@@ -2,7 +2,7 @@
 
 import type { RecognitionStatus, RecognitionTask } from "@/lib/types";
 import { elapsedBetween, formatDuration } from "@/lib/format";
-import { AlertIcon, BoltIcon, CheckIcon } from "./icons";
+import { Icon } from "@/lib/discovery";
 
 const LABEL: Record<RecognitionStatus, string> = {
   queued: "Queued",
@@ -42,32 +42,37 @@ export function StatusHero({
   const queueMs = elapsedBetween(task.created_at, task.started_at);
   const workMs = elapsedBetween(task.started_at, task.finished_at);
 
-  const accentText =
+  // Green and red fail AA as text on white, so they colour the glyph only;
+  // the label stays ink. Cobalt (7:1 on white) can carry both.
+  const glyphColour =
     colour === "success"
-      ? "text-success"
+      ? "text-green-600"
       : colour === "danger"
-        ? "text-danger"
-        : "text-accent-strong";
+        ? "text-red-500"
+        : "text-cobalt-500";
+  const labelColour = colour === "accent" ? "text-cobalt-500" : "text-ink-primary";
 
   return (
-    <section className="surface-hero animate-enter-rise overflow-hidden rounded-3xl">
+    <section className="surface-hero animate-enter-rise overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-6 p-6">
         <div className="flex flex-col gap-3">
-          <div className={`flex items-center gap-2 text-sm font-medium ${accentText}`}>
-            <StatusGlyph status={status} isRunning={isRunning} />
+          <div className={`flex items-center gap-2 text-caption font-semibold ${labelColour}`}>
+            <span className={glyphColour}>
+              <StatusGlyph status={status} isRunning={isRunning} />
+            </span>
             {LABEL[status]}
           </div>
 
           <div className="flex items-baseline gap-2">
-            <span className="numerals-display text-5xl font-semibold sm:text-6xl">
+            <span className="numerals-display text-5xl sm:text-6xl">
               {formatDuration(wallClockMs).replace(/[a-z]+$/i, "")}
             </span>
-            <span className="text-xl font-medium text-muted">
+            <span className="text-headline font-semibold text-grey-800">
               {formatDuration(wallClockMs).match(/[a-z]+$/i)?.[0] ?? ""}
             </span>
           </div>
 
-          <p className="font-mono text-xs text-muted">{task.recognition_id}</p>
+          <p className="font-mono text-micro text-grey-800">{task.recognition_id}</p>
         </div>
 
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
@@ -86,14 +91,14 @@ export function StatusHero({
       </div>
 
       {task.error_message ? (
-        <p className="flex items-start gap-2 border-t border-danger/25 bg-danger/10 px-6 py-3 text-sm text-danger">
-          <AlertIcon className="mt-0.5" />
+        <p className="flex items-start gap-2 bg-red-500/10 px-6 py-3 text-caption text-ink-primary">
+          <Icon className="mt-0.5 text-red-500" name="circle-alert" size={16} />
           {task.error_message}
         </p>
       ) : null}
 
       {task.retry_count > 0 ? (
-        <p className="border-t border-warning/25 bg-warning/10 px-6 py-2 text-xs text-warning">
+        <p className="bg-amber-500/15 px-6 py-2 text-micro text-ink-primary">
           Retried {task.retry_count}{" "}
           {task.retry_count === 1 ? "time" : "times"}.
         </p>
@@ -109,9 +114,19 @@ function StatusGlyph({
   status: RecognitionStatus;
   isRunning: boolean;
 }) {
-  if (status === "failed" || status === "expired") return <AlertIcon />;
-  if (status === "completed" || status === "committed") return <CheckIcon />;
-  return <BoltIcon className={isRunning ? "animate-pulse" : ""} />;
+  if (status === "failed" || status === "expired") {
+    return <Icon name="circle-alert" size={16} />;
+  }
+  if (status === "completed" || status === "committed") {
+    return <Icon name="check" size={16} />;
+  }
+  return (
+    <Icon
+      className={isRunning ? "animate-pulse motion-reduce:animate-none" : ""}
+      name="zap"
+      size={16}
+    />
+  );
 }
 
 function Metric({
@@ -125,12 +140,12 @@ function Metric({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-muted">
+      <dt className="ds-section-label text-grey-800">
         {label}
       </dt>
       <dd
-        className={`numerals-display text-lg font-semibold ${
-          emphasised ? "text-accent-strong" : ""
+        className={`numerals-display text-headline ${
+          emphasised ? "text-cobalt-500" : ""
         }`}
       >
         {value}

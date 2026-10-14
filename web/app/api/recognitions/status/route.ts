@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { callBackend } from "@/lib/backend";
+import { withConsoleGate } from "@/lib/console-gate";
 import type { RecognitionResult, RecognitionTask } from "@/lib/types";
 
-export async function GET(request: Request) {
+export const GET = withConsoleGate(async (request: Request) => {
   const id = new URL(request.url).searchParams.get("id");
 
   if (!id) {
@@ -22,4 +23,4 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ status, result }, { status: 200 });
-}
+});

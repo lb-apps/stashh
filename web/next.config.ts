@@ -1,3 +1,4 @@
+import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -8,4 +9,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// The legal pages import their copy from `.mdx` files; elements are mapped to
+// Discovery in `mdx-components.tsx`. Plugins are named by string so Turbopack
+// can serialise them. GFM turns the bare e-mail addresses into mailto links.
+const withMDX = createMDX({
+  options: {
+    remarkPlugins: ["remark-gfm"],
+  },
+});
+
+export default withMDX(nextConfig);

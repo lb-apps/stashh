@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Badge, Icon } from "@/lib/discovery";
 import type { RecognitionResult } from "@/lib/types";
 import { SectionTitle } from "./section-title";
-import { ChevronIcon } from "./icons";
 
 const CLAMP_LENGTH = 260;
 
@@ -21,25 +21,25 @@ export function SourcePanel({ result }: { result: RecognitionResult }) {
     <section className="animate-enter-rise flex flex-col gap-3">
       <SectionTitle trailing={`${caption.length} chars`}>Scraped source</SectionTitle>
 
-      <div className="surface-panel overflow-hidden rounded-2xl">
+      <div className="surface-panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 pb-3 pt-4">
-          <Pill tone="neutral">{result.source_type}</Pill>
-          <Pill tone={result.video_url ? "success" : "danger"}>
+          <Badge tone="grey">{result.source_type}</Badge>
+          <Badge tone={result.video_url ? "cobaltSoft" : "amberSoft"}>
             {result.video_url ? "video resolved" : "no video"}
-          </Pill>
-          <Pill tone={caption ? "success" : "warning"}>
+          </Badge>
+          <Badge tone={caption ? "cobaltSoft" : "amberSoft"}>
             {caption ? "caption found" : "no caption"}
-          </Pill>
+          </Badge>
         </div>
 
         {caption ? (
           <div className="px-4 pb-4">
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/85">
+            <p className="whitespace-pre-wrap text-caption leading-relaxed">
               {visible}
             </p>
             {isLong ? (
               <button
-                className="mt-2 cursor-pointer text-xs font-medium text-accent-strong transition-opacity duration-150 hover:opacity-80"
+                className="mt-1 min-h-11 cursor-pointer text-micro font-semibold text-cobalt-500 transition-opacity duration-150 hover:opacity-70"
                 onClick={() => setShowFullCaption((value) => !value)}
                 type="button"
               >
@@ -48,7 +48,7 @@ export function SourcePanel({ result }: { result: RecognitionResult }) {
             ) : null}
           </div>
         ) : (
-          <p className="px-4 pb-4 text-[13px] text-muted">
+          <p className="px-4 pb-4 text-caption text-grey-800">
             No caption was extracted from this post.
           </p>
         )}
@@ -57,20 +57,22 @@ export function SourcePanel({ result }: { result: RecognitionResult }) {
           <>
             <button
               aria-expanded={showVideoUrl}
-              className="flex w-full cursor-pointer items-center gap-2 border-t border-[var(--console-hairline)] px-4 py-2.5 text-left transition-colors duration-150 hover:bg-white/4"
+              className="flex min-h-11 w-full cursor-pointer items-center gap-2 border-t border-grey-200 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-grey-100"
               onClick={() => setShowVideoUrl((value) => !value)}
               type="button"
             >
-              <span className="flex-1 text-xs text-muted">Resolved video URL</span>
-              <ChevronIcon
-                className={`size-3.5 text-muted transition-transform duration-200 ease-out ${
+              <span className="flex-1 text-micro text-grey-800">Resolved video URL</span>
+              <Icon
+                className={`text-grey-800 transition-transform duration-200 ease-out ${
                   showVideoUrl ? "rotate-90" : ""
                 }`}
+                name="chevron-right"
+                size={14}
               />
             </button>
             {showVideoUrl ? (
               <div className="animate-enter-rise px-4 pb-4">
-                <p className="break-all rounded-xl bg-black/25 p-3 font-mono text-[11px] leading-relaxed text-foreground/70">
+                <p className="break-all rounded-sm bg-grey-100 p-3 font-mono text-nano leading-relaxed text-grey-800">
                   {result.video_url}
                 </p>
               </div>
@@ -79,28 +81,5 @@ export function SourcePanel({ result }: { result: RecognitionResult }) {
         ) : null}
       </div>
     </section>
-  );
-}
-
-function Pill({
-  children,
-  tone,
-}: {
-  children: React.ReactNode;
-  tone: "neutral" | "success" | "warning" | "danger";
-}) {
-  const tones = {
-    neutral: "bg-white/6 text-muted",
-    success: "bg-success/12 text-success",
-    warning: "bg-warning/12 text-warning",
-    danger: "bg-danger/12 text-danger",
-  };
-
-  return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tones[tone]}`}
-    >
-      {children}
-    </span>
   );
 }

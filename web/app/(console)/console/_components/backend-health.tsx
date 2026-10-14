@@ -36,20 +36,20 @@ export function BackendHealth() {
 
   return (
     <span
-      className="flex items-center gap-2 rounded-full border border-[var(--console-hairline)] bg-white/4 px-3 py-1.5 text-xs"
+      className="flex items-center gap-2 rounded-full bg-surface-card px-3 py-1.5 text-micro shadow-card"
       title={health?.target || "backend"}
     >
       <span
         aria-hidden
-        className={`size-1.5 rounded-full transition-colors duration-300 ${
-          !health ? "bg-muted/50" : reachable ? "bg-success" : "bg-danger"
+        className={`size-2 rounded-full transition-colors duration-300 ${
+          !health ? "bg-grey-500" : reachable ? "bg-green-500" : "bg-red-500"
         }`}
       />
-      <span className={reachable ? "text-muted" : "text-danger"}>
+      <span className={reachable ? "text-grey-800" : "font-semibold text-ink-primary"}>
         {!health ? "checking" : reachable ? "backend" : "unreachable"}
       </span>
       {health && reachable ? (
-        <span className="font-mono tabular-nums text-muted">
+        <span className="font-mono tabular-nums text-grey-800">
           {health.durationMs}ms
         </span>
       ) : null}

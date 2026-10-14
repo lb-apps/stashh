@@ -3,7 +3,7 @@
 import type { RecognitionTask } from "@/lib/types";
 import { elapsedBetween, formatClock, formatDuration } from "@/lib/format";
 import { SectionTitle } from "./section-title";
-import { CheckIcon } from "./icons";
+import { Icon } from "@/lib/discovery";
 
 type PhaseState = "pending" | "active" | "done" | "failed";
 
@@ -74,11 +74,11 @@ export function PhaseBreakdown({
     <section className="flex flex-col gap-3">
       <SectionTitle>Pipeline</SectionTitle>
 
-      <div className="surface-panel rounded-2xl p-2">
+      <div className="surface-panel p-2">
         <ol className="flex flex-col">
           {phases.map((phase, index) => (
             <li
-              className="animate-enter-rise relative flex gap-4 rounded-xl px-4 py-3.5"
+              className="animate-enter-rise relative flex gap-4 px-4 py-3.5"
               key={phase.key}
               style={{ animationDelay: `${index * 60}ms` }}
             >
@@ -86,7 +86,7 @@ export function PhaseBreakdown({
               {index < phases.length - 1 ? (
                 <span
                   aria-hidden
-                  className="absolute left-[27px] top-9 h-[calc(100%-1rem)] w-px bg-[var(--console-hairline)]"
+                  className="absolute left-[27px] top-9 h-[calc(100%-1rem)] w-px bg-grey-300"
                 />
               ) : null}
 
@@ -94,10 +94,10 @@ export function PhaseBreakdown({
 
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-medium">{phase.label}</span>
-                  <span className="shrink-0 font-mono text-xs tabular-nums">
+                  <span className="text-caption font-semibold">{phase.label}</span>
+                  <span className="shrink-0 font-mono text-micro tabular-nums">
                     {phase.state === "active" ? (
-                      <span className="text-accent-strong">running</span>
+                      <span className="text-cobalt-500">running</span>
                     ) : (
                       formatDuration(phase.durationMs)
                     )}
@@ -111,8 +111,8 @@ export function PhaseBreakdown({
                 />
 
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-xs text-muted">{phase.hint}</span>
-                  <span className="shrink-0 font-mono text-[11px] text-muted">
+                  <span className="truncate text-micro text-grey-800">{phase.hint}</span>
+                  <span className="shrink-0 font-mono text-nano text-grey-800">
                     {formatClock(phase.at)}
                   </span>
                 </div>
@@ -122,8 +122,8 @@ export function PhaseBreakdown({
         </ol>
       </div>
 
-      <p className="px-1 text-xs leading-relaxed text-muted">
-        Per-stage timings inside <span className="text-foreground">Processing</span>{" "}
+      <p className="px-1 text-micro leading-relaxed text-grey-800">
+        Per-stage timings inside <span className="font-semibold text-ink-primary">Processing</span>{" "}
         go to the worker&rsquo;s server log, not the API. The console reports only what
         the backend actually returns.
       </p>
@@ -134,28 +134,28 @@ export function PhaseBreakdown({
 function PhaseNode({ state }: { state: PhaseState }) {
   if (state === "done") {
     return (
-      <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
-        <CheckIcon className="size-3.5" />
+      <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-green-500 text-surface-card">
+        <Icon name="check" size={14} />
       </span>
     );
   }
   if (state === "failed") {
     return (
-      <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-danger/15">
-        <span className="size-2 rounded-full bg-danger" />
+      <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-red-500/15">
+        <span className="size-2 rounded-full bg-red-500" />
       </span>
     );
   }
   if (state === "active") {
     return (
-      <span className="animate-node-pulse relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/20">
-        <span className="size-2 rounded-full bg-accent" />
+      <span className="animate-node-pulse relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-cobalt-100">
+        <span className="size-2 rounded-full bg-cobalt-500" />
       </span>
     );
   }
   return (
-    <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-white/5">
-      <span className="size-1.5 rounded-full bg-muted/50" />
+    <span className="relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-grey-200">
+      <span className="size-1.5 rounded-full bg-grey-500" />
     </span>
   );
 }
@@ -173,8 +173,8 @@ function PhaseBar({
 
   if (state === "active") {
     return (
-      <div className="h-1 overflow-hidden rounded-full bg-white/5">
-        <div className="animate-rail-sweep h-full w-1/3 rounded-full bg-accent" />
+      <div className="h-1 overflow-hidden rounded-full bg-grey-200">
+        <div className="animate-rail-sweep h-full w-1/3 rounded-full bg-cobalt-500" />
       </div>
     );
   }
@@ -182,10 +182,10 @@ function PhaseBar({
   const pct = slowest > 0 && durationMs ? Math.max(2, (durationMs / slowest) * 100) : 0;
 
   return (
-    <div className="h-1 overflow-hidden rounded-full bg-white/5">
+    <div className="h-1 overflow-hidden rounded-full bg-grey-200">
       <div
         className={`h-full rounded-full transition-[width] duration-500 ease-out ${
-          state === "failed" ? "bg-danger" : "bg-accent/70"
+          state === "failed" ? "bg-red-500" : "bg-cobalt-500/70"
         }`}
         style={{ width: `${pct}%` }}
       />
