@@ -54,19 +54,19 @@ export function KpiCard({
   badge?: ReactNode;
 }) {
   return (
-    <Card className="@container/kpi gap-3 overflow-hidden pb-0">
+    <Card className="@container/kpi gap-3 overflow-hidden pt-5 pb-0">
       <CardHeader>
-        <CardDescription className="flex items-center gap-1.5">
-          <Icon aria-hidden className="size-4" />
+        <CardDescription className="micro-label flex items-center gap-1.5">
+          <Icon aria-hidden className="size-3.5" />
           {label}
         </CardDescription>
-        <CardTitle className="font-heading text-2xl font-semibold tracking-tight tabular-nums @[230px]/kpi:text-3xl">{value}</CardTitle>
+        <CardTitle className="numeric pt-1 text-[28px] leading-none font-black tracking-[-0.02em] @[230px]/kpi:text-[34px]">{value}</CardTitle>
         <CardAction>{trend ? <TrendBadge trend={trend} /> : badge}</CardAction>
       </CardHeader>
       {/* Context under the number, not a separate band (this style's footer is a grey strip). */}
-      <CardFooter className="flex-col items-start gap-1 rounded-none border-t-0 bg-transparent py-0 text-sm">
+      <CardFooter className="flex-col items-start gap-1 text-caption">
         {detail && <p className="line-clamp-1 text-muted-foreground tabular-nums">{detail}</p>}
-        {trend?.change != null && trendCaption && <p className="text-xs text-muted-foreground">{trendCaption}</p>}
+        {trend?.change != null && trendCaption && <p className="text-xs text-micro">{trendCaption}</p>}
       </CardFooter>
       {spark && spark.length > 1 ? <Sparkline values={spark} tone={sparkTone} /> : <div className="h-3" />}
     </Card>
@@ -80,7 +80,7 @@ export function KpiCardSkeleton() {
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-20" />
       </CardHeader>
-      <CardFooter className="flex-col items-start gap-2 rounded-none border-t-0 bg-transparent">
+      <CardFooter className="flex-col items-start gap-2">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="h-10 w-full" />
       </CardFooter>

@@ -19,7 +19,7 @@ export function Panel({
   return (
     <Card className={cn("min-w-0", className)}>
       <CardHeader>
-        <CardTitle className="font-heading text-base font-semibold">{title}</CardTitle>
+        <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
         {action && <CardAction>{action}</CardAction>}
       </CardHeader>

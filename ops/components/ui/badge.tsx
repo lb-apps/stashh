@@ -1,28 +1,29 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
+/**
+ * Discovery's inline pill badge: 20px, 11px heavy uppercase, the inner highlight. Tones
+ * follow the console kit — cobalt-soft for done, amber-soft for waiting or review, grey
+ * for nothing found. Discovery has no red fill, so a failure is a grey pill with a red
+ * mark and ink text.
+ */
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full px-2 font-heading text-nano uppercase whitespace-nowrap gloss transition-colors focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-cobalt-300 [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        secondary:
-          "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
-        destructive:
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
-        outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
-        ghost:
-          "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
-        link: "text-primary underline-offset-4 hover:underline",
-        // Status badges: a soft fill carries the hue, the text stays ink for contrast.
-        success: "bg-success-soft text-foreground",
-        warning: "bg-warning-soft text-foreground",
-        danger: "bg-danger/12 text-foreground",
-        info: "bg-accent text-accent-foreground",
+        default: "bg-cobalt-500 text-white",
+        secondary: "bg-grey-300 text-muted-foreground",
+        outline: "bg-grey-100 text-muted-foreground",
+        ghost: "bg-transparent text-muted-foreground shadow-none",
+        link: "bg-transparent text-primary underline-offset-4 shadow-none hover:underline",
+        success: "bg-cobalt-100 text-cobalt-600",
+        info: "bg-cobalt-500 text-white",
+        warning: "bg-amber-100 text-amber-ink",
+        danger: "bg-grey-300 text-foreground before:size-1.5 before:rounded-full before:bg-danger before:content-['']",
+        destructive: "bg-grey-300 text-foreground before:size-1.5 before:rounded-full before:bg-danger before:content-['']",
       },
     },
     defaultVariants: {

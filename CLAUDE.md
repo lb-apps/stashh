@@ -115,11 +115,22 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
 
 - **shadcn/ui is allowed here and only here.** `web/` stays Discovery-only. The exception holds
   because `ops/` is a separate app with its own component kit, so web's token system is not split.
-- **The palette is still Discovery.** `ops/app/globals.css` imports
-  `web/lib/discovery/tokens/*.css` (never copies) and maps shadcn's variables onto them. Light
-  only. Depth via the `depth-card` utility (Discovery `--sh-card`), not hairlines.
-- Status hues (green, red, amber) are for marks and badge fills; status text stays ink, because
-  they sit under 4.5:1 on white. Muted text is `grey-800`, not Discovery's lighter `grey-600`.
+- **Design language = Discovery's Recognition console kit** (`ui_kits/web_console/` in the
+  Discovery Design System project on Claude Design): utility mode only, bone page, white cards at
+  `rounded-card` (24px), no borders, heavy display page titles, uppercase `micro-label`s for
+  column heads and metadata, rounded black numerals (`numeric`), glossy cobalt pills
+  (`fill-primary`), segmented controls for every filter, the run detail docked beside the runs
+  table at ≥1280px (Sheet below). Check the kit before adding a screen.
+- **Tokens come from web.** `ops/app/globals.css` imports `web/lib/discovery/tokens/*.css`
+  (never copies; `base.css` left out) and maps shadcn's variables onto them. Light only. The
+  shadcn primitives in `ops/components/ui/` are restyled to the kit, not replaced.
+- `ops/lib/utils.ts` configures `cn` with Discovery's type, radius and depth scales — without it
+  the merger drops `text-display` beside a text colour. Import `cn` from `@/lib/utils`, never `"cn"`.
+- Focus is an outline (`outline-solid outline-3 outline-cobalt-300`), never a ring: fills carry
+  their own box-shadow and would swallow it.
+- Text greys, by the owner's call: secondary `grey-800`, micro-labels `--micro-foreground`
+  #6E6B66 (the kit's lighter greys miss 4.5:1). Status hues are marks and soft badge fills;
+  Discovery has no red fill — a failure is a grey pill with a red dot.
 - Metrics come from `recognition_runs` (one row per worker attempt: step timings, fetch method,
   model usage and cost), `recognition_results.source_thumbnail_url` (covers in the public
   `source-thumbnails` bucket) and `instagram_messages.intent` / `finished_at`. Add a metric there,

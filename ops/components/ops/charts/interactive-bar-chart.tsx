@@ -37,9 +37,9 @@ export function InteractiveBarChart<K extends string>({
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="flex flex-col items-stretch gap-0 border-b p-0! sm:flex-row">
-        <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:py-5">
-          <CardTitle className="font-heading text-base font-semibold">{title}</CardTitle>
+      <CardHeader className="flex flex-col items-stretch gap-0 p-0! sm:flex-row">
+        <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-5 pb-3 sm:py-5">
+          <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </div>
         <div className="grid grid-cols-2 sm:flex" role="tablist" aria-label="Metric shown">
@@ -51,10 +51,10 @@ export function InteractiveBarChart<K extends string>({
               aria-selected={m.key === active}
               data-active={m.key === active}
               onClick={() => setActive(m.key)}
-              className="relative flex flex-col justify-center gap-1 border-t px-5 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring data-[active=true]:bg-accent sm:border-t-0 sm:border-l sm:px-6 sm:py-5"
+              className="relative flex flex-col justify-center gap-1.5 px-5 py-3 text-left transition-colors hover:bg-grey-100 focus-visible:z-10 focus-visible:outline-solid focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-cobalt-300 data-[active=true]:bg-cobalt-50 data-[active=true]:[&>span:first-child]:text-cobalt-600 sm:px-6 sm:py-5"
             >
-              <span className="text-xs text-muted-foreground">{m.label}</span>
-              <span className="font-heading text-lg leading-none font-semibold tabular-nums sm:text-2xl">{m.total}</span>
+              <span className="micro-label">{m.label}</span>
+              <span className="numeric text-lg leading-none font-black sm:text-[28px]">{m.total}</span>
             </button>
           ))}
         </div>

@@ -22,6 +22,7 @@ import { CHANNEL, FETCH_METHOD, SOURCE_TYPE, stepLabel } from "@/lib/labels";
 import { PREVIOUS_LABELS, type InstagramOps, type RecognitionOps } from "@/lib/ops-types";
 import { trend } from "@/lib/trend";
 import { DonutChart } from "./charts/donut-chart";
+import { CATEGORY_COLORS } from "./charts/shared";
 import { HorizontalBarChart } from "./charts/horizontal-bar-chart";
 import { RadialGauge } from "./charts/radial-gauge";
 import { KpiCard, KpiCardSkeleton, KpiGrid } from "./kpi-card";
@@ -31,7 +32,6 @@ import { StatGrid } from "./stat-grid";
 import { EmptyState } from "./states";
 
 const ratio = (part: number, whole: number) => (whole > 0 ? part / whole : null);
-const SOURCE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 export function KpiGridSkeleton({ count = 4 }: { count?: number }) {
   return (
@@ -221,7 +221,7 @@ export function SourceMixPanel({ ops, className }: { ops: RecognitionOps; classN
     key: item.type,
     label: SOURCE_TYPE[item.type],
     value: item.count,
-    color: SOURCE_COLORS[index % SOURCE_COLORS.length]!,
+    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]!,
   }));
   return (
     <Panel title="Source type" description="What was shared" className={className}>
@@ -235,7 +235,7 @@ export function ChannelMixPanel({ ops, className }: { ops: RecognitionOps; class
     key: item.channel,
     label: `${CHANNEL[item.channel]} · ${formatInt(item.users)} people`,
     value: item.count,
-    color: SOURCE_COLORS[index % SOURCE_COLORS.length]!,
+    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]!,
   }));
   return (
     <Panel title="Channel" description="Where requests came from" className={className}>

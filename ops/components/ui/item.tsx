@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
 import { Separator } from "@/components/ui/separator"
@@ -40,7 +40,7 @@ const itemVariants = cva(
       variant: {
         default: "border-transparent",
         outline: "border-border",
-        muted: "border-transparent bg-muted/50",
+        muted: "rounded-tile border-transparent bg-grey-100",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",

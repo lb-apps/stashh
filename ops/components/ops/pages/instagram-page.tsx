@@ -9,11 +9,14 @@ import { DM_CONTENT, intentLabel } from "@/lib/labels";
 import { PREVIOUS_LABELS, RANGE_LABELS, type InstagramOps } from "@/lib/ops-types";
 import { trend } from "@/lib/trend";
 import { DonutChart } from "../charts/donut-chart";
+import { CATEGORY_COLORS } from "../charts/shared";
 import { HorizontalBarChart } from "../charts/horizontal-bar-chart";
 import { MultiLineChart } from "../charts/multi-line-chart";
 import { RadialGauge } from "../charts/radial-gauge";
 import { StackedAreaChart } from "../charts/stacked-area-chart";
 import { KpiCard, KpiGrid } from "../kpi-card";
+import { useOpsControls } from "../ops-provider";
+import { PageHeader } from "../page-header";
 import { Panel } from "../panel";
 import { DmKpis, KpiGridSkeleton, PanelSkeleton } from "../sections";
 import { StatGrid } from "../stat-grid";
@@ -30,7 +33,6 @@ const messagesConfig = {
   open: { label: "Open", color: "var(--chart-4)" },
 };
 const replyConfig = { reply_p50_ms: { label: "Reply time p50", color: "var(--chart-1)" } };
-const CONTENT_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function TokenPanel({ account }: { account: InstagramOps["stats"]["account"] }) {
   const now = useNow();
@@ -49,10 +51,15 @@ function TokenPanel({ account }: { account: InstagramOps["stats"]["account"] }) 
 
 export function InstagramPage() {
   const { data: ig, error } = useInstagramOps();
+  const { range } = useOpsControls();
+  const header = (
+    <PageHeader title="Instagram DMs" description={`Last ${RANGE_LABELS[range]} of the DM channel: messages, replies and what went unanswered.`} />
+  );
 
   if (!ig) {
     return (
       <>
+        {header}
         {error && <ServiceError error={error} />}
         <KpiGridSkeleton count={8} />
         <PanelSkeleton />
@@ -67,6 +74,7 @@ export function InstagramPage() {
 
   return (
     <>
+      {header}
       {error && <ServiceError error={error} />}
       <KpiGrid>
         <KpiCard
@@ -123,7 +131,7 @@ export function InstagramPage() {
               key: item.content,
               label: DM_CONTENT[item.content],
               value: item.count,
-              color: CONTENT_COLORS[index % CONTENT_COLORS.length]!,
+              color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]!,
             }))}
           />
         </Panel>

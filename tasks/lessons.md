@@ -58,3 +58,15 @@ exists after switching branches before reporting the switch as done.
 ## 2026-10-14 — Design source for new surfaces
 - **Mistake:** built the ops dashboard's palette and design language from `web/lib/discovery/tokens`, but the current Stashh design lives in a Claude Design project ("Stashh - stack lists", claude.ai/design/p/16d56bb0-…).
 - **Rule:** before styling a new surface, confirm with the user which design source is current; repo tokens can lag the design project. If the project link can't be opened (no claude.ai session in the browser pane, no `/design-login`), ask for access before styling, not after.
+
+## 2026-10-14 — Tailwind v4 focus outlines
+- **Mistake:** `focus-visible:outline-3` on elements whose base has `outline-none` rendered no
+  ring — v4's `outline-none` sets `--tw-outline-style: none`, which the width utility inherits.
+- **Rule:** pair it with `focus-visible:outline-solid`, and check focus with the keyboard
+  (computed `outline-style`), not by reading class names.
+
+## 2026-10-14 — Custom Tailwind scales and class merging
+- **Mistake:** added `text-display` / `rounded-card`; the shadcn `cn` (tailwind-merge
+  semantics) treated `text-display` as a colour and dropped it beside `text-foreground`.
+- **Rule:** when adding a theme scale, extend `cn`'s config (`createCn({ extend })`) in the same
+  change and test a merge of the new class against its neighbours.

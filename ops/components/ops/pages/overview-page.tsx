@@ -5,11 +5,13 @@ import { useDetailHref, useOpenDetail } from "@/hooks/use-detail-param";
 import { useNow } from "@/hooks/use-now";
 import { formatCompact, formatDuration, formatInt, formatUsd } from "@/lib/format";
 import { RANGE_LABELS } from "@/lib/ops-types";
+import { useOpsControls } from "../ops-provider";
 import { InteractiveBarChart } from "../charts/interactive-bar-chart";
 import { StackedAreaChart } from "../charts/stacked-area-chart";
 import { KpiGrid } from "../kpi-card";
+import { PageHeader } from "../page-header";
 import { Panel } from "../panel";
-import { RecognitionDetailFromUrl } from "../recognition-detail-sheet";
+import { RecognitionDetailFromUrl } from "../detail-from-url";
 import { RecognitionGallery } from "../recognitions-browser";
 import {
   ApiHealthPanel,
@@ -44,9 +46,11 @@ export function OverviewPage() {
   const detailHref = useDetailHref();
   const now = useNow();
   const ops = recognitions.data;
+  const { range } = useOpsControls();
 
   return (
     <>
+      <PageHeader title="Overview" description={`Last ${RANGE_LABELS[range]} across recognitions and Instagram DMs.`} />
       {recognitions.error && <ServiceError error={recognitions.error} />}
       {instagram.error && <ServiceError error={instagram.error} />}
 

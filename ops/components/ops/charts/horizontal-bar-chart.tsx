@@ -23,7 +23,7 @@ export function HorizontalBarChart({
   tone?: "primary" | "muted" | "danger";
   valueFormatter?: (value: number) => string;
 }) {
-  const color = { primary: "var(--chart-1)", muted: "var(--chart-3)", danger: "var(--chart-5)" }[tone];
+  const color = { primary: "var(--chart-1)", muted: "var(--cobalt-300)", danger: "var(--chart-5)" }[tone];
   const config = { value: { label: "Value", color } } satisfies ChartConfig;
   const data = items.map((item) => ({ ...item, display: item.display ?? valueFormatter?.(item.value) ?? item.value.toLocaleString("en-US") }));
 

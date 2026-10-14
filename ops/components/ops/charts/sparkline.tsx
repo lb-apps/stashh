@@ -13,7 +13,7 @@ export function Sparkline({ values, tone = "primary" }: { values: Array<number |
 
   return (
     <ChartContainer config={config} className="aspect-auto h-12 w-full" aria-hidden>
-      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+      <AreaChart data={data} accessibilityLayer={false} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id={`spark-${id}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.35} />

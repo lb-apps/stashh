@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { AppSidebar } from "@/components/ops/app-sidebar";
 import { OpsProvider } from "@/components/ops/ops-provider";
-import { SiteHeader } from "@/components/ops/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { fontVariables } from "./fonts";
@@ -23,8 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <AppSidebar />
               {/* min-w-0: a wide table scrolls inside its card instead of widening the page. */}
               <SidebarInset className="min-w-0">
-                <SiteHeader />
-                <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">{children}</main>
+                <main className="flex flex-1 flex-col gap-5 px-4 pt-5 pb-10 md:px-8 md:pt-7 lg:gap-6">{children}</main>
               </SidebarInset>
             </SidebarProvider>
           </TooltipProvider>

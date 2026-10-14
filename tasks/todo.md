@@ -1,3 +1,29 @@
+# Stashh Ops v3 — English UI, native shadcn, Discovery console kit
+
+- [x] English everywhere (en-US formats, labels, route `/recognitions`, `lang="en"`)
+- [x] Native shadcn only: Item, Avatar, AspectRatio, Card, Collapsible, Label, chart step bar
+- [x] Design source found: Claude Design → Discovery Design System → `ui_kits/web_console`
+      ("Recognition runs"). Tokens were already identical (7/8 files byte-equal; fonts.css
+      differs on purpose — SF Pro is never self-hosted). The gap was the component language.
+- [x] Theme: type/radius/depth/gloss utilities, `micro-label`, `numeric`, `fill-primary`;
+      `cn` configured for Discovery's scales; typography + spacing tokens imported
+- [x] Primitives restyled (button, badge, card, table, tabs, toggle, input, select, sidebar,
+      sheet, switch, item, skeleton, alert, empty, chart tooltip)
+- [x] Shell: kit sidebar + in-page header (display title, helper, range + live)
+- [x] Runs: search + segmented filters, table in a white card, detail docked at ≥1280px
+- [x] Bug the owner spotted: emoji in captions were boxes — `fromCharCode` truncated
+      `&#x1F4CD;` to U+F4CD. Fixed with `fromCodePoint` + tests; 13 stored captions repaired
+      and the trailing `".` wrapper trimmed (migrations 20261014170000/170100)
+
+## Review
+- ops typecheck, lint, build clean; backend 69 tests pass
+- Browser, fresh tab: Overview, Recognitions (docked at 1440, Sheet at 1024), Instagram —
+  no console errors, no hydration mismatch (live dot reads fetching with a false server
+  snapshot); 375px no horizontal overflow
+- Contrast: micro 5.31 on white / 4.54 on bone; done badge 6.87; amber badge 4.88
+- Keyboard: solid 3px cobalt outline on nav, range, switch, search, rows; sparklines no
+  longer take focus
+
 # Stashh Ops v2 — back office (every request visible, richer KPIs, shadcn charts)
 
 Plan: `~/.claude/plans/sunny-zooming-meerkat.md` (approved). Branch `feature/ops-dashboard`.
