@@ -35,6 +35,17 @@ interface EnqueueRecognitionParams {
   ownerUserId: string;
   sourceUrl: string;
   options?: RecognitionTaskOptions;
+  /**
+   * Caller-supplied key (e.g. the channel's message id). A repeat with the same key
+   * for the same owner returns the original task instead of creating a second one.
+   */
+  idempotencyKey?: string;
+}
+
+const UNIQUE_VIOLATION = "23505";
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === UNIQUE_VIOLATION;
 }
 
 interface ProcessRecognitionSuccessParams {
@@ -109,13 +120,30 @@ export class RecognitionService {
   async enqueueRecognition(params: EnqueueRecognitionParams): Promise<RecognitionTaskRow> {
     const sourceUrl = normalizeInstagramSourceUrl(params.sourceUrl);
     const options = params.options ?? {};
-    return this.recognitionRepository.createQueuedRecognition({
-      owner_user_id: params.ownerUserId,
-      source_url: sourceUrl,
-      status: "queued",
-      retry_count: 0,
-      options: options as Json,
-    });
+    const { idempotencyKey } = params;
+
+    if (idempotencyKey) {
+      const existing = await this.recognitionRepository.getRecognitionByIdempotencyKey(params.ownerUserId, idempotencyKey);
+      if (existing) return existing;
+    }
+
+    try {
+      return await this.recognitionRepository.createQueuedRecognition({
+        owner_user_id: params.ownerUserId,
+        source_url: sourceUrl,
+        status: "queued",
+        retry_count: 0,
+        options: options as Json,
+        idempotency_key: idempotencyKey ?? null,
+      });
+    } catch (error) {
+      // Lost a race with a concurrent request carrying the same key: return the winner.
+      if (idempotencyKey && isUniqueViolation(error)) {
+        const winner = await this.recognitionRepository.getRecognitionByIdempotencyKey(params.ownerUserId, idempotencyKey);
+        if (winner) return winner;
+      }
+      throw error;
+    }
   }
 
   async getRecognition(
@@ -137,6 +165,20 @@ export class RecognitionService {
     ownerUserId: string,
   ): Promise<RecognitionTaskRow | null> {
     return this.recognitionRepository.markRecognitionCommitted(recognitionId, ownerUserId);
+  }
+
+  /** Atomically claims queued tasks for this worker (`FOR UPDATE SKIP LOCKED`). */
+  async claimQueuedRecognitions(
+    params: Parameters<RecognitionRepository["claimQueuedRecognitions"]>[0],
+  ): Promise<RecognitionTaskRow[]> {
+    return this.recognitionRepository.claimQueuedRecognitions(params);
+  }
+
+  /** Requeues tasks whose worker stopped heartbeating past the claim timeout. */
+  async recoverStaleRecognitions(
+    params: Parameters<RecognitionRepository["recoverStaleRecognitions"]>[0],
+  ): Promise<RecognitionTaskRow[]> {
+    return this.recognitionRepository.recoverStaleRecognitions(params);
   }
 
   async getCachedResultId(sourceUrl: string): Promise<string | null> {

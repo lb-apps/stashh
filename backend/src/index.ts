@@ -11,7 +11,9 @@ import { placesRouter } from "./modules/places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
 import { rootLogger } from "./lib/logger.js";
 import { requireAuth } from "./middleware/auth.js";
-import { apiRateLimiter } from "./middleware/rateLimiter.js";
+import { apiRateLimiter, internalRateLimiter } from "./middleware/rateLimiter.js";
+import { createServiceAuth } from "./middleware/serviceAuth.js";
+import { internalRouter } from "./modules/internal/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestIdMiddleware } from "./http/requestId.js";
 import { sendSuccess, sendError } from "./http/response.js";
@@ -116,6 +118,14 @@ app.use("/api/v1/places", requireAuth, apiRateLimiter, placesRouter);
 // ── Recognitions (protected + rate limited) ──────────────────────────────────
 
 app.use("/api/v1/recognitions", requireAuth, apiRateLimiter, recognitionsRouter);
+
+// ── Internal API (service-to-service; service token, never user JWTs) ───────
+
+if (config.INTERNAL_API_TOKENS.length > 0) {
+  app.use("/internal/v1", createServiceAuth(config.INTERNAL_API_TOKENS), internalRateLimiter, internalRouter);
+} else {
+  rootLogger.info("internal API disabled — INTERNAL_API_TOKENS not set");
+}
 
 await mountDocs(app);
 

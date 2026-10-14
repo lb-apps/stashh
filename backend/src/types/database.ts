@@ -13,6 +13,27 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      channel_identities: {
+        Row: {
+          provider: string;
+          external_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          provider: string;
+          external_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          provider?: string;
+          external_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       user_lists: {
         Row: {
           id: string;
@@ -199,6 +220,7 @@ export interface Database {
           finished_at: string | null;
           error_message: string | null;
           retry_count: number;
+          idempotency_key: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -213,6 +235,7 @@ export interface Database {
           finished_at?: string | null;
           error_message?: string | null;
           retry_count?: number;
+          idempotency_key?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -227,6 +250,7 @@ export interface Database {
           finished_at?: string | null;
           error_message?: string | null;
           retry_count?: number;
+          idempotency_key?: string | null;
           created_at?: string;
           updated_at?: string;
         };

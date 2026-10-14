@@ -1,8 +1,7 @@
 import { Router } from "express";
-import { createSupabaseClientForRequest } from "../../db/supabaseClient.js";
 import { sendAccepted, sendError, sendSuccess } from "../../http/response.js";
-import { RecognitionRepository } from "./repository.js";
-import { RecognitionService } from "./service.js";
+import { createRecognitionServiceForRequest } from "./factory.js";
+import { presentAcceptedRecognition, presentRecognition } from "./presenter.js";
 import {
   createRecognitionRequestSchema,
   recognitionIdentifierSchema,
@@ -27,10 +26,7 @@ recognitionsRouter.get("/result", async (req, res, next) => {
   }
 
   try {
-    const supabaseClient = createSupabaseClientForRequest(req);
-    const recognitionService = new RecognitionService(
-      new RecognitionRepository(supabaseClient),
-    );
+    const recognitionService = createRecognitionServiceForRequest(req);
     const result = await recognitionService.getRecognitionResultForOwner(
       parsedQuery.data.id,
       ownerUserId,
@@ -69,10 +65,7 @@ recognitionsRouter.post("/", async (req, res, next) => {
   }
 
   try {
-    const supabaseClient = createSupabaseClientForRequest(req);
-    const recognitionService = new RecognitionService(
-      new RecognitionRepository(supabaseClient),
-    );
+    const recognitionService = createRecognitionServiceForRequest(req);
 
     const recognition = await recognitionService.enqueueRecognition({
       ownerUserId,
@@ -82,11 +75,7 @@ recognitionsRouter.post("/", async (req, res, next) => {
       },
     });
 
-    sendAccepted(res, req, {
-      recognition_id: recognition.id,
-      status: recognition.status,
-      created_at: recognition.created_at,
-    });
+    sendAccepted(res, req, presentAcceptedRecognition(recognition));
   } catch (error) {
     next(error);
   }
@@ -106,10 +95,7 @@ recognitionsRouter.get("/:id", async (req, res, next) => {
   }
 
   try {
-    const supabaseClient = createSupabaseClientForRequest(req);
-    const recognitionService = new RecognitionService(
-      new RecognitionRepository(supabaseClient),
-    );
+    const recognitionService = createRecognitionServiceForRequest(req);
 
     const recognitionData = await recognitionService.getRecognition(
       parsedParameters.data.id,
@@ -119,21 +105,7 @@ recognitionsRouter.get("/:id", async (req, res, next) => {
       sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
       return;
     }
-    const { task: recognition, places } = recognitionData;
-
-    sendSuccess(res, req, 200, {
-      recognition_id: recognition.id,
-      status: recognition.status,
-      source_url: recognition.source_url,
-      result_id: recognition.result_id,
-      places,
-      error_message: recognition.error_message,
-      retry_count: recognition.retry_count,
-      started_at: recognition.started_at,
-      finished_at: recognition.finished_at,
-      created_at: recognition.created_at,
-      updated_at: recognition.updated_at,
-    });
+    sendSuccess(res, req, 200, presentRecognition(recognitionData.task, recognitionData.places));
   } catch (error) {
     next(error);
   }
@@ -153,10 +125,7 @@ recognitionsRouter.post("/:id/commit", async (req, res, next) => {
   }
 
   try {
-    const supabaseClient = createSupabaseClientForRequest(req);
-    const recognitionService = new RecognitionService(
-      new RecognitionRepository(supabaseClient),
-    );
+    const recognitionService = createRecognitionServiceForRequest(req);
     const recognition = await recognitionService.commitRecognition(
       parsedParameters.data.id,
       ownerUserId,

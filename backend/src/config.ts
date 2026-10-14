@@ -25,6 +25,20 @@ const envSchema = z.object({
   RECOGNITIONS_CLAIM_TIMEOUT_MS: z.coerce.number().int().min(60000).default(900000),
   RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS: z.coerce.number().int().min(5000).default(30000),
   PLACE_THUMBNAILS_BUCKET: z.string().default("place-thumbnails"),
+  /**
+   * Bearer tokens accepted on `/internal/v1` (service-to-service), comma-separated so a
+   * token can be rotated without downtime. Each ≥ 32 chars. Unset → internal API disabled.
+   */
+  INTERNAL_API_TOKENS: z
+    .string()
+    .optional()
+    .transform((value) => (value ?? "").split(",").map((t) => t.trim()).filter(Boolean))
+    .refine((tokens) => tokens.every((t) => t.length >= 32), "Each INTERNAL_API_TOKENS entry must be ≥ 32 chars"),
+  /**
+   * Domain for the reserved, never-mailed addresses that back channel-identity users
+   * (Supabase Auth requires an email or phone on every user). Must be a domain we own.
+   */
+  CHANNEL_IDENTITY_EMAIL_DOMAIN: z.string().default("identities.stashh.me"),
 });
 
 const parsed = envSchema.safeParse(process.env);

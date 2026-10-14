@@ -55,6 +55,21 @@ export class RecognitionRepository {
     return data;
   }
 
+  async getRecognitionByIdempotencyKey(
+    ownerUserId: string,
+    idempotencyKey: string,
+  ): Promise<RecognitionTaskRow | null> {
+    const { data, error } = await this.supabaseClient
+      .from("recognition_tasks")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
   async getRecognitionByIdForOwner(
     recognitionId: string,
     ownerUserId: string,
