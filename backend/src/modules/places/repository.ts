@@ -300,7 +300,7 @@ export class PlacesRepository {
       p_lng: params.longitude,
       p_lat: params.latitude,
       p_radius_m: params.radiusM,
-      p_category: params.category ?? null,
+      p_category: params.category,
       p_limit: params.limit,
       p_offset: params.offset,
     });
@@ -323,7 +323,7 @@ export class PlacesRepository {
       p_lng: params.longitude,
       p_lat: params.latitude,
       p_radius_m: params.radiusM,
-      p_category: params.category ?? null,
+      p_category: params.category,
     });
     if (error) throw error;
     return Number(data ?? 0);
