@@ -55,8 +55,6 @@ const features = tableFeatures({
   sortFns,
 });
 
-const COMPACT_HIDDEN = { source_type: false, channel: false, cost_usd: false, created_at: false };
-
 const STATUS_GROUP: Record<Exclude<StatusTab, "all">, TaskStatus[]> = {
   done: ["completed", "committed"],
   failed: ["failed", "cancelled", "expired"],
@@ -179,14 +177,11 @@ export function RecognitionsBrowser({
   items,
   onOpen,
   selectedId,
-  compact = false,
   pageSize = 10,
 }: {
   items: RecognitionListItem[];
   onOpen: (id: string) => void;
   selectedId: string | null;
-  /** The detail is docked beside the table: drop the columns the panel repeats. */
-  compact?: boolean;
   pageSize?: number;
 }) {
   const now = useNow();
@@ -205,7 +200,6 @@ export function RecognitionsBrowser({
     state: {
       sorting,
       columnFilters: statusTab === "all" ? columnFilters : [...columnFilters, { id: "status", value: STATUS_GROUP[statusTab] }],
-      columnVisibility: compact ? COMPACT_HIDDEN : {},
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,

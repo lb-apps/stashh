@@ -10,7 +10,7 @@
 - [x] Primitives restyled (button, badge, card, table, tabs, toggle, input, select, sidebar,
       sheet, switch, item, skeleton, alert, empty, chart tooltip)
 - [x] Shell: kit sidebar + in-page header (display title, helper, range + live)
-- [x] Runs: search + segmented filters, table in a white card, detail docked at ≥1280px
+- [x] Runs: search + segmented filters, table in a white card; detail opens as a dialog (owner: not docked)
 - [x] Bug the owner spotted: emoji in captions were boxes — `fromCharCode` truncated
       `&#x1F4CD;` to U+F4CD. Fixed with `fromCodePoint` + tests; 13 stored captions repaired
       and the trailing `".` wrapper trimmed (migrations 20261014170000/170100)

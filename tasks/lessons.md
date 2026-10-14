@@ -70,3 +70,17 @@ exists after switching branches before reporting the switch as done.
   semantics) treated `text-display` as a colour and dropped it beside `text-foreground`.
 - **Rule:** when adding a theme scale, extend `cn`'s config (`createCn({ extend })`) in the same
   change and test a merge of the new class against its neighbours.
+
+## 2026-10-14 — "Slowness" is the user's symptom, not a list of every delay
+- **Mistake:** asked about HomeKit lights feeling slow, I counted the lights' deliberate 1 s fade
+  (`transition: 1`) as part of the problem and removed it once the user said "do both". The user
+  meant system latency (command → light starts reacting); the fade was a chosen look.
+- **Rule:** separate configured behaviour (fades, delays, schedules) from faults before offering
+  fixes, and say which bucket each finding is in. Only offer to change a deliberate setting as an
+  explicit, separately named option — never bundle it with fault fixes.
+
+## 2026-10-14 — Following a kit vs. what the owner already approved
+- **Mistake:** copied the console kit's docked run panel, replacing the detail dialog the owner
+  had already approved; they wanted the dialog back.
+- **Rule:** a design-kit pass restyles; it does not change an approved interaction (dialog vs
+  docked, page vs sheet) without asking. List such behaviour changes in the plan as a question.

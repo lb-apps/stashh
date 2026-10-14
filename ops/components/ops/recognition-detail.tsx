@@ -1,13 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, CircleAlert, ExternalLink, MapPin, Star, X } from "lucide-react";
+import { ChevronDown, CircleAlert, ExternalLink, MapPin, Star } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -17,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DASH, formatBytes, formatDateTime, formatDuration, formatInt, formatRating, formatSource, formatUsd } from "@/lib/format";
 import { CHANNEL, FETCH_METHOD, RUN_OUTCOME, SOURCE_TYPE, TASK_STATUS, stepLabel } from "@/lib/labels";
 import type { RecognitionDetail, RecognitionPlace, RecognitionRunDetail } from "@/lib/ops-types";
-import { cn } from "@/lib/utils";
 import { STEP_COLORS } from "./charts/shared";
 import { SOURCE_ICON, Thumb } from "./recognition-thumb";
 import { StatGrid } from "./stat-grid";
@@ -42,25 +40,7 @@ function useRecognitionDetail(id: string | null) {
 /** A short, stable handle for a run: the first block of its id, as the kit's `r-8841`. */
 export const shortId = (id: string) => `r-${id.slice(0, 6)}`;
 
-/** The kit's run detail as a white card docked beside the runs table. */
-export function RecognitionDetailPanel({ id, onClose, className }: { id: string; onClose: () => void; className?: string }) {
-  const { data, error } = useRecognitionDetail(id);
-  return (
-    <Card className={cn("sticky top-6 max-h-[calc(100svh-3rem)] w-[400px] shrink-0 gap-0 self-start py-0", className)}>
-      <ScrollArea className="min-h-0">
-        <div className="p-6">
-          {data ? (
-            <DetailBody detail={data} close={<CloseButton onClose={onClose} />} />
-          ) : (
-            <DetailPending error={error} close={<CloseButton onClose={onClose} />} />
-          )}
-        </div>
-      </ScrollArea>
-    </Card>
-  );
-}
-
-/** The same detail in a side sheet, for narrower screens and pages without a runs table. */
+/** One recognition's whole story in a side sheet (a dialog), opened from any runs list. */
 export function RecognitionDetailSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { data, error } = useRecognitionDetail(id);
   return (
@@ -78,22 +58,11 @@ export function RecognitionDetailSheet({ id, onClose }: { id: string | null; onC
   );
 }
 
-function CloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <Button variant="secondary" size="icon-sm" onClick={onClose} aria-label="Close">
-      <X />
-    </Button>
-  );
-}
-
-function DetailPending({ error, close }: { error: Error | null; close?: ReactNode }) {
+function DetailPending({ error }: { error: Error | null }) {
   if (error) {
     return (
       <div className="grid gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="font-heading text-headline">Could not open the recognition</p>
-          {close}
-        </div>
+        <p className="font-heading text-headline">Could not open the recognition</p>
         <p className="text-caption text-muted-foreground">{error.message}</p>
       </div>
     );
@@ -106,7 +75,6 @@ function DetailPending({ error, close }: { error: Error | null; close?: ReactNod
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-6 w-48" />
         </div>
-        {close}
       </div>
       <div className="grid grid-cols-3 gap-2.5">
         <Skeleton className="h-[72px]" />
@@ -127,7 +95,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function DetailBody({ detail, close }: { detail: RecognitionDetail; close?: ReactNode }) {
+function DetailBody({ detail }: { detail: RecognitionDetail }) {
   const status = TASK_STATUS[detail.status];
   const firstRun = detail.runs[0];
   const lastRun = detail.runs.at(-1);
@@ -148,7 +116,6 @@ function DetailBody({ detail, close }: { detail: RecognitionDetail; close?: Reac
             <Badge variant={status.variant}>{status.label}</Badge>
           </div>
         </div>
-        {close}
       </div>
 
       <StatGrid

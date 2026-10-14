@@ -65,9 +65,7 @@ export function RecognitionsPage() {
 
       {ops ? (
         <RunsWithDetail>
-          {(selectedId, docked) => (
-            <RecognitionsBrowser items={ops.recognitions} onOpen={openDetail} selectedId={selectedId} compact={docked} />
-          )}
+          {(selectedId) => <RecognitionsBrowser items={ops.recognitions} onOpen={openDetail} selectedId={selectedId} />}
         </RunsWithDetail>
       ) : (
         <PanelSkeleton height="h-96" />

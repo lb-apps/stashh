@@ -119,8 +119,9 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   Discovery Design System project on Claude Design): utility mode only, bone page, white cards at
   `rounded-card` (24px), no borders, heavy display page titles, uppercase `micro-label`s for
   column heads and metadata, rounded black numerals (`numeric`), glossy cobalt pills
-  (`fill-primary`), segmented controls for every filter, the run detail docked beside the runs
-  table at ≥1280px (Sheet below). Check the kit before adding a screen.
+  (`fill-primary`), segmented controls for every filter. One deviation, by the owner's call: the
+  run detail always opens as a dialog (side Sheet), never docked beside the table, even though
+  the kit docks it. Check the kit before adding a screen.
 - **Tokens come from web.** `ops/app/globals.css` imports `web/lib/discovery/tokens/*.css`
   (never copies; `base.css` left out) and maps shadcn's variables onto them. Light only. The
   shadcn primitives in `ops/components/ui/` are restyled to the kit, not replaced.
