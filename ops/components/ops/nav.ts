@@ -2,13 +2,13 @@ import { LayoutDashboard, MessageCircle, ScanSearch, type LucideIcon } from "luc
 
 export interface NavItem {
   title: string;
-  href: "/" | "/tanimalar" | "/instagram";
+  href: "/" | "/recognitions" | "/instagram";
   icon: LucideIcon;
 }
 
 export const NAV: NavItem[] = [
-  { title: "Genel bakış", href: "/", icon: LayoutDashboard },
-  { title: "Tanımalar", href: "/tanimalar", icon: ScanSearch },
+  { title: "Overview", href: "/", icon: LayoutDashboard },
+  { title: "Recognitions", href: "/recognitions", icon: ScanSearch },
   { title: "Instagram", href: "/instagram", icon: MessageCircle },
 ];
 

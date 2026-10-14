@@ -25,16 +25,16 @@ import { ServiceError } from "../states";
 import { QueueTable } from "../tables";
 
 const durationConfig = {
-  processing_p50_ms: { label: "İşlem p50", color: "var(--chart-1)" },
-  processing_p95_ms: { label: "İşlem p95", color: "var(--chart-2)" },
-  wait_p50_ms: { label: "Kuyruk bekleme p50", color: "var(--chart-3)" },
+  processing_p50_ms: { label: "Processing p50", color: "var(--chart-1)" },
+  processing_p95_ms: { label: "Processing p95", color: "var(--chart-2)" },
+  wait_p50_ms: { label: "Queue wait p50", color: "var(--chart-3)" },
 };
 
 const stepsConfig = {
-  fetch_ms: { label: "İçerik alma", color: "var(--chart-3)" },
+  fetch_ms: { label: "Content fetch", color: "var(--chart-3)" },
   analysis_ms: { label: "Model", color: "var(--chart-1)" },
-  match_ms: { label: "Google eşleşme", color: "var(--chart-2)" },
-  thumbnails_ms: { label: "Görseller", color: "var(--chart-4)" },
+  match_ms: { label: "Google match", color: "var(--chart-2)" },
+  thumbnails_ms: { label: "Photos", color: "var(--chart-4)" },
 };
 
 export function RecognitionsPage() {
@@ -56,7 +56,7 @@ export function RecognitionsPage() {
       )}
 
       {ops ? (
-        <Panel title="Tanımalar" description="Son 60 tanıma · bir satıra tıkla, sürecin ve sonucun tamamını gör">
+        <Panel title="Recognitions" description="Latest 60 · open a row to see the whole run and its result">
           <RecognitionsBrowser items={ops.recognitions} onOpen={openDetail} />
         </Panel>
       ) : (
@@ -64,7 +64,7 @@ export function RecognitionsPage() {
       )}
 
       {ops && ops.queue.length > 0 && (
-        <Panel title="Canlı kuyruk" description="Bekleyen ve işlenen tanımalar; süreler canlı akar">
+        <Panel title="Live queue" description="Recognitions waiting or running; times tick live">
           <QueueTable items={ops.queue} onOpen={openDetail} />
         </Panel>
       )}
@@ -72,7 +72,7 @@ export function RecognitionsPage() {
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Süreler" description={`İşlem ve kuyruk süresi · son ${RANGE_LABELS[ops.range]}`}>
+            <Panel title="Durations" description={`Processing and queue time · last ${RANGE_LABELS[ops.range]}`}>
               <MultiLineChart
                 bucket={ops.bucket}
                 config={durationConfig}
@@ -82,7 +82,7 @@ export function RecognitionsPage() {
                 axisFormatter={formatDuration}
               />
             </Panel>
-            <Panel title="Zamanın dağılımı" description="Yeni işlemlerde adım başına ortalama süre">
+            <Panel title="Where the time goes" description="Average time per step in fresh runs">
               <StackedBarChart
                 bucket={ops.bucket}
                 config={stepsConfig}

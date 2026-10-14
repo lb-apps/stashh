@@ -2,6 +2,7 @@
 
 import { Label, Pie, PieChart } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { formatInt, formatShare } from "@/lib/format";
 
 export interface DonutSlice {
@@ -13,7 +14,8 @@ export interface DonutSlice {
 
 /**
  * shadcn chart-pie-donut-text: shares of a whole with the total in the middle. A list
- * beside it repeats every slice as text with its count and share.
+ * beside it repeats every slice as text with its count and share, so colour is never the
+ * only cue.
  */
 export function DonutChart({ slices, centerLabel }: { slices: DonutSlice[]; centerLabel: string }) {
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
@@ -43,16 +45,22 @@ export function DonutChart({ slices, centerLabel }: { slices: DonutSlice[]; cent
           </Pie>
         </PieChart>
       </ChartContainer>
-      <ul className="grid gap-2 text-sm">
+      <ItemGroup className="gap-0!">
         {slices.map((slice) => (
-          <li key={slice.key} className="flex items-center gap-2">
-            <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: slice.color }} />
-            <span className="flex-1 truncate">{slice.label}</span>
-            <span className="font-medium tabular-nums">{formatInt(slice.value)}</span>
-            <span className="w-10 text-right text-muted-foreground tabular-nums">{formatShare(slice.value, total)}</span>
-          </li>
+          <Item key={slice.key} role="listitem" size="xs" className="flex-nowrap px-0 py-1.5">
+            <ItemMedia>
+              <span aria-hidden className="size-2.5 rounded-[3px]" style={{ background: slice.color }} />
+            </ItemMedia>
+            <ItemContent className="min-w-0">
+              <ItemTitle className="block w-full truncate font-normal">{slice.label}</ItemTitle>
+            </ItemContent>
+            <ItemActions className="tabular-nums">
+              <span className="font-medium">{formatInt(slice.value)}</span>
+              <span className="w-10 text-right text-muted-foreground">{formatShare(slice.value, total)}</span>
+            </ItemActions>
+          </Item>
         ))}
-      </ul>
+      </ItemGroup>
     </div>
   );
 }

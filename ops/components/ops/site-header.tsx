@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useIsFetching } from "@tanstack/react-query";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
@@ -29,7 +30,7 @@ export function SiteHeader() {
           size="sm"
           value={range}
           onValueChange={(value) => value && setRange(value as OpsRange)}
-          aria-label="Zaman aralığı"
+          aria-label="Time range"
         >
           {OPS_RANGES.map((option) => (
             <ToggleGroupItem key={option} value={option} className="px-2 sm:px-3" aria-label={RANGE_LABELS[option]}>
@@ -39,13 +40,13 @@ export function SiteHeader() {
           ))}
         </ToggleGroup>
 
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={live} onCheckedChange={setLive} aria-label="Canlı yenileme" />
-          <span className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <Switch id="live-refresh" checked={live} onCheckedChange={setLive} aria-label="Live refresh" />
+          <Label htmlFor="live-refresh" className="gap-1.5 font-normal">
             <StatusDot state={live ? "live" : "unknown"} pulse={live && fetching} />
-            <span className="sr-only sm:not-sr-only">{live ? "Canlı" : "Durduruldu"}</span>
-          </span>
-        </label>
+            <span className="sr-only sm:not-sr-only">{live ? "Live" : "Paused"}</span>
+          </Label>
+        </div>
       </div>
     </header>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useInstagramOps, useRecognitionOps } from "@/hooks/use-ops-data";
-import { useOpenDetail } from "@/hooks/use-detail-param";
+import { useDetailHref, useOpenDetail } from "@/hooks/use-detail-param";
 import { useNow } from "@/hooks/use-now";
 import { formatCompact, formatDuration, formatInt, formatUsd } from "@/lib/format";
 import { RANGE_LABELS } from "@/lib/ops-types";
@@ -32,15 +32,16 @@ import { ServiceError } from "../states";
 import { QueueTable } from "../tables";
 
 const outcomeConfig = {
-  fresh: { label: "Yeni işlem", color: "var(--chart-1)" },
+  fresh: { label: "Fresh run", color: "var(--chart-1)" },
   cache: { label: "Cache", color: "var(--chart-2)" },
-  failed: { label: "Hata", color: "var(--chart-5)" },
+  failed: { label: "Failed", color: "var(--chart-5)" },
 };
 
 export function OverviewPage() {
   const recognitions = useRecognitionOps();
   const instagram = useInstagramOps();
   const openDetail = useOpenDetail();
+  const detailHref = useDetailHref();
   const now = useNow();
   const ops = recognitions.data;
 
@@ -65,8 +66,8 @@ export function OverviewPage() {
 
       {ops ? (
         <InteractiveBarChart
-          title="Zaman içinde"
-          description={`Son ${RANGE_LABELS[ops.range]} · bir ölçü seç`}
+          title="Over time"
+          description={`Last ${RANGE_LABELS[ops.range]} · pick a metric`}
           bucket={ops.bucket}
           data={ops.stats.series.map((p) => ({
             bucket: p.bucket,
@@ -76,12 +77,12 @@ export function OverviewPage() {
             tokens: p.tokens,
           }))}
           metrics={[
-            { key: "requests", label: "İstek", total: formatInt(ops.stats.totals.requests), format: formatInt },
-            { key: "cost_usd", label: "Maliyet", total: formatUsd(ops.stats.runs.cost_usd), format: formatUsd },
-            { key: "processing_p50_ms", label: "Süre p50", total: formatDuration(ops.stats.runs.processing_p50_ms), format: formatDuration },
+            { key: "requests", label: "Requests", total: formatInt(ops.stats.totals.requests), format: formatInt },
+            { key: "cost_usd", label: "Cost", total: formatUsd(ops.stats.runs.cost_usd), format: formatUsd },
+            { key: "processing_p50_ms", label: "Duration p50", total: formatDuration(ops.stats.runs.processing_p50_ms), format: formatDuration },
             {
               key: "tokens",
-              label: "Token",
+              label: "Tokens",
               total: formatCompact(ops.stats.runs.prompt_tokens + ops.stats.runs.completion_tokens),
               format: formatCompact,
             },
@@ -94,7 +95,7 @@ export function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Sonuçlar" description="Yeni işlenen, cache'ten gelen ve başarısız tanımalar" className="lg:col-span-2">
+            <Panel title="Outcomes" description="Fresh runs, cache hits and failed recognitions" className="lg:col-span-2">
               <StackedAreaChart
                 bucket={ops.bucket}
                 config={outcomeConfig}
@@ -118,8 +119,8 @@ export function OverviewPage() {
       </div>
 
       {ops && (
-        <Panel title="Son tanımalar" description="Kapağa tıkla, sürecin tamamını gör">
-          <RecognitionGallery items={ops.recognitions.slice(0, 10)} onOpen={openDetail} now={now} />
+        <Panel title="Latest recognitions" description="Open a cover to see the whole run">
+          <RecognitionGallery items={ops.recognitions.slice(0, 10)} href={detailHref} now={now} />
         </Panel>
       )}
 
@@ -142,7 +143,7 @@ export function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Canlı kuyruk" description="Bekleyen ve işlenen tanımalar" className="lg:col-span-2">
+            <Panel title="Live queue" description="Recognitions waiting or running" className="lg:col-span-2">
               <QueueTable items={ops.queue} onOpen={openDetail} />
             </Panel>
             <LibraryPanel ops={ops} />

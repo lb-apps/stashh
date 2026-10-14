@@ -9,13 +9,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Stashh Ops", template: "%s · Stashh Ops" },
-  description: "Stashh sisteminin canlı durumu: kuyruk, süreler, cache, hatalar, DM trafiği.",
+  description: "Live state of the Stashh system: queue, durations, cache, failures, DM traffic.",
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="tr" className={`${fontVariables} h-full antialiased`}>
+    <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full">
         <OpsProvider>
           <TooltipProvider>

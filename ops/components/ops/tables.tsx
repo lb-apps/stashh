@@ -4,24 +4,24 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNow } from "@/hooks/use-now";
 import { DASH, formatDateTime, formatDuration, formatSource } from "@/lib/format";
-import { DM_CONTENT } from "@/lib/labels";
+import { DM_CONTENT, intentLabel } from "@/lib/labels";
 import type { InstagramStats, QueueItem } from "@/lib/ops-types";
 import { EmptyState } from "./states";
 
 /** Tasks waiting or running now; their waiting/running time ticks every second. */
 export function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen?: (id: string) => void }) {
   const now = useNow();
-  if (items.length === 0) return <EmptyState title="Kuyruk boş" description="Bekleyen ya da işlenen tanıma yok." />;
+  if (items.length === 0) return <EmptyState title="Queue is empty" description="No recognition is waiting or running." />;
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Durum</TableHead>
-          <TableHead>Kaynak</TableHead>
-          <TableHead className="text-right">Bekleme</TableHead>
-          <TableHead className="text-right">İşlem</TableHead>
-          <TableHead className="text-right">Deneme</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead className="text-right">Wait</TableHead>
+          <TableHead className="text-right">Running</TableHead>
+          <TableHead className="text-right">Attempts</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -36,7 +36,7 @@ export function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen?: (id
             >
               <TableCell>
                 <Badge variant={item.status === "processing" ? "info" : "warning"}>
-                  {item.status === "processing" ? "İşleniyor" : "Kuyrukta"}
+                  {item.status === "processing" ? "Processing" : "Queued"}
                 </Badge>
               </TableCell>
               <TableCell className="max-w-72 truncate font-mono text-xs">{formatSource(item.source_url)}</TableCell>
@@ -51,29 +51,20 @@ export function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen?: (id
   );
 }
 
-const INTENT_LABELS: Record<string, string> = {
-  recognize: "Tanıma",
-  help: "Yardım",
-  unsupported: "Desteklenmeyen",
-  erase: "Silme",
-};
-
-export const intentLabel = (intent: string | null) => (intent ? (INTENT_LABELS[intent] ?? intent) : "Bilinmiyor");
-
 /** DMs that ended without an answer. */
 export function MessageFailuresTable({ failures }: { failures: InstagramStats["recent_failures"] }) {
-  if (failures.length === 0) return <EmptyState title="Yanıtsız mesaj yok" description="Bu aralıkta her DM yanıtlandı." />;
+  if (failures.length === 0) return <EmptyState title="No unanswered messages" description="Every DM in this range got a reply." />;
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Bitiş</TableHead>
-          <TableHead>Durum</TableHead>
-          <TableHead>İçerik</TableHead>
-          <TableHead>Niyet</TableHead>
-          <TableHead className="text-right">Deneme</TableHead>
-          <TableHead>Son hata</TableHead>
+          <TableHead>Finished</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Content</TableHead>
+          <TableHead>Intent</TableHead>
+          <TableHead className="text-right">Attempts</TableHead>
+          <TableHead>Last error</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -82,7 +73,7 @@ export function MessageFailuresTable({ failures }: { failures: InstagramStats["r
             <TableCell className="whitespace-nowrap tabular-nums">{formatDateTime(failure.finished_at)}</TableCell>
             <TableCell>
               <Badge variant={failure.status === "failed" ? "danger" : "warning"}>
-                {failure.status === "failed" ? "Başarısız" : "Süresi doldu"}
+                {failure.status === "failed" ? "Failed" : "Expired"}
               </Badge>
             </TableCell>
             <TableCell>{DM_CONTENT[failure.content]}</TableCell>

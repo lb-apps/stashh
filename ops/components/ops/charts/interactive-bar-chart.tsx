@@ -42,7 +42,7 @@ export function InteractiveBarChart<K extends string>({
           <CardTitle className="font-heading text-base font-semibold">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </div>
-        <div className="grid grid-cols-2 sm:flex" role="tablist" aria-label="Gösterilen ölçü">
+        <div className="grid grid-cols-2 sm:flex" role="tablist" aria-label="Metric shown">
           {metrics.map((m) => (
             <button
               key={m.key}

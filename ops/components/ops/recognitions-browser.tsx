@@ -19,19 +19,22 @@ import {
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, LayoutGrid, Rows3 } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDetailHref } from "@/hooks/use-detail-param";
 import { useNow } from "@/hooks/use-now";
 import { DASH, formatDuration, formatRelative, formatSource, formatUsd } from "@/lib/format";
 import { CHANNEL, SOURCE_TYPE, TASK_STATUS } from "@/lib/labels";
 import type { Channel, RecognitionListItem, SourceType, TaskStatus } from "@/lib/ops-types";
 import { cn } from "@/lib/utils";
-import { RecognitionThumb } from "./recognition-thumb";
+import { SOURCE_ICON, SourceCover, Thumb } from "./recognition-thumb";
 import { EmptyState } from "./states";
 
 type StatusTab = "all" | "done" | "failed" | "open";
@@ -83,10 +86,10 @@ function useColumns(now: number): ColumnDef<typeof features, RecognitionListItem
   return [
     {
       id: "source",
-      header: "Kaynak",
+      header: "Source",
       cell: ({ row: { original: item } }) => (
         <div className="flex min-w-0 items-center gap-3">
-          <RecognitionThumb url={item.thumbnail_url} type={item.source_type} className="size-12" sizes="48px" />
+          <Thumb url={item.thumbnail_url} icon={SOURCE_ICON[item.source_type]} className="size-12" />
           <div className="grid min-w-0 gap-1">
             <div className="flex items-center gap-1.5">
               <Badge variant="info">{SOURCE_TYPE[item.source_type]}</Badge>
@@ -99,38 +102,38 @@ function useColumns(now: number): ColumnDef<typeof features, RecognitionListItem
     },
     {
       accessorKey: "channel",
-      header: "Kanal",
+      header: "Channel",
       filterFn: "equals",
       cell: ({ row }) => <span className="whitespace-nowrap">{CHANNEL[row.original.channel]}</span>,
     },
     {
       accessorKey: "source_type",
-      header: "Tür",
+      header: "Type",
       filterFn: "equals",
       enableHiding: true,
     },
     {
       accessorKey: "status",
-      header: "Durum",
+      header: "Status",
       filterFn: (row, _id, value: TaskStatus[]) => value.includes(row.original.status),
       cell: ({ row: { original: item } }) => (
         <div className="flex items-center gap-1.5">
           <Badge variant={TASK_STATUS[item.status].variant}>{TASK_STATUS[item.status].label}</Badge>
-          {item.runs > 1 && <span className="text-xs text-muted-foreground">{item.runs} deneme</span>}
+          {item.runs > 1 && <span className="text-xs text-muted-foreground">{item.runs} attempts</span>}
         </div>
       ),
     },
     {
       accessorKey: "places_count",
       header: ({ column }) => (
-        <SortButton label="Mekân" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
+        <SortButton label="Places" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
       ),
       cell: ({ row }) => <PlacesCell item={row.original} />,
     },
     {
       accessorKey: "total_ms",
       header: ({ column }) => (
-        <SortButton label="Süre" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
+        <SortButton label="Duration" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
       ),
       sortUndefined: "last",
       cell: ({ row }) => <span className="tabular-nums">{formatDuration(row.original.total_ms)}</span>,
@@ -138,7 +141,7 @@ function useColumns(now: number): ColumnDef<typeof features, RecognitionListItem
     {
       accessorKey: "cost_usd",
       header: ({ column }) => (
-        <SortButton label="Maliyet" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
+        <SortButton label="Cost" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
       ),
       sortUndefined: "last",
       cell: ({ row }) => <span className="tabular-nums">{formatUsd(row.original.cost_usd)}</span>,
@@ -146,7 +149,7 @@ function useColumns(now: number): ColumnDef<typeof features, RecognitionListItem
     {
       accessorKey: "created_at",
       header: ({ column }) => (
-        <SortButton label="Zaman" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
+        <SortButton label="When" sorted={column.getIsSorted()} onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} />
       ),
       cell: ({ row }) => <span className="whitespace-nowrap text-muted-foreground">{formatRelative(row.original.created_at, now)}</span>,
     },
@@ -167,6 +170,7 @@ export function RecognitionsBrowser({
   pageSize?: number;
 }) {
   const now = useNow();
+  const href = useDetailHref();
   const columns = useColumns(now);
   const [view, setView] = useState<"table" | "gallery">("table");
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
@@ -199,18 +203,18 @@ export function RecognitionsBrowser({
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={statusTab} onValueChange={(value) => { setStatusTab(value as StatusTab); table.setPageIndex(0); }}>
           <TabsList>
-            <TabsTrigger value="all">Tümü</TabsTrigger>
-            <TabsTrigger value="done">Tamamlanan</TabsTrigger>
-            <TabsTrigger value="failed">Başarısız</TabsTrigger>
-            <TabsTrigger value="open">Süren</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="done">Done</TabsTrigger>
+            <TabsTrigger value="failed">Failed</TabsTrigger>
+            <TabsTrigger value="open">Running</TabsTrigger>
           </TabsList>
         </Tabs>
         <Select value={filterValue("source_type")} onValueChange={(value) => setFilter("source_type", value)}>
-          <SelectTrigger size="sm" className="w-36" aria-label="Tür">
+          <SelectTrigger size="sm" className="w-36" aria-label="Type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm türler</SelectItem>
+            <SelectItem value="all">All types</SelectItem>
             {(Object.keys(SOURCE_TYPE) as SourceType[]).map((type) => (
               <SelectItem key={type} value={type}>
                 {SOURCE_TYPE[type]}
@@ -219,11 +223,11 @@ export function RecognitionsBrowser({
           </SelectContent>
         </Select>
         <Select value={filterValue("channel")} onValueChange={(value) => setFilter("channel", value)}>
-          <SelectTrigger size="sm" className="w-40" aria-label="Kanal">
+          <SelectTrigger size="sm" className="w-40" aria-label="Channel">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm kanallar</SelectItem>
+            <SelectItem value="all">All channels</SelectItem>
             {(Object.keys(CHANNEL) as Channel[]).map((channel) => (
               <SelectItem key={channel} value={channel}>
                 {CHANNEL[channel]}
@@ -238,19 +242,19 @@ export function RecognitionsBrowser({
           value={view}
           onValueChange={(value) => value && setView(value as "table" | "gallery")}
           className="ml-auto"
-          aria-label="Görünüm"
+          aria-label="View"
         >
-          <ToggleGroupItem value="table" aria-label="Tablo">
+          <ToggleGroupItem value="table" aria-label="Table">
             <Rows3 />
           </ToggleGroupItem>
-          <ToggleGroupItem value="gallery" aria-label="Galeri">
+          <ToggleGroupItem value="gallery" aria-label="Gallery">
             <LayoutGrid />
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
       {rows.length === 0 ? (
-        <EmptyState title="Bu filtrelere uyan tanıma yok" description="Filtreleri genişlet ya da aralığı değiştir." />
+        <EmptyState title="No recognitions match these filters" description="Widen the filters or change the range." />
       ) : view === "table" ? (
         <Table>
           <TableHeader>
@@ -267,7 +271,7 @@ export function RecognitionsBrowser({
               <TableRow
                 key={row.id}
                 tabIndex={0}
-                aria-label={`${SOURCE_TYPE[row.original.source_type]} ayrıntısını aç`}
+                aria-label={`Open ${SOURCE_TYPE[row.original.source_type]} details`}
                 className="cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none"
                 onClick={() => onOpen(row.original.id)}
                 onKeyDown={(event) => {
@@ -285,19 +289,19 @@ export function RecognitionsBrowser({
           </TableBody>
         </Table>
       ) : (
-        <RecognitionGallery items={rows.map((row) => row.original)} onOpen={onOpen} now={now} />
+        <RecognitionGallery items={rows.map((row) => row.original)} href={href} now={now} />
       )}
 
       <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span className="tabular-nums">{filteredCount} tanıma</span>
+        <span className="tabular-nums">{filteredCount} recognitions</span>
         <div className="flex items-center gap-2">
           <span className="tabular-nums">
             {table.state.pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}
           </span>
-          <Button variant="outline" size="icon-sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Önceki sayfa">
+          <Button variant="outline" size="icon-sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Previous page">
             <ChevronLeft />
           </Button>
-          <Button variant="outline" size="icon-sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Sonraki sayfa">
+          <Button variant="outline" size="icon-sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Next page">
             <ChevronRight />
           </Button>
         </div>
@@ -306,33 +310,29 @@ export function RecognitionsBrowser({
   );
 }
 
-/** Covers first: what was shared is recognisable at a glance. */
+/** Covers first: what was shared is recognisable at a glance. Each cover links to its detail. */
 export function RecognitionGallery({
   items,
-  onOpen,
+  href,
   now,
   className,
 }: {
   items: RecognitionListItem[];
-  onOpen: (id: string) => void;
+  href: (id: string) => string;
   now: number;
   className?: string;
 }) {
   return (
-    <ul className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5", className)}>
+    <ItemGroup className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5", className)}>
       {items.map((item) => (
-        <li key={item.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(item.id)}
-            className="group grid w-full gap-2 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <div className="relative">
-              <RecognitionThumb
+        <Item key={item.id} asChild role="listitem" className="group/cover gap-2 p-1.5 hover:bg-muted">
+          <Link href={href(item.id)} scroll={false}>
+            <ItemHeader className="relative">
+              <SourceCover
                 url={item.thumbnail_url}
                 type={item.source_type}
-                className="aspect-[4/5] w-full rounded-xl transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none"
                 sizes="(min-width: 1024px) 20vw, 45vw"
+                className="w-full transition-transform duration-200 ease-out group-hover/cover:scale-[1.02] motion-reduce:transition-none"
               />
               <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
                 <Badge className="bg-card/90 text-foreground">{SOURCE_TYPE[item.source_type]}</Badge>
@@ -340,18 +340,18 @@ export function RecognitionGallery({
                   {TASK_STATUS[item.status].label}
                 </Badge>
               </div>
-            </div>
-            <div className="grid gap-0.5 px-0.5">
-              <p className="line-clamp-1 text-sm font-medium">
-                {item.place_names?.length ? item.place_names.join(", ") : item.status === "completed" ? "Mekân bulunamadı" : DASH}
-              </p>
-              <p className="text-xs text-muted-foreground tabular-nums">
+            </ItemHeader>
+            <ItemContent className="min-w-0 gap-0.5 px-0.5">
+              <ItemTitle className="block w-full truncate">
+                {item.place_names?.length ? item.place_names.join(", ") : item.status === "completed" ? "No places found" : DASH}
+              </ItemTitle>
+              <ItemDescription className="line-clamp-1 text-xs tabular-nums">
                 {CHANNEL[item.channel]} · {formatDuration(item.total_ms)} · {formatRelative(item.created_at, now)}
-              </p>
-            </div>
-          </button>
-        </li>
+              </ItemDescription>
+            </ItemContent>
+          </Link>
+        </Item>
       ))}
-    </ul>
+    </ItemGroup>
   );
 }

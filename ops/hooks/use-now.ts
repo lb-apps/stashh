@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-/** One shared 1-second clock, so every "x sn önce" ticks together and only while mounted. */
+/** One shared 1-second clock, so every "x seconds ago" ticks together and only while mounted. */
 let now = Date.now();
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;

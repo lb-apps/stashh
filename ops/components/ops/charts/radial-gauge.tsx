@@ -2,7 +2,7 @@
 
 import { Label, PolarAngleAxis, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
-import { DASH } from "@/lib/format";
+import { DASH, formatPercent } from "@/lib/format";
 
 /**
  * shadcn chart-radial-text: one ratio as an arc on a track, the number in the middle.
@@ -23,7 +23,7 @@ export function RadialGauge({
   const color = { primary: "var(--chart-1)", danger: "var(--chart-5)", success: "var(--color-success)" }[tone];
   const config = { value: { label, color } } satisfies ChartConfig;
   const percent = ratio == null ? 0 : Math.round(Math.max(0, Math.min(1, ratio)) * 100);
-  const text = ratio == null ? DASH : `%${percent}`;
+  const text = ratio == null ? DASH : formatPercent(percent / 100);
 
   return (
     <div className="grid justify-items-center gap-1 text-center">

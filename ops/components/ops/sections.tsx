@@ -12,12 +12,12 @@ import {
   TriangleAlert,
   Users,
 } from "lucide-react";
-import Image from "next/image";
-import { Star } from "lucide-react";
+import { MapPin, Star } from "lucide-react";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNow } from "@/hooks/use-now";
-import { DASH, formatCompact, formatDuration, formatInt, formatShare, formatUsd } from "@/lib/format";
+import { DASH, formatCompact, formatDecimal, formatDuration, formatInt, formatRating, formatShare, formatUsd } from "@/lib/format";
 import { CHANNEL, FETCH_METHOD, SOURCE_TYPE, stepLabel } from "@/lib/labels";
 import { PREVIOUS_LABELS, type InstagramOps, type RecognitionOps } from "@/lib/ops-types";
 import { trend } from "@/lib/trend";
@@ -26,6 +26,8 @@ import { HorizontalBarChart } from "./charts/horizontal-bar-chart";
 import { RadialGauge } from "./charts/radial-gauge";
 import { KpiCard, KpiCardSkeleton, KpiGrid } from "./kpi-card";
 import { Panel } from "./panel";
+import { Thumb } from "./recognition-thumb";
+import { StatGrid } from "./stat-grid";
 import { EmptyState } from "./states";
 
 const ratio = (part: number, whole: number) => (whole > 0 ? part / whole : null);
@@ -43,7 +45,7 @@ export function KpiGridSkeleton({ count = 4 }: { count?: number }) {
 
 export function PanelSkeleton({ className, height = "h-64" }: { className?: string; height?: string }) {
   return (
-    <Panel title="Yükleniyor" className={className}>
+    <Panel title="Loading" className={className}>
       <Skeleton className={`${height} w-full`} />
     </Panel>
   );
@@ -56,9 +58,9 @@ export function RequestsKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Activity}
-      label="Tanıma isteği"
+      label="Recognition requests"
       value={formatInt(totals.requests)}
-      detail={`Cache ${formatShare(runs.cache_hits, runs.cache_hits + runs.completed)} · ${formatInt(totals.unique_sources)} farklı kaynak`}
+      detail={`Cache ${formatShare(runs.cache_hits, runs.cache_hits + runs.completed)} · ${formatInt(totals.unique_sources)} unique sources`}
       trend={trend(totals.requests, previous.requests, "up")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
       spark={series.map((p) => p.requests)}
@@ -71,7 +73,7 @@ export function ProcessingKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Timer}
-      label="İşlem süresi (p50)"
+      label="Processing time (p50)"
       value={formatDuration(runs.processing_p50_ms)}
       detail={`p95 ${formatDuration(runs.processing_p95_ms)} · cache ${formatDuration(runs.cache_p50_ms)}`}
       trend={trend(runs.processing_p50_ms, previous.processing_p50_ms, "down")}
@@ -86,9 +88,9 @@ export function FailureKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={TriangleAlert}
-      label="Hata oranı"
+      label="Failure rate"
       value={formatShare(totals.failed, totals.requests)}
-      detail={`${formatInt(totals.failed)} başarısız · ${formatInt(totals.retried)} tekrar denendi`}
+      detail={`${formatInt(totals.failed)} failed · ${formatInt(totals.retried)} retried`}
       trend={trend(ratio(totals.failed, totals.requests), ratio(previous.failed, previous.requests), "down")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
       spark={series.map((p) => p.failed)}
@@ -103,9 +105,9 @@ export function CostKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={CircleDollarSign}
-      label="Model maliyeti"
+      label="Model cost"
       value={formatUsd(runs.cost_usd)}
-      detail={`${formatInt(runs.model_calls)} çağrı · ${formatCompact(runs.prompt_tokens + runs.completion_tokens)} token · tanıma başı ${formatUsd(perRun)}`}
+      detail={`${formatInt(runs.model_calls)} calls · ${formatCompact(runs.prompt_tokens + runs.completion_tokens)} tokens · ${formatUsd(perRun)} per run`}
       trend={trend(runs.cost_usd, previous.cost_usd, "neutral")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
       spark={series.map((p) => p.cost_usd)}
@@ -118,9 +120,9 @@ export function UsersKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Users}
-      label="Aktif kullanıcı"
+      label="Active users"
       value={formatInt(totals.active_users)}
-      detail={`Toplam ${formatInt(users.total)} · ${formatInt(users.new)} yeni (${formatInt(users.new_instagram)} Instagram)`}
+      detail={`${formatInt(users.total)} total · ${formatInt(users.new)} new (${formatInt(users.new_instagram)} via Instagram)`}
       trend={trend(totals.active_users, previous.active_users, "up")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
     />
@@ -132,16 +134,16 @@ export function ZeroResultKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={MapPinOff}
-      label="Sıfır sonuç oranı"
+      label="Zero-result rate"
       value={formatShare(runs.zero_results, runs.completed)}
-      detail={`${formatInt(runs.zero_results)} tanımada mekân yok · ort. ${runs.completed ? (runs.places_extracted / runs.completed).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) : DASH} mekân`}
+      detail={`${formatInt(runs.zero_results)} runs found no place · avg ${runs.completed ? formatDecimal(runs.places_extracted / runs.completed) : DASH} places`}
       trend={trend(ratio(runs.zero_results, runs.completed), ratio(previous.zero_results, previous.completed_runs), "down")}
       trendCaption={PREVIOUS_LABELS[ops.range]}
     />
   );
 }
 
-/** "en eski 42 sn" for the oldest item still waiting. */
+/** "42 s" — the age of the oldest item still waiting. */
 function useAge(iso: string | null): string {
   const now = useNow();
   return iso ? formatDuration(now - Date.parse(iso)) : DASH;
@@ -153,9 +155,9 @@ export function QueueKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Inbox}
-      label="Kuyrukta"
+      label="Queued"
       value={formatInt(live.queued)}
-      detail={live.queued > 0 ? `${formatInt(live.processing)} işleniyor · en eski ${oldest}` : `${formatInt(live.processing)} işleniyor · worker ×${ops.process.worker_concurrency}`}
+      detail={live.queued > 0 ? `${formatInt(live.processing)} processing · oldest ${oldest}` : `${formatInt(live.processing)} processing · worker ×${ops.process.worker_concurrency}`}
     />
   );
 }
@@ -165,7 +167,7 @@ export function WaitKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Hourglass}
-      label="Kuyrukta bekleme (p50)"
+      label="Queue wait (p50)"
       value={formatDuration(wait.p50_ms)}
       detail={`p95 ${formatDuration(wait.p95_ms)}`}
       spark={series.map((p) => p.wait_p50_ms)}
@@ -178,7 +180,7 @@ export function ModelLatencyKpi({ ops }: { ops: RecognitionOps }) {
   return (
     <KpiCard
       icon={Gauge}
-      label="Model gecikmesi (p50)"
+      label="Model latency (p50)"
       value={formatDuration(runs.model_p50_ms)}
       detail={`p95 ${formatDuration(runs.model_p95_ms)} · ${ops.process.model.replace(/^google\//, "")}`}
       spark={series.map((p) => p.analysis_ms)}
@@ -192,16 +194,16 @@ export function DmKpis({ ig }: { ig: InstagramOps }) {
     <>
       <KpiCard
         icon={MessageCircle}
-        label="DM"
+        label="DMs"
         value={formatInt(totals.messages)}
-        detail={`${formatInt(totals.senders)} kişi · ${formatInt(totals.replied)} yanıtlandı`}
+        detail={`${formatInt(totals.senders)} people · ${formatInt(totals.replied)} replied`}
         trend={trend(totals.messages, previous.messages, "up")}
         trendCaption={PREVIOUS_LABELS[ig.range]}
         spark={series.map((p) => p.messages)}
       />
       <KpiCard
         icon={Timer}
-        label="DM yanıt süresi (p50)"
+        label="DM reply time (p50)"
         value={formatDuration(reply.p50_ms)}
         detail={`p95 ${formatDuration(reply.p95_ms)}`}
         trend={trend(reply.p50_ms, previous.reply_p50_ms, "down")}
@@ -222,8 +224,8 @@ export function SourceMixPanel({ ops, className }: { ops: RecognitionOps; classN
     color: SOURCE_COLORS[index % SOURCE_COLORS.length]!,
   }));
   return (
-    <Panel title="Kaynak türü" description="Ne paylaşıldı" className={className}>
-      {slices.length ? <DonutChart slices={slices} centerLabel="istek" /> : <EmptyState title="Henüz istek yok" />}
+    <Panel title="Source type" description="What was shared" className={className}>
+      {slices.length ? <DonutChart slices={slices} centerLabel="requests" /> : <EmptyState title="No requests yet" />}
     </Panel>
   );
 }
@@ -231,13 +233,13 @@ export function SourceMixPanel({ ops, className }: { ops: RecognitionOps; classN
 export function ChannelMixPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const slices = ops.stats.channel_mix.map((item, index) => ({
     key: item.channel,
-    label: `${CHANNEL[item.channel]} · ${formatInt(item.users)} kişi`,
+    label: `${CHANNEL[item.channel]} · ${formatInt(item.users)} people`,
     value: item.count,
     color: SOURCE_COLORS[index % SOURCE_COLORS.length]!,
   }));
   return (
-    <Panel title="Kanal" description="İsteklerin geldiği yer" className={className}>
-      {slices.length ? <DonutChart slices={slices} centerLabel="istek" /> : <EmptyState title="Henüz istek yok" />}
+    <Panel title="Channel" description="Where requests came from" className={className}>
+      {slices.length ? <DonutChart slices={slices} centerLabel="requests" /> : <EmptyState title="No requests yet" />}
     </Panel>
   );
 }
@@ -247,18 +249,18 @@ export function HealthGauges({ ops, className }: { ops: RecognitionOps; classNam
   const { runs, totals } = ops.stats;
   const served = runs.completed + runs.cache_hits;
   return (
-    <Panel title="Sağlık" description="Başarı, cache ve Google eşleşme oranları" className={className}>
+    <Panel title="Health" description="Success, cache and Google match rates" className={className}>
       <div className="grid grid-cols-3 gap-2">
         <RadialGauge
           ratio={ratio(totals.completed, totals.requests - totals.in_progress)}
-          label="Başarı"
+          label="Success"
           detail={`${formatInt(totals.completed)} / ${formatInt(totals.requests - totals.in_progress)}`}
           tone="success"
         />
         <RadialGauge ratio={ratio(runs.cache_hits, served)} label="Cache" detail={`${formatInt(runs.cache_hits)} / ${formatInt(served)}`} />
         <RadialGauge
           ratio={ratio(runs.places_matched, runs.places_extracted)}
-          label="Eşleşme"
+          label="Match"
           detail={`${formatInt(runs.places_matched)} / ${formatInt(runs.places_extracted)}`}
         />
       </div>
@@ -269,30 +271,30 @@ export function HealthGauges({ ops, className }: { ops: RecognitionOps; classNam
 export function TopPlacesPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const places = ops.stats.top_places;
   return (
-    <Panel title="En çok çıkan mekânlar" description="Bu aralıkta tanımalarda" className={className}>
+    <Panel title="Top places" description="Most found in this range" className={className}>
       {places.length === 0 ? (
-        <EmptyState title="Henüz mekân yok" />
+        <EmptyState title="No places yet" />
       ) : (
-        <ol className="grid gap-2">
+        <ItemGroup className="gap-0!">
           {places.map((place, index) => (
-            <li key={place.google_place_id} className="flex items-center gap-3">
-              <span className="w-4 text-right text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-              <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
-                {place.thumbnail_url && <Image src={place.thumbnail_url} alt="" fill sizes="40px" className="object-cover" />}
-              </div>
-              <div className="grid min-w-0 flex-1">
-                <span className="truncate text-sm font-medium">{place.name}</span>
+            <Item key={place.google_place_id} role="listitem" size="sm" className="flex-nowrap px-0">
+              <ItemMedia className="gap-3">
+                <span className="w-4 text-right text-xs text-muted-foreground tabular-nums">{index + 1}</span>
+                <Thumb url={place.thumbnail_url} icon={MapPin} />
+              </ItemMedia>
+              <ItemContent className="min-w-0 gap-0">
+                <ItemTitle className="block w-full truncate">{place.name}</ItemTitle>
                 {place.rating != null && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+                  <ItemDescription className="flex items-center gap-1 text-xs tabular-nums">
                     <Star aria-hidden className="size-3 fill-current" />
-                    {place.rating.toLocaleString("tr-TR", { minimumFractionDigits: 1 })}
-                  </span>
+                    {formatRating(place.rating)}
+                  </ItemDescription>
                 )}
-              </div>
-              <span className="text-sm font-medium tabular-nums">{formatInt(place.count)}×</span>
-            </li>
+              </ItemContent>
+              <ItemActions className="text-sm font-medium tabular-nums">{formatInt(place.count)}×</ItemActions>
+            </Item>
           ))}
-        </ol>
+        </ItemGroup>
       )}
     </Panel>
   );
@@ -310,8 +312,8 @@ export function StepsPanel({ ops, className }: { ops: RecognitionOps; className?
   const avg = ops.stats.runs.steps_avg_ms;
   const items = STEPS.filter(([key]) => avg[key] != null).map(([key, step]) => ({ label: stepLabel(step), value: avg[key] ?? 0 }));
   return (
-    <Panel title="Adım başına ortalama" description="Yeni işlenen tanımalarda zaman nereye gidiyor" className={className}>
-      {items.length ? <HorizontalBarChart items={items} valueFormatter={formatDuration} /> : <EmptyState title="Henüz veri yok" />}
+    <Panel title="Average per step" description="Where the time goes in fresh runs" className={className}>
+      {items.length ? <HorizontalBarChart items={items} valueFormatter={formatDuration} /> : <EmptyState title="No data yet" />}
     </Panel>
   );
 }
@@ -319,22 +321,24 @@ export function StepsPanel({ ops, className }: { ops: RecognitionOps; className?
 export function FailuresPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const { failures_by_step, top_errors } = ops.stats;
   return (
-    <Panel title="Hatalar" description="Başarısız denemelerin durduğu adım ve en sık mesajlar" className={className}>
+    <Panel title="Failures" description="The step failed attempts stopped at, and the most common messages" className={className}>
       {failures_by_step.length === 0 ? (
-        <EmptyState title="Hata yok" description="Bu aralıkta başarısız deneme olmadı." />
+        <EmptyState title="No failures" description="No attempt failed in this range." />
       ) : (
         <div className="grid gap-4">
           <HorizontalBarChart items={failures_by_step.map((f) => ({ label: stepLabel(f.step), value: f.count }))} tone="danger" />
-          <ul className="grid gap-2">
+          <ItemGroup>
             {top_errors.map((error) => (
-              <li key={`${error.step}-${error.message}`} className="grid gap-0.5 rounded-lg bg-muted px-3 py-2 text-xs">
-                <span className="font-medium">
-                  {stepLabel(error.step)} · {formatInt(error.count)}×
-                </span>
-                <span className="line-clamp-2 text-muted-foreground">{error.message}</span>
-              </li>
+              <Item key={`${error.step}-${error.message}`} role="listitem" variant="muted" size="sm">
+                <ItemContent className="gap-0.5">
+                  <ItemTitle className="text-xs">
+                    {stepLabel(error.step)} · {formatInt(error.count)}×
+                  </ItemTitle>
+                  <ItemDescription className="text-xs">{error.message}</ItemDescription>
+                </ItemContent>
+              </Item>
             ))}
-          </ul>
+          </ItemGroup>
         </div>
       )}
     </Panel>
@@ -344,12 +348,12 @@ export function FailuresPanel({ ops, className }: { ops: RecognitionOps; classNa
 export function FetchMethodsPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const methods = ops.stats.fetch_methods;
   return (
-    <Panel title="İçerik nasıl alındı" description="Kaynağa erişim yolları ve başarısızlıkları" className={className}>
+    <Panel title="How content was fetched" description="Ways to reach the source, and how often each failed" className={className}>
       {methods.length === 0 ? (
-        <EmptyState title="Henüz kayıt yok" description="Yeni tanımalarla dolacak." />
+        <EmptyState title="Nothing recorded yet" description="Fills in with new recognitions." />
       ) : (
         <HorizontalBarChart
-          items={methods.map((m) => ({ label: FETCH_METHOD[m.method], value: m.count, display: `${formatInt(m.count)} · ${formatShare(m.failed, m.count)} hata` }))}
+          items={methods.map((m) => ({ label: FETCH_METHOD[m.method], value: m.count, display: `${formatInt(m.count)} · ${formatShare(m.failed, m.count)} failed` }))}
           tone="muted"
         />
       )}
@@ -359,23 +363,18 @@ export function FetchMethodsPanel({ ops, className }: { ops: RecognitionOps; cla
 
 export function LibraryPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const { library } = ops.stats;
-  const rows = [
-    ["Kaydedilen mekân", library.saved_places],
-    ["Oluşturulan liste", library.lists_created],
-    ["Listeye ekleme", library.list_additions],
-    ["Katalogdaki mekân", library.catalog_places],
-    ["Kataloğa yeni eklenen", library.catalog_new],
-  ] as const;
   return (
-    <Panel title="Kütüphane ve katalog" description="Kullanıcıların kaydettikleri, mekân kataloğu" className={className}>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {rows.map(([label, value]) => (
-          <div key={label} className="grid gap-0.5">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="font-heading text-xl font-semibold tabular-nums">{formatInt(value)}</dd>
-          </div>
-        ))}
-      </dl>
+    <Panel title="Library and catalog" description="What people saved, and the place catalog" className={className}>
+      <StatGrid
+        className="sm:grid-cols-2"
+        stats={[
+          { label: "Places saved", value: formatInt(library.saved_places) },
+          { label: "Lists created", value: formatInt(library.lists_created) },
+          { label: "Added to lists", value: formatInt(library.list_additions) },
+          { label: "Catalog places", value: formatInt(library.catalog_places) },
+          { label: "New in catalog", value: formatInt(library.catalog_new) },
+        ]}
+      />
     </Panel>
   );
 }
@@ -386,35 +385,29 @@ export function ApiHealthPanel({ ops, className }: { ops: RecognitionOps; classN
   const now = useNow();
   return (
     <Panel
-      title="API sağlığı"
-      description={`Bu süreç · ${formatDuration(now - Date.parse(ops.process.started_at))} çalışıyor · ${formatInt(memory_mb)} MB`}
+      title="API health"
+      description={`This process · up ${formatDuration(now - Date.parse(ops.process.started_at))} · ${formatInt(memory_mb)} MB`}
       className={className}
     >
       <div className="grid gap-4">
-        <dl className="grid grid-cols-4 gap-2 text-center">
-          {(
-            [
-              ["İstek", api.totals.requests],
-              ["4xx", api.totals["4xx"]],
-              ["5xx", api.totals["5xx"]],
-              ["429", api.totals.rate_limited],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="rounded-lg bg-muted py-2">
-              <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="font-heading text-lg font-semibold tabular-nums">{formatInt(value)}</dd>
-            </div>
-          ))}
-        </dl>
+        <StatGrid
+          className="sm:grid-cols-4"
+          stats={[
+            { label: "Requests", value: formatInt(api.totals.requests) },
+            { label: "4xx", value: formatInt(api.totals["4xx"]) },
+            { label: "5xx", value: formatInt(api.totals["5xx"]) },
+            { label: "429", value: formatInt(api.totals.rate_limited) },
+          ]}
+        />
         {api.routes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Bu süreç başladığından beri API isteği gelmedi.</p>
+          <p className="text-sm text-muted-foreground">No API requests since this process started.</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rota</TableHead>
-                <TableHead className="text-right">İstek</TableHead>
-                <TableHead className="text-right">Hata</TableHead>
+                <TableHead>Route</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+                <TableHead className="text-right">Errors</TableHead>
                 <TableHead className="text-right">p50</TableHead>
                 <TableHead className="text-right">p95</TableHead>
               </TableRow>

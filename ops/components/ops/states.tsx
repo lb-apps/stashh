@@ -8,10 +8,10 @@ export function ServiceError({ error }: { error: Error }) {
   return (
     <Alert variant="destructive">
       <CircleAlert />
-      <AlertTitle>Veri alınamadı</AlertTitle>
+      <AlertTitle>Could not load data</AlertTitle>
       <AlertDescription>
         <p>{error.message}</p>
-        <p className="text-muted-foreground">Servisin çalıştığını ve ops/.env.local ayarlarını kontrol et. Panel otomatik yeniden dener.</p>
+        <p className="text-muted-foreground">Check that the service is running and that ops/.env.local is set. The dashboard retries on its own.</p>
       </AlertDescription>
     </Alert>
   );

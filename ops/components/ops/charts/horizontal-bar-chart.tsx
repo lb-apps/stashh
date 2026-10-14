@@ -24,8 +24,8 @@ export function HorizontalBarChart({
   valueFormatter?: (value: number) => string;
 }) {
   const color = { primary: "var(--chart-1)", muted: "var(--chart-3)", danger: "var(--chart-5)" }[tone];
-  const config = { value: { label: "Değer", color } } satisfies ChartConfig;
-  const data = items.map((item) => ({ ...item, display: item.display ?? valueFormatter?.(item.value) ?? item.value.toLocaleString("tr-TR") }));
+  const config = { value: { label: "Value", color } } satisfies ChartConfig;
+  const data = items.map((item) => ({ ...item, display: item.display ?? valueFormatter?.(item.value) ?? item.value.toLocaleString("en-US") }));
 
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: Math.max(72, data.length * 36) }}>

@@ -130,6 +130,11 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   horizontal bar) in `ops/components/ops/charts/`. They do not animate: data refreshes every 5 s
   and a replayed entrance would hide value labels.
 - Only the detail sheet reads `?id=` (inside its own Suspense); pages must hydrate with the layout.
+- **UI is English** (`en-US` formats in `ops/lib/format.ts`, every label in `ops/lib/labels.ts`).
+- **shadcn components first.** No raw `ul/li/dl/label/button/img` in `ops/components/ops/`: row
+  lists are `ItemGroup`/`Item`, number tiles are `StatGrid` (muted `Item`s), thumbnails are
+  `Avatar` (`Thumb`), covers are `AspectRatio`, cards are `Card`, toggles are `Collapsible`, form
+  labels are `Label`. Add a missing piece with `npx shadcn add`, never hand-roll it.
 
 ## Backend / API
 

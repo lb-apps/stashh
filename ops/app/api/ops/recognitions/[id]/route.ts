@@ -7,7 +7,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/ops/recogni
   if (!UUID.test(id)) return Response.json({ error: "id must be a UUID" }, { status: 400 });
   try {
     const detail = await fetchRecognitionDetail(id);
-    if (!detail) return Response.json({ error: "Tanıma bulunamadı" }, { status: 404 });
+    if (!detail) return Response.json({ error: "Recognition not found" }, { status: 404 });
     return Response.json(detail, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof ServiceUnavailableError) return Response.json({ error: error.message }, { status: 502 });

@@ -5,46 +5,55 @@ import type { Channel, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatu
 
 export const SOURCE_TYPE: Record<SourceType, string> = {
   reel: "Reel",
-  post: "Gönderi",
+  post: "Post",
   igtv: "IGTV",
   tiktok: "TikTok",
-  shared_post: "DM gönderisi",
+  shared_post: "DM post",
 };
 
-export const CHANNEL: Record<Channel, string> = { app: "Uygulama", instagram: "Instagram DM" };
+export const CHANNEL: Record<Channel, string> = { app: "App", instagram: "Instagram DM" };
 
 export const TASK_STATUS: Record<TaskStatus, { label: string; variant: BadgeVariantName }> = {
-  queued: { label: "Kuyrukta", variant: "warning" },
-  processing: { label: "İşleniyor", variant: "info" },
-  completed: { label: "Tamamlandı", variant: "success" },
-  committed: { label: "Kaydedildi", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  cancelled: { label: "İptal", variant: "secondary" },
-  expired: { label: "Süresi doldu", variant: "secondary" },
+  queued: { label: "Queued", variant: "warning" },
+  processing: { label: "Processing", variant: "info" },
+  completed: { label: "Completed", variant: "success" },
+  committed: { label: "Saved", variant: "success" },
+  failed: { label: "Failed", variant: "danger" },
+  cancelled: { label: "Cancelled", variant: "secondary" },
+  expired: { label: "Expired", variant: "secondary" },
 };
 
 export const RUN_OUTCOME: Record<RunOutcome, { label: string; variant: BadgeVariantName }> = {
-  completed: { label: "Yeni işlem", variant: "info" },
+  completed: { label: "Fresh run", variant: "info" },
   cache_hit: { label: "Cache", variant: "secondary" },
-  failed: { label: "Hata", variant: "danger" },
+  failed: { label: "Failed", variant: "danger" },
 };
 
 export const FETCH_METHOD: Record<FetchMethod, string> = {
-  scrape: "Instagram sayfası",
-  downloader: "İndirici (yedek)",
-  tiktok: "TikTok indirici",
-  supplied: "DM'den geldi",
+  scrape: "Instagram page",
+  downloader: "Downloader (fallback)",
+  tiktok: "TikTok downloader",
+  supplied: "From the DM",
 };
 
-export const DM_CONTENT: Record<DmContent, string> = { reel: "Reel", post: "Gönderi", link: "Link", text: "Yazı", other: "Diğer" };
+export const DM_CONTENT: Record<DmContent, string> = { reel: "Reel", post: "Post", link: "Link", text: "Text", other: "Other" };
+
+export const INTENT: Record<string, string> = {
+  recognize: "Recognition",
+  help: "Help",
+  unsupported: "Unsupported",
+  erase: "Delete data",
+};
+
+export const intentLabel = (intent: string | null) => (intent ? (INTENT[intent] ?? intent) : "Unknown");
 
 const STEPS: Record<string, string> = {
-  "content fetched": "İçerik alma",
+  "content fetched": "Content fetch",
   "media analyzed": "Model",
-  "places found": "Google eşleşme",
-  "thumbnails saved": "Görseller",
-  "result saved": "Kaydetme",
-  "cache checked": "Cache kontrolü",
+  "places found": "Google match",
+  "thumbnails saved": "Photos",
+  "result saved": "Save",
+  "cache checked": "Cache check",
   "served from cache": "Cache",
 };
 

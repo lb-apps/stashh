@@ -8,7 +8,7 @@ import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 export function Sparkline({ values, tone = "primary" }: { values: Array<number | null>; tone?: "primary" | "danger" }) {
   const id = useId().replace(/:/g, "");
   const color = tone === "danger" ? "var(--chart-5)" : "var(--chart-1)";
-  const config = { value: { label: "Değer", color } } satisfies ChartConfig;
+  const config = { value: { label: "Value", color } } satisfies ChartConfig;
   const data = values.map((value, index) => ({ index, value: value ?? 0 }));
 
   return (

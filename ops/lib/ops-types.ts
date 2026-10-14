@@ -8,10 +8,10 @@
 export const OPS_RANGES = ["24h", "7d", "30d"] as const;
 export type OpsRange = (typeof OPS_RANGES)[number];
 
-export const RANGE_LABELS: Record<OpsRange, string> = { "24h": "24 saat", "7d": "7 gün", "30d": "30 gün" };
+export const RANGE_LABELS: Record<OpsRange, string> = { "24h": "24 hours", "7d": "7 days", "30d": "30 days" };
 /** For the header on phones. */
-export const RANGE_SHORT_LABELS: Record<OpsRange, string> = { "24h": "24 sa", "7d": "7 g", "30d": "30 g" };
-export const PREVIOUS_LABELS: Record<OpsRange, string> = { "24h": "önceki 24 saate göre", "7d": "önceki 7 güne göre", "30d": "önceki 30 güne göre" };
+export const RANGE_SHORT_LABELS: Record<OpsRange, string> = { "24h": "24h", "7d": "7d", "30d": "30d" };
+export const PREVIOUS_LABELS: Record<OpsRange, string> = { "24h": "vs the previous 24 hours", "7d": "vs the previous 7 days", "30d": "vs the previous 30 days" };
 
 type Ms = number | null;
 

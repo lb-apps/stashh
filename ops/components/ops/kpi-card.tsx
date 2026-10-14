@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatSignedPercent } from "@/lib/format";
 import type { Trend } from "@/lib/trend";
 import { Sparkline } from "./charts/sparkline";
 
@@ -16,11 +17,10 @@ const TREND_BADGE = { good: "success", bad: "danger", neutral: "secondary" } as 
 function TrendBadge({ trend }: { trend: Trend }) {
   if (trend.change == null) return null;
   const Icon = trend.direction === "up" ? TrendingUp : trend.direction === "down" ? TrendingDown : Minus;
-  const percent = new Intl.NumberFormat("tr-TR", { style: "percent", maximumFractionDigits: 0, signDisplay: "exceptZero" }).format(trend.change);
   return (
     <Badge variant={TREND_BADGE[trend.tone]} className="gap-1 tabular-nums">
       <Icon aria-hidden className="size-3" />
-      {percent}
+      {formatSignedPercent(trend.change)}
     </Badge>
   );
 }
@@ -46,7 +46,7 @@ export function KpiCard({
   /** One line of context under the number. */
   detail?: ReactNode;
   trend?: Trend;
-  /** "önceki 24 saate göre" — shown with the trend. */
+  /** "vs the previous 24 hours" — shown with the trend. */
   trendCaption?: string;
   spark?: Array<number | null>;
   sparkTone?: "primary" | "danger";

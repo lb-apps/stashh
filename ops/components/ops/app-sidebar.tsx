@@ -33,7 +33,7 @@ export function AppSidebar() {
                 </span>
                 <span className="grid leading-tight">
                   <span className="font-heading font-semibold">Stashh Ops</span>
-                  <span className="text-xs text-muted-foreground">Yalnızca yerel</span>
+                  <span className="text-xs text-muted-foreground">Local only</span>
                 </span>
               </Link>
             </SidebarMenuButton>
@@ -62,7 +62,7 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarGroup className="p-0">
-          <SidebarGroupLabel>Servisler</SidebarGroupLabel>
+          <SidebarGroupLabel>Services</SidebarGroupLabel>
           <SidebarGroupContent>
             <ServiceHealth />
           </SidebarGroupContent>
@@ -89,7 +89,7 @@ function ServiceHealth() {
             <StatusDot state={query.isError ? "down" : query.isSuccess ? "up" : "unknown"} />
             <span>{name}</span>
             <span className="ml-auto text-xs text-muted-foreground">
-              {query.isError ? "Ulaşılamıyor" : query.isSuccess ? "Çalışıyor" : "Bekleniyor"}
+              {query.isError ? "Unreachable" : query.isSuccess ? "Running" : "Waiting"}
             </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
