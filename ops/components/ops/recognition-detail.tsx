@@ -7,7 +7,7 @@ import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -265,7 +265,11 @@ const STEP_SEGMENTS = [
   { key: "save_ms", step: "result saved", color: STEP_COLORS.save },
 ] as const;
 
-/** shadcn chart-bar-stacked, laid on its side: one bar for the attempt, one segment per step. */
+/**
+ * shadcn chart-bar-stacked, laid on its side: one bar for the attempt, one segment per step.
+ * Each step's time sits in the legend below it, always visible, so there is no hover
+ * tooltip to cover anything.
+ */
 function StepBar({ run }: { run: RecognitionRunDetail }) {
   const segments = STEP_SEGMENTS.filter((segment) => (run[segment.key] ?? 0) > 0);
   if (segments.length === 0) return null;
@@ -273,24 +277,33 @@ function StepBar({ run }: { run: RecognitionRunDetail }) {
   const row = Object.fromEntries([["attempt", run.attempt], ...segments.map((s) => [s.key, run[s.key]])]);
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-16 w-full">
-      <BarChart accessibilityLayer data={[row]} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barSize={10}>
-        <XAxis type="number" hide domain={[0, "dataMax"]} />
-        <YAxis type="category" dataKey="attempt" hide />
-        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel valueFormatter={formatDuration} />} />
-        {segments.map((segment, index) => (
-          <Bar
-            key={segment.key}
-            dataKey={segment.key}
-            stackId="steps"
-            fill={`var(--color-${segment.key})`}
-            radius={segments.length === 1 ? 999 : index === 0 ? [999, 0, 0, 999] : index === segments.length - 1 ? [0, 999, 999, 0] : 0}
-            isAnimationActive={false}
-          />
+    <div className="grid gap-2.5">
+      <ChartContainer config={config} className="aspect-auto h-2.5 w-full" aria-hidden>
+        <BarChart data={[row]} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barSize={10} accessibilityLayer={false}>
+          <XAxis type="number" hide domain={[0, "dataMax"]} />
+          <YAxis type="category" dataKey="attempt" hide />
+          {segments.map((segment, index) => (
+            <Bar
+              key={segment.key}
+              dataKey={segment.key}
+              stackId="steps"
+              fill={`var(--color-${segment.key})`}
+              radius={segments.length === 1 ? 999 : index === 0 ? [999, 0, 0, 999] : index === segments.length - 1 ? [0, 999, 999, 0] : 0}
+              isAnimationActive={false}
+            />
+          ))}
+        </BarChart>
+      </ChartContainer>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption">
+        {segments.map((segment) => (
+          <span key={segment.key} className="flex items-center gap-1.5">
+            <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: segment.color }} />
+            {stepLabel(segment.step)}
+            <span className="numeric font-bold text-muted-foreground">{formatDuration(run[segment.key])}</span>
+          </span>
         ))}
-        <ChartLegend itemSorter={null} content={<ChartLegendContent className="flex-wrap justify-start gap-x-3 gap-y-1 pt-2" />} />
-      </BarChart>
-    </ChartContainer>
+      </div>
+    </div>
   );
 }
 
