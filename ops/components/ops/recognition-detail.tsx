@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -242,6 +242,7 @@ function RunItem({ run }: { run: RecognitionRunDetail }) {
         <ItemTitle className="w-full font-heading text-body font-bold">
           Attempt {run.attempt}
           <Badge variant={outcome.variant}>{outcome.label}</Badge>
+          <span className="numeric ml-auto text-caption font-bold">{formatDuration(run.total_ms)}</span>
         </ItemTitle>
         {run.fetch_method && <span className="micro-label">{FETCH_METHOD[run.fetch_method]}</span>}
         <StepBar run={run} />
@@ -252,7 +253,6 @@ function RunItem({ run }: { run: RecognitionRunDetail }) {
           </ItemDescription>
         )}
       </ItemContent>
-      <ItemActions className="numeric self-start text-caption font-bold">{formatDuration(run.total_ms)}</ItemActions>
     </Item>
   );
 }
@@ -294,13 +294,13 @@ function StepBar({ run }: { run: RecognitionRunDetail }) {
           ))}
         </BarChart>
       </ChartContainer>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption">
+      <div className="grid gap-1 text-caption">
         {segments.map((segment) => (
-          <span key={segment.key} className="flex items-center gap-1.5">
+          <div key={segment.key} className="flex items-center gap-2">
             <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: segment.color }} />
-            {stepLabel(segment.step)}
+            <span className="flex-1">{stepLabel(segment.step)}</span>
             <span className="numeric font-bold text-muted-foreground">{formatDuration(run[segment.key])}</span>
-          </span>
+          </div>
         ))}
       </div>
     </div>
