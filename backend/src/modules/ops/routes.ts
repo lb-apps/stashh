@@ -25,8 +25,9 @@ opsRouter.get("/recognitions", async (req, res, next) => {
   try {
     const range = resolveOpsRange(query.data.range);
     const repository = new OpsRepository(createSupabaseServiceClient());
-    const [stats, queue, recognitions] = await Promise.all([
+    const [stats, dependencies, queue, recognitions] = await Promise.all([
       repository.recognitionStats(range),
+      repository.dependencies(range),
       repository.liveQueue(),
       repository.recentRecognitions(),
     ]);
@@ -36,6 +37,7 @@ opsRouter.get("/recognitions", async (req, res, next) => {
       bucket: range.bucket,
       generated_at: new Date().toISOString(),
       stats,
+      dependencies,
       queue,
       recognitions,
       // This instance only: API traffic since start, and how the worker is configured.

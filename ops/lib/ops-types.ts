@@ -127,9 +127,36 @@ export interface RecognitionListItem {
 export interface ApiRouteHealth {
   route: string;
   requests: number;
-  errors: number;
+  client_errors: number;
+  server_errors: number;
+  rate_limited: number;
+  last_error_at: string | null;
   p50_ms: Ms;
   p95_ms: Ms;
+}
+
+/** One 5-minute bucket of API traffic. */
+export interface ApiSeriesPoint {
+  bucket: string;
+  requests: number;
+  client_errors: number;
+  server_errors: number;
+  rate_limited: number;
+}
+
+export interface ApiServerError {
+  at: string;
+  route: string;
+  status: number;
+  message: string | null;
+}
+
+/** How an outside service did for fresh runs: attempts that reached it, failures there, median time. */
+export interface DependencyHealth {
+  key: "instagram_fetch" | "tiktok_fetch" | "model" | "places" | "storage" | "database";
+  attempts: number;
+  failures: number;
+  typical_ms: Ms;
 }
 
 export interface RecognitionOps {
@@ -138,6 +165,7 @@ export interface RecognitionOps {
   bucket: "hour" | "day";
   generated_at: string;
   stats: RecognitionStats;
+  dependencies: DependencyHealth[];
   queue: QueueItem[];
   recognitions: RecognitionListItem[];
   process: {
@@ -148,7 +176,10 @@ export interface RecognitionOps {
     api: {
       since: string;
       totals: { requests: number; "2xx": number; "3xx": number; "4xx": number; "5xx": number; rate_limited: number };
+      latency: { p50_ms: Ms; p95_ms: Ms };
       routes: ApiRouteHealth[];
+      series: ApiSeriesPoint[];
+      recent_errors: ApiServerError[];
     };
   };
 }

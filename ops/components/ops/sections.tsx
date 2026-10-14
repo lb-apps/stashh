@@ -15,7 +15,6 @@ import {
 import { MapPin, Star } from "lucide-react";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNow } from "@/hooks/use-now";
 import { DASH, formatCompact, formatDecimal, formatDuration, formatInt, formatRating, formatShare, formatUsd } from "@/lib/format";
 import { CHANNEL, FETCH_METHOD, SOURCE_TYPE, stepLabel } from "@/lib/labels";
@@ -375,57 +374,6 @@ export function LibraryPanel({ ops, className }: { ops: RecognitionOps; classNam
           { label: "New in catalog", value: formatInt(library.catalog_new) },
         ]}
       />
-    </Panel>
-  );
-}
-
-/** This backend instance: API traffic by route since it started. */
-export function ApiHealthPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
-  const { api, memory_mb } = ops.process;
-  const now = useNow();
-  return (
-    <Panel
-      title="API health"
-      description={`This process · up ${formatDuration(now - Date.parse(ops.process.started_at))} · ${formatInt(memory_mb)} MB`}
-      className={className}
-    >
-      <div className="grid gap-4">
-        <StatGrid
-          className="sm:grid-cols-4"
-          stats={[
-            { label: "Requests", value: formatInt(api.totals.requests) },
-            { label: "4xx", value: formatInt(api.totals["4xx"]) },
-            { label: "5xx", value: formatInt(api.totals["5xx"]) },
-            { label: "429", value: formatInt(api.totals.rate_limited) },
-          ]}
-        />
-        {api.routes.length === 0 ? (
-          <p className="text-caption text-muted-foreground">No API requests since this process started.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Route</TableHead>
-                <TableHead className="text-right">Requests</TableHead>
-                <TableHead className="text-right">Errors</TableHead>
-                <TableHead className="text-right">Typical</TableHead>
-                <TableHead className="text-right">Slowest 5%</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {api.routes.slice(0, 8).map((route) => (
-                <TableRow key={route.route}>
-                  <TableCell className="max-w-56 truncate font-mono text-[13px]">{route.route}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatInt(route.requests)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatInt(route.errors)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatDuration(route.p50_ms)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatDuration(route.p95_ms)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
     </Panel>
   );
 }

@@ -147,7 +147,10 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   `source-thumbnails` bucket) and `instagram_messages.intent` / `finished_at`. Add a metric there,
   expose it in the service's ops SQL function (`recognition_ops_stats/_list/_detail`,
   `instagram_ops_stats`), then show it. Source type and channel come from the shared SQL helpers
-  `recognition_source_type()` / `recognition_channel()` — never re-derive them elsewhere.
+  `recognition_source_type()` / `recognition_source_platform()` / `recognition_channel()` — never
+  re-derive them elsewhere. API health is in memory per backend process (`lib/api-metrics.ts`:
+  routes, 5-minute series, last server errors) and says so on screen; dependency health comes
+  from `recognition_ops_dependencies()`.
 - Charts follow shadcn's chart blocks (area, interactive bar, donut, radial, line, stacked and
   horizontal bar) in `ops/components/ops/charts/`. They do not animate: data refreshes every 5 s
   and a replayed entrance would hide value labels.

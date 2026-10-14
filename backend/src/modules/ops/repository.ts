@@ -15,6 +15,13 @@ export class OpsRepository {
     return data;
   }
 
+  /** How each outside service (fetchers, model, Google, storage, database) did for fresh runs. */
+  async dependencies({ since }: ResolvedOpsRange): Promise<Json> {
+    const { data, error } = await this.db.rpc("recognition_ops_dependencies", { p_since: since.toISOString() });
+    if (error) throw error;
+    return data;
+  }
+
   /** Tasks waiting or running right now, oldest first. */
   async liveQueue() {
     const { data, error } = await this.db

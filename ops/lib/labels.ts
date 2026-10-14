@@ -1,5 +1,7 @@
 import type { BadgeVariantName } from "@/components/ui/badge";
-import type { Channel, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+import type { Channel, DependencyHealth, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+
+type DependencyKey = DependencyHealth["key"];
 
 /** Every name the dashboard gives to the system's states, in one place. */
 
@@ -55,6 +57,15 @@ const STEPS: Record<string, string> = {
   "result saved": "Save",
   "cache checked": "Cache check",
   "served from cache": "Cache",
+};
+
+export const DEPENDENCY: Record<DependencyKey, { label: string; detail: string }> = {
+  instagram_fetch: { label: "Instagram", detail: "Reading the post or Reel" },
+  tiktok_fetch: { label: "TikTok", detail: "Reading the video or photos" },
+  model: { label: "Model", detail: "OpenRouter, finding the places" },
+  places: { label: "Google Places", detail: "Matching each place" },
+  storage: { label: "Photo storage", detail: "Saving covers and place photos" },
+  database: { label: "Database", detail: "Saving the result" },
 };
 
 export const stepLabel = (step: string | null | undefined) => (step ? (STEPS[step] ?? step) : "—");

@@ -18,7 +18,6 @@ import { KpiCard, KpiGrid } from "../kpi-card";
 import { PageHeader } from "../page-header";
 import { Panel } from "../panel";
 import { DmKpis, KpiGridSkeleton, PanelSkeleton } from "../sections";
-import { StatGrid } from "../stat-grid";
 import { ServiceError } from "../states";
 import { MessageFailuresTable } from "../tables";
 
@@ -68,7 +67,6 @@ export function InstagramPage() {
   const { stats } = ig;
   const { totals, live, previous, intents, outcomes, senders } = stats;
   const finished = totals.replied + totals.failed + totals.expired;
-  const webhooks = stats.process.webhooks;
 
   return (
     <>
@@ -169,23 +167,10 @@ export function InstagramPage() {
             ]}
           />
         </Panel>
-        <Panel title="Webhooks" description={`Since this process started · ${formatDateTime(webhooks.since)}`} className="lg:col-span-2">
-          <StatGrid
-            stats={[
-              { label: "Deliveries", value: formatInt(webhooks.deliveries) },
-              { label: "Messages queued", value: formatInt(webhooks.messages_queued) },
-              { label: "Duplicates (skipped)", value: formatInt(webhooks.messages_duplicate) },
-              { label: "Bad signature", value: formatInt(webhooks.rejected_signature) },
-              { label: "Unknown payload", value: formatInt(webhooks.ignored_envelope) },
-              { label: "Other account", value: formatInt(webhooks.other_account) },
-            ]}
-          />
+        <Panel title="Unanswered messages" description="Latest 10" className="lg:col-span-2">
+          <MessageFailuresTable failures={stats.recent_failures} />
         </Panel>
       </div>
-
-      <Panel title="Unanswered messages" description="Latest 10">
-        <MessageFailuresTable failures={stats.recent_failures} />
-      </Panel>
     </>
   );
 }

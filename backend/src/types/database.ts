@@ -1095,11 +1095,16 @@ export type Database = {
         Args: { p_owner_user_id: string }
         Returns: string
       }
+      recognition_ops_dependencies: { Args: { p_since: string }; Returns: Json }
       recognition_ops_detail: { Args: { p_task_id: string }; Returns: Json }
       recognition_ops_list: { Args: { p_limit: number }; Returns: Json }
       recognition_ops_stats: {
         Args: { p_bucket: string; p_since: string }
         Returns: Json
+      }
+      recognition_source_platform: {
+        Args: { p_source_url: string }
+        Returns: string
       }
       recognition_source_type: {
         Args: { p_source_url: string }

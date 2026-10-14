@@ -12,7 +12,6 @@ import { Panel } from "../panel";
 import { RecognitionDetailFromUrl } from "../detail-from-url";
 import { RecognitionGallery } from "../recognitions-browser";
 import {
-  ApiHealthPanel,
   ChannelMixPanel,
   CostKpi,
   DmKpis,
@@ -147,7 +146,6 @@ export function OverviewPage() {
               <QueueTable items={ops.queue} onOpen={openDetail} />
             </Panel>
             <LibraryPanel ops={ops} />
-            <ApiHealthPanel ops={ops} className="lg:col-span-3" />
           </>
         ) : (
           <PanelSkeleton className="lg:col-span-3" height="h-40" />
