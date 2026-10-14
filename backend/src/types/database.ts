@@ -277,6 +277,7 @@ export type Database = {
           created_at: string
           id: string
           places: Json
+          source_thumbnail_url: string | null
           source_type: string | null
           source_url: string
           updated_at: string
@@ -287,6 +288,7 @@ export type Database = {
           created_at?: string
           id?: string
           places?: Json
+          source_thumbnail_url?: string | null
           source_type?: string | null
           source_url: string
           updated_at?: string
@@ -297,6 +299,7 @@ export type Database = {
           created_at?: string
           id?: string
           places?: Json
+          source_thumbnail_url?: string | null
           source_type?: string | null
           source_url?: string
           updated_at?: string
@@ -313,6 +316,7 @@ export type Database = {
           cost_usd: number | null
           error_message: string | null
           failed_step: string | null
+          fetch_method: string | null
           fetch_ms: number | null
           finished_at: string
           id: string
@@ -340,6 +344,7 @@ export type Database = {
           cost_usd?: number | null
           error_message?: string | null
           failed_step?: string | null
+          fetch_method?: string | null
           fetch_ms?: number | null
           finished_at?: string
           id?: string
@@ -367,6 +372,7 @@ export type Database = {
           cost_usd?: number | null
           error_message?: string | null
           failed_step?: string | null
+          fetch_method?: string | null
           fetch_ms?: number | null
           finished_at?: string
           id?: string
@@ -1085,9 +1091,19 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      recognition_channel: {
+        Args: { p_owner_user_id: string }
+        Returns: string
+      }
+      recognition_ops_detail: { Args: { p_task_id: string }; Returns: Json }
+      recognition_ops_list: { Args: { p_limit: number }; Returns: Json }
       recognition_ops_stats: {
         Args: { p_bucket: string; p_since: string }
         Returns: Json
+      }
+      recognition_source_type: {
+        Args: { p_source_url: string }
+        Returns: string
       }
       recover_stale_recognitions: {
         Args: { p_claim_limit?: number; p_stale_after_milliseconds: number }
