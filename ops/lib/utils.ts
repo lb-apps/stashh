@@ -14,6 +14,12 @@ export const cn = createCn({
     classGroups: {
       shadow: [{ depth: ["card", "float", "thumb", "inset"] }, "gloss"],
       "font-family": [{ font: ["numeric"] }],
+      "micro-label": ["micro-label"],
+    },
+    // `micro-label` sets its own size, weight, tracking, case and colour: it must replace a
+    // component's default text classes (e.g. ItemDescription's text-caption), not lose to them.
+    conflictingClassGroups: {
+      "micro-label": ["font-size", "font-weight", "leading", "tracking", "text-color", "text-transform"],
     },
   },
 });

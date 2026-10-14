@@ -100,12 +100,28 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
   const cost = detail.runs.reduce((sum, run) => sum + (run.cost_usd ?? 0), 0);
   const isUrl = detail.source_url.startsWith("http");
 
+  // Read top to bottom: what was read (source, caption), what was found, how the run went.
   return (
     <div className="grid gap-5">
       <div className="flex items-start gap-4">
         <Thumb url={detail.source?.thumbnail_url ?? null} icon={SOURCE_ICON[detail.source_type]} className="size-16" />
         <div className="grid min-w-0 flex-1 gap-1">
-          <h2 className="truncate font-heading text-headline font-black">{formatSource(detail.source_url)}</h2>
+          <h2 className="min-w-0 font-heading text-headline font-black">
+            {isUrl ? (
+              <a
+                href={detail.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-w-0 items-center gap-1.5 rounded-tile hover:text-primary focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-cobalt-300"
+              >
+                <span className="min-w-0 truncate">{formatSource(detail.source_url)}</span>
+                <ExternalLink aria-hidden className="size-4 shrink-0" />
+                <span className="sr-only">(opens the source)</span>
+              </a>
+            ) : (
+              <span className="block truncate">{formatSource(detail.source_url)}</span>
+            )}
+          </h2>
           <div className="flex flex-wrap gap-1.5 pt-0.5">
             <Badge variant="success">{SOURCE_TYPE[detail.source_type]}</Badge>
             <Badge variant="outline">{CHANNEL[detail.channel]}</Badge>
@@ -113,21 +129,6 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
           </div>
         </div>
       </div>
-
-      <StatGrid
-        size="md"
-        // Places is one digit, cost is up to "$0.0032": share the width accordingly.
-        className="grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1.15fr)] sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1.15fr)]"
-        stats={[
-          { label: "Places", value: detail.places.length },
-          { label: "Duration", value: formatDuration(lastRun?.total_ms) },
-          { label: "Cost", value: detail.runs.some((r) => r.cost_usd != null) ? formatUsd(cost) : DASH },
-        ]}
-      />
-      <p className="-mt-2 text-caption text-muted-foreground">
-        {formatDateTime(detail.created_at)} · waited {formatDuration(waited)} in the queue · {detail.runs.length}{" "}
-        {detail.runs.length === 1 ? "attempt" : "attempts"}
-      </p>
 
       {detail.status === "failed" && detail.error_message && (
         <Alert variant="destructive">
@@ -137,7 +138,9 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
         </Alert>
       )}
 
-      <Section label="Extracted places">
+      {detail.source?.caption && <Caption text={detail.source.caption} />}
+
+      <Section label={detail.places.length ? `Extracted places · ${detail.places.length}` : "Extracted places"}>
         {detail.places.length === 0 ? (
           <p className="text-caption text-muted-foreground">No places resolved from this source.</p>
         ) : (
@@ -149,7 +152,18 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
         )}
       </Section>
 
-      <Section label="Attempts">
+      <Section label="Process">
+        <StatGrid
+          size="md"
+          className="grid-cols-2 sm:grid-cols-2"
+          stats={[
+            { label: "Duration", value: formatDuration(lastRun?.total_ms) },
+            { label: "Cost", value: detail.runs.some((r) => r.cost_usd != null) ? formatUsd(cost) : DASH },
+          ]}
+        />
+        <p className="text-caption text-muted-foreground">
+          {formatDateTime(detail.created_at)} · waited {formatDuration(waited)} in the queue
+        </p>
         {detail.runs.length === 0 ? (
           <p className="text-caption text-muted-foreground">This recognition ran before attempts were recorded.</p>
         ) : (
@@ -160,17 +174,6 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
           </ItemGroup>
         )}
       </Section>
-
-      {detail.source?.caption && <Caption text={detail.source.caption} />}
-
-      {isUrl && (
-        <Button asChild>
-          <a href={detail.source_url} target="_blank" rel="noreferrer">
-            Open source <ExternalLink aria-hidden />
-          </a>
-        </Button>
-      )}
-
     </div>
   );
 }
