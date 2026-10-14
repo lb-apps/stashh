@@ -18,6 +18,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `ios/Stashh/` | SwiftUI app (target iOS 26.4, Swift 6) |
 | `backend/` | Express + Zod + OpenAPI API |
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
+| `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -115,7 +116,7 @@ theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
 - **iOS:** build in Xcode. Configs in `ios/Configurations/*.xcconfig`; runtime values (API base URL, Supabase keys) in `ios/Config/*.plist` per environment (Testing/Staging/Production).
   `ios/Config/*.plist` holds real credentials and is **gitignored** — on a fresh clone, copy each `ios/Config/<Env>.plist.example` to `ios/Config/<Env>.plist` and fill in the values before building.
-- **Backend dev:** `cd backend && PORT=3001 npx tsx src/index.ts` (allow-listed in `.claude/settings.local.json`). OpenAPI at `localhost:3001/openapi.json`.
+- **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`).
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
