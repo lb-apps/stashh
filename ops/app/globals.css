@@ -1,0 +1,130 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Discovery is the single source of colour, depth, radius, type and motion. These
+   files are imported from web/, never copied, so a token change reaches both apps.
+   base.css is left out on purpose: its element resets belong to web/. */
+@import "../../web/lib/discovery/tokens/colors.css";
+@import "../../web/lib/discovery/tokens/elevation.css";
+@import "../../web/lib/discovery/tokens/radius.css";
+@import "../../web/lib/discovery/tokens/fonts.css";
+@import "../../web/lib/discovery/tokens/motion.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Status hues for marks (dots, bars, badge fills) — never as text colour: on white
+     they sit under 4.5:1, so status text stays ink beside the mark. */
+  --color-success: var(--green-600);
+  --color-success-soft: var(--green-100);
+  --color-warning: var(--amber-500);
+  --color-warning-soft: var(--amber-100);
+  --color-danger: var(--red-500);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Depth comes from the bone/white contrast plus Discovery's soft warm shadow, not
+   hairlines. Own name: Tailwind reads shadow-<colour> as a shadow colour, and its
+   shadow-* scale cannot take a var(). */
+@utility depth-card {
+  box-shadow: var(--sh-card);
+}
+
+/* shadcn's semantic variables, mapped onto Discovery. Light only: Discovery has no
+   dark theme. */
+:root {
+  /* Discovery's controls use 12–24px corners; 12px here gives cards ~17px and
+     controls ~10px on shadcn's scale — rounded, but dense enough for an ops screen. */
+  --radius: var(--r-sm);
+
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--cobalt-500);
+  --primary-foreground: var(--text-on-brand);
+  --secondary: var(--fill-secondary);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-sunken-on-white);
+  /* Discovery's secondary grey (#8E8B86) is ~3.3:1 on white — too faint for the many
+     small labels of a dense screen. grey-800 keeps the warm family at ~9:1. */
+  --muted-foreground: var(--grey-800);
+  --accent: var(--cobalt-tint-08);
+  --accent-foreground: var(--cobalt-700);
+  --destructive: var(--red-500);
+  --border: var(--hairline);
+  --input: var(--fill-secondary);
+  --ring: var(--cobalt-300);
+
+  /* Charts: cobalt carries the main series, warm greys the rest; failures use red. */
+  --chart-1: var(--cobalt-500);
+  --chart-2: var(--cobalt-300);
+  --chart-3: var(--grey-600);
+  --chart-4: var(--grey-500);
+  --chart-5: var(--red-500);
+
+  --sidebar: var(--bone-50);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--cobalt-500);
+  --sidebar-primary-foreground: var(--text-on-brand);
+  --sidebar-accent: var(--surface-card);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--cobalt-300);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}
