@@ -22,8 +22,9 @@ polling (`RECOGNITIONS_POLL_MAX_MS`) if Realtime is unavailable.
 Validated at boot by [`src/config.ts`](../src/config.ts); the process exits on a bad value.
 [`.env.example`](../.env.example) lists every variable with comments.
 
-Required: `GEMINI_API_KEY`, `GOOGLE_PLACES_API_KEY`, `SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`.
+Required: `OPENROUTER_API_KEY`, `GOOGLE_PLACES_API_KEY`, `SUPABASE_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`. `OPENROUTER_MODEL` defaults to
+`google/gemini-3.8-flash`; any replacement must accept video input and structured outputs.
 
 Internal API (needed by the Instagram channel): `INTERNAL_API_TOKENS` — comma-separated,
 each ≥ 32 chars. List the old and new token together while rotating, then drop the old.

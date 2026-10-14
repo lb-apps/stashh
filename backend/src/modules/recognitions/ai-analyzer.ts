@@ -1,5 +1,5 @@
-import { GoogleGenAI, Type, createPartFromUri } from "@google/genai";
 import { config } from "../../config.js";
+import { createOpenRouterClient, type ContentPart } from "../../lib/openrouter.js";
 import type { Logger } from "../../lib/logger.js";
 import type {
   AIAnalysisResult,
@@ -54,16 +54,16 @@ function normalizeRecommendations(
   return out;
 }
 
-const genai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
+const openRouter = createOpenRouterClient({ apiKey: config.OPENROUTER_API_KEY });
 
-const SYSTEM_PROMPT = `You extract featured venues from one short-form social post (caption + video).
+const SYSTEM_PROMPT = `You extract featured venues from one social post (caption + its video or image).
 
 Rules:
 - Return only specific businesses likely to have a Google Maps listing.
 - Never return cities, neighborhoods, streets, or generic place types.
 - Exclude venues mentioned only as landmarks (e.g. "across from X").
 - Prefer precision over recall; if unsure, omit.
-- instagram_username: only include a handle if the caption contains that exact @mention for the venue, or the video clearly shows an @username on screen for that business. Otherwise null. Never infer from business name, speech, signage without @, or URL paths.
+- instagram_username: only include a handle if the caption contains that exact @mention for the venue, or the video or image clearly shows an @username for that business. Otherwise null. Never infer from business name, speech, signage without @, or URL paths.
 - recommendations must include only explicit creator tips tied to that venue.
 - recommendations summary must be English, concise, imperative, and neutral.
 - For consumables (dish/drink/cocktail/dessert), use "Try ..." phrasing.
@@ -71,112 +71,97 @@ Rules:
 
 Output must strictly follow the provided JSON schema.`;
 
+// Strict JSON Schema (OpenRouter structured outputs): every property is required and
+// optional values are expressed as nullable types.
 const responseSchema = {
-  type: Type.OBJECT,
+  type: "object",
   properties: {
     places: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          name: { type: Type.STRING, description: "The venue's proper name" },
+          name: { type: "string", description: "The venue's proper name" },
           instagram_username: {
-            type: Type.STRING,
+            type: ["string", "null"],
             description:
-              "Handle without @ only if post caption includes that @mention or video shows that @ on screen; else null",
-            nullable: true,
+              "Handle without @ only if post caption includes that @mention or the video or image shows that @; else null",
           },
           location_hint: {
-            type: Type.STRING,
+            type: ["string", "null"],
             description: "City or neighborhood as a Google Maps search hint only",
-            nullable: true,
           },
           recommendations: {
-            type: Type.ARRAY,
+            type: "array",
             description:
               "Only tips explicitly endorsed in caption, spoken audio, or on-screen text for this venue. Empty if the creator only shows food without recommendation language.",
             items: {
-              type: Type.OBJECT,
+              type: "object",
               properties: {
                 summary: {
-                  type: Type.STRING,
+                  type: "string",
                   description:
                     "English imperative tip; consumable kinds default to Try the … / Try … (not Order the …). Same voice as other summaries per system recommendation_voice (6-18 words, no emoji)",
                 },
                 kind: {
-                  type: Type.STRING,
+                  type: "string",
                   enum: venueRecommendationKindValues,
                   description: "Category for UI",
                 },
               },
               required: ["summary", "kind"],
+              additionalProperties: false,
             },
           },
           confidence_score: {
-            type: Type.NUMBER,
+            type: "number",
             description: "Confidence between 0.0 and 1.0",
           },
           source: {
-            type: Type.STRING,
+            type: "string",
             enum: ["video"],
           },
         },
-        required: ["name", "instagram_username", "recommendations", "confidence_score", "source"],
+        required: ["name", "instagram_username", "location_hint", "recommendations", "confidence_score", "source"],
+        additionalProperties: false,
       },
     },
   },
   required: ["places"],
+  additionalProperties: false,
 };
 
-const INLINE_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+type MediaKind = AIAnalysisResult["media_kind"];
 
-async function uploadVideoToGemini(
-  videoUrl: string,
-  log: Logger,
-): Promise<{ fileRef: { uri: string; name: string } | null; inlineData: { data: string; mimeType: string } | null }> {
+/**
+ * The model input for downloaded media, chosen by what the server says it is: a feed
+ * post shared in a DM may be a photo or a video, and only the response knows which.
+ * Media goes as a base64 data URL, the only form Gemini accepts on OpenRouter.
+ */
+export function toMediaPart(contentType: string | null, base64: string): { kind: MediaKind; part: ContentPart } {
+  const mimeType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (mimeType.startsWith("video/")) {
+    return { kind: "video", part: { type: "video_url", video_url: { url: `data:${mimeType};base64,${base64}` } } };
+  }
+  if (mimeType.startsWith("image/")) {
+    return { kind: "image", part: { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } } };
+  }
+  throw new Error(`Post media has an unsupported content type: ${mimeType || "unknown"}`);
+}
+
+async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaKind; part: ContentPart }> {
   const t0 = Date.now();
-  const res = await fetch(videoUrl);
-  if (!res.ok) throw new Error(`Failed to fetch video: HTTP ${res.status} ${res.statusText}`);
+  const res = await fetch(mediaUrl);
+  if (!res.ok) throw new Error(`Failed to fetch media: HTTP ${res.status} ${res.statusText}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.length === 0) throw new Error(`Video response body was empty`);
-  const size = Math.round(buffer.length / 1024);
-  const downloadMs = Date.now() - t0;
-  log.info({ size, duration: downloadMs }, "video downloaded");
-
-  if (buffer.length <= INLINE_VIDEO_MAX_BYTES) {
-    log.debug({ size }, "using inline data (under 20MB)");
-    return {
-      fileRef: null,
-      inlineData: { data: buffer.toString("base64"), mimeType: "video/mp4" },
-    };
-  }
-
-  const t1 = Date.now();
-  const blob = new Blob([buffer], { type: "video/mp4" });
-  let uploadedFile;
-  try {
-    uploadedFile = await genai.files.upload({
-      file: blob,
-      config: { mimeType: "video/mp4", displayName: "instagram-reel" },
-    });
-  } catch (uploadError) {
-    const detail = uploadError instanceof Error ? uploadError.message : String(uploadError);
-    throw new Error(`Gemini file upload failed: ${detail}`);
-  }
-
-  let file = uploadedFile;
-  while (file.state === "PROCESSING") {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    file = await genai.files.get({ name: file.name! });
-  }
-  if (file.state !== "ACTIVE") throw new Error(`Gemini file processing finished with state="${file.state}"`);
-
-  log.info({ duration: Date.now() - t1 }, "video uploaded to Gemini");
-  return { fileRef: { uri: file.uri!, name: file.name! }, inlineData: null };
+  if (buffer.length === 0) throw new Error(`Media response body was empty`);
+  const media = toMediaPart(res.headers.get("content-type"), buffer.toString("base64"));
+  log.info({ kind: media.kind, size: Math.round(buffer.length / 1024), duration: Date.now() - t0 }, "media downloaded");
+  return media;
 }
 
 export async function analyzeContent(
-  videoUrl: string,
+  mediaUrl: string,
   caption: string | null,
   log: Logger,
   platform: SourcePlatform = "instagram",
@@ -187,7 +172,7 @@ export async function analyzeContent(
     captionLength: caption?.length ?? 0,
   }, "analyze start");
 
-  const { fileRef, inlineData } = await uploadVideoToGemini(videoUrl, log);
+  const media = await fetchMedia(mediaUrl, log);
 
   const t = Date.now();
 
@@ -196,44 +181,44 @@ export async function analyzeContent(
   // explicitly ask the model to leave the field null.
   const handleRule =
     platform === "instagram"
-      ? "For instagram_username: only if that @handle appears in this caption or as a clear @ on-screen for that venue in the video."
+      ? `For instagram_username: only if that @handle appears in this caption or as a clear @ on-screen for that venue in the ${media.kind}.`
       : "For instagram_username: always return null. This post is from TikTok, so any @handle here is a TikTok handle, not an Instagram one.";
 
-  const postNoun = platform === "tiktok" ? "TikTok video" : "Instagram post";
+  const postNoun = platform === "tiktok" ? "TikTok video" : `Instagram ${media.kind === "image" ? "photo post" : "post"}`;
 
   const userText = caption
     ? `Extract featured venues and any concrete per-venue recommendations from this ${postNoun}.\n\nPost caption:\n${caption}\n\n${handleRule}`
     : `Extract featured venues and any concrete per-venue recommendations visible or audible in this ${postNoun}.\n\n${handleRule}`;
 
-  const videoPart = inlineData
-    ? { inlineData }
-    : createPartFromUri(fileRef!.uri, "video/mp4");
-
-  let response;
+  let completion;
   try {
-    response = await genai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [videoPart, { text: userText }] }],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        responseSchema,
-        maxOutputTokens: 8192,
-        temperature: 0.2,
-      },
+    completion = await openRouter.complete({
+      model: config.OPENROUTER_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            media.part,
+            { type: "text", text: userText },
+          ],
+        },
+      ],
+      jsonSchema: { name: "featured_venues", schema: responseSchema },
+      // Reasoning tokens count against max_tokens, so leave room for both.
+      maxTokens: 16384,
+      reasoningEffort: "low",
     });
-  } catch (geminiError) {
-    const detail = geminiError instanceof Error ? geminiError.message : String(geminiError);
-    throw new Error(`Gemini generateContent failed: ${detail}`);
+  } catch (error) {
+    throw new Error(`Model analysis failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  const text = response.text;
-  const finishReason = response.candidates?.[0]?.finishReason;
-  if (finishReason && finishReason !== "STOP") {
-    log.warn({ finishReason }, "Gemini non-STOP finish reason");
+  const text = completion.content;
+  const finishReason = completion.finishReason;
+  if (finishReason && finishReason !== "stop") {
+    log.warn({ finishReason, model: completion.model }, "model non-stop finish reason");
   }
-  if (!text) throw new Error("Gemini returned an empty response");
-  log.debug({ responseLength: text.length }, "raw response");
+  log.debug({ responseLength: text.length, model: completion.model }, "raw response");
 
   let parsed: {
     places: Array<{
@@ -248,18 +233,15 @@ export async function analyzeContent(
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch (error) {
-    const truncationNote = finishReason === "MAX_TOKENS" ? " (truncated)" : "";
+    const truncationNote = finishReason === "length" ? " (truncated)" : "";
     log.debug({ finishReason, responseLength: text.length, responseTail: text.slice(-200) }, "parse error context");
-    throw new Error(`Failed to parse Gemini JSON response: ${error instanceof Error ? error.message : String(error)}${truncationNote}`);
+    throw new Error(`Failed to parse model JSON response: ${error instanceof Error ? error.message : String(error)}${truncationNote}`);
   }
 
-  const analyzeMs = Date.now() - t;
-  void analyzeMs;
-  if (fileRef) {
-    genai.files.delete({ name: fileRef.name }).catch(() => {});
-  }
+  log.info({ duration: Date.now() - t, model: completion.model, kind: media.kind }, "media analyzed");
 
   return {
+    media_kind: media.kind,
     places: parsed.places.map((p) => {
       const raw = p.instagram_username?.trim().replace(/^@/, "") ?? "";
       const instagram_username = enforceInstagramUsernamePolicy(raw || null, caption);

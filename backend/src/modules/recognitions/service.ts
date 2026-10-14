@@ -5,6 +5,7 @@ import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, So
 import type { RecognitionRepository } from "./repository.js";
 import type {
   RecognitionResultRow,
+  RecognitionSource,
   RecognitionTaskOptions,
   RecognitionTaskRow,
 } from "./types.js";
@@ -31,9 +32,14 @@ function normalizeInstagramSourceUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
+/** Result-cache key of a post shared in an Instagram DM, which has no URL. */
+function instagramMediaKey(mediaId: string): string {
+  return `instagram-media:${mediaId}`;
+}
+
 interface EnqueueRecognitionParams {
   ownerUserId: string;
-  sourceUrl: string;
+  source: RecognitionSource;
   options?: RecognitionTaskOptions;
   /**
    * Caller-supplied key (e.g. the channel's message id). A repeat with the same key
@@ -118,7 +124,12 @@ export class RecognitionService {
   constructor(private readonly recognitionRepository: RecognitionRepository) {}
 
   async enqueueRecognition(params: EnqueueRecognitionParams): Promise<RecognitionTaskRow> {
-    const sourceUrl = normalizeInstagramSourceUrl(params.sourceUrl);
+    const { source } = params;
+    const sourceUrl = source.kind === "url" ? normalizeInstagramSourceUrl(source.url) : instagramMediaKey(source.mediaId);
+    const sourceMedia =
+      source.kind === "shared_media"
+        ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: "post" }
+        : null;
     const options = params.options ?? {};
     const { idempotencyKey } = params;
 
@@ -135,6 +146,7 @@ export class RecognitionService {
         retry_count: 0,
         options: options as Json,
         idempotency_key: idempotencyKey ?? null,
+        source_media: sourceMedia,
       });
     } catch (error) {
       // Lost a race with a concurrent request carrying the same key: return the winner.
@@ -208,11 +220,13 @@ export class RecognitionService {
     sourceUrl: string,
     places: RecognitionResultPlace[],
     sourceContent: SourceContent,
+    mediaKind: "video" | "image",
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
       sourceUrl,
       places: places as unknown as Json,
-      videoUrl: sourceContent.video_url,
+      // The stored field means "video"; a photo post has none.
+      videoUrl: mediaKind === "video" ? sourceContent.media_url : null,
       caption: sourceContent.caption,
       sourceType: sourceContent.source_type,
     });

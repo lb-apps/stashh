@@ -69,7 +69,7 @@ recognitionsRouter.post("/", async (req, res, next) => {
 
     const recognition = await recognitionService.enqueueRecognition({
       ownerUserId,
-      sourceUrl: parsedBody.data.source_url,
+      source: { kind: "url", url: parsedBody.data.source_url },
       options: {
         bypass_cache: req.headers["x-bypass-cache"] === "true",
       },

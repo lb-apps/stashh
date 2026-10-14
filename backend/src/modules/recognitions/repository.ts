@@ -36,7 +36,7 @@ interface FailRecognitionParams {
 interface UpsertRecognitionResultParams {
   sourceUrl: string;
   places: Json;
-  videoUrl: string;
+  videoUrl: string | null;
   caption: string | null;
   sourceType: SourceType;
 }

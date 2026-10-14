@@ -7,7 +7,7 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
-      GEMINI_API_KEY: "test",
+      OPENROUTER_API_KEY: "test",
       GOOGLE_PLACES_API_KEY: "test",
       SUPABASE_URL: "http://127.0.0.1:54321",
     },

@@ -35,6 +35,7 @@ function task(partial: Partial<RecognitionTaskRow> & { owner_user_id: string; so
     error_message: null,
     retry_count: 0,
     idempotency_key: null,
+    source_media: null,
     created_at: "2026-10-14T00:00:00Z",
     updated_at: "2026-10-14T00:00:00Z",
     ...partial,
@@ -52,15 +53,15 @@ function setup() {
 describe("RecognitionService.enqueueRecognition", () => {
   it("normalises the source URL and stores the idempotency key", async () => {
     const { service } = setup();
-    const created = await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL, idempotencyKey: "mid-1" });
+    const created = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-1" });
     expect(created.source_url).toBe("https://instagram.com/reel/ABC123");
     expect(created.idempotency_key).toBe("mid-1");
   });
 
   it("returns the original task for a repeated key", async () => {
     const { repo, service } = setup();
-    const first = await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL, idempotencyKey: "mid-1" });
-    const second = await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL, idempotencyKey: "mid-1" });
+    const first = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-1" });
+    const second = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-1" });
     expect(second.id).toBe(first.id);
     expect(repo.tasks).toHaveLength(1);
   });
@@ -68,14 +69,37 @@ describe("RecognitionService.enqueueRecognition", () => {
   it("returns the winner when a concurrent request inserts the same key first", async () => {
     const { repo, service } = setup();
     repo.raceOnNextInsert = task({ id: "winner", owner_user_id: OWNER, source_url: URL, idempotency_key: "mid-2" });
-    const result = await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL, idempotencyKey: "mid-2" });
+    const result = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-2" });
     expect(result.id).toBe("winner");
   });
 
   it("creates a new task every time without a key", async () => {
     const { repo, service } = setup();
-    await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL });
-    await service.enqueueRecognition({ ownerUserId: OWNER, sourceUrl: URL });
+    await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } });
+    await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } });
     expect(repo.tasks).toHaveLength(2);
+  });
+
+  it("keys a shared Instagram post by its media id and keeps its content for the worker", async () => {
+    const { repo, service } = setup();
+    const source = {
+      kind: "shared_media" as const,
+      provider: "instagram" as const,
+      mediaId: "18008721881113680",
+      mediaUrl: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=x",
+      caption: "jazz clubs",
+    };
+    const created = await service.enqueueRecognition({ ownerUserId: OWNER, source, idempotencyKey: "mid-9" });
+    expect(created.source_url).toBe("instagram-media:18008721881113680");
+    expect(created.source_media).toEqual({
+      media_url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=x",
+      caption: "jazz clubs",
+      platform: "instagram",
+      source_type: "post",
+    });
+
+    const again = await service.enqueueRecognition({ ownerUserId: OWNER, source, idempotencyKey: "mid-9" });
+    expect(again.id).toBe(created.id);
+    expect(repo.tasks).toHaveLength(1);
   });
 });

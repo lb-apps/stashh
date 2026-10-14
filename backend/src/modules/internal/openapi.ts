@@ -2,7 +2,7 @@ import { z } from "zod";
 import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
 import { channelIdentityParamsSchema } from "../identities/types.js";
 import { recognitionEnqueuedSchema, recognitionStatusSchema } from "../recognitions/openapi.js";
-import { createRecognitionRequestSchema } from "../recognitions/types.js";
+import { createInternalRecognitionRequestSchema } from "../recognitions/types.js";
 
 registry.registerComponent("securitySchemes", "ServiceToken", {
   type: "http",
@@ -61,13 +61,16 @@ registry.registerPath({
   method: "post",
   path: "/users/{userId}/recognitions",
   summary: "Enqueue recognition for a user",
-  description: `Same contract as the public \`POST /recognitions\`, on behalf of \`userId\`.
+  description: `Same contract as the public \`POST /recognitions\`, on behalf of \`userId\`, with one more source:
+\`shared_media\` — a post shared in an Instagram DM, which has no permalink. The channel sends the
+signed Instagram CDN link and the caption it received; the task is keyed \`instagram-media:<media_id>\`,
+so the same post is served from cache afterwards.
 
 Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key for the same user returns the original task instead of enqueuing a second one.`,
   request: {
     params: userParams,
     headers: z.object({ "Idempotency-Key": z.string().min(1).max(255).optional() }),
-    body: { content: { "application/json": { schema: createRecognitionRequestSchema } } },
+    body: { content: { "application/json": { schema: createInternalRecognitionRequestSchema } } },
   },
   responses: {
     202: { description: "Recognition enqueued (or the original, for a repeated key)", content: { "application/json": { schema: successEnvelope(recognitionEnqueuedSchema, "InternalEnqueueRecognition") } } },

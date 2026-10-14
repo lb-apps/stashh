@@ -29,6 +29,46 @@ export const createRecognitionRequestSchema = z.object({
     .refine(isSupportedSourceUrl, "Must be an Instagram post, Reel or IGTV link, or a TikTok video link"),
 });
 
+/**
+ * What a recognition reads. A URL is scraped; shared media arrives with its content
+ * because the channel that received it holds the only copy (an Instagram post shared
+ * in a DM has no permalink, just a signed CDN link and the caption).
+ */
+export type RecognitionSource =
+  | { kind: "url"; url: string }
+  | { kind: "shared_media"; provider: "instagram"; mediaId: string; mediaUrl: string; caption: string | null };
+
+/** Hosts Instagram's messaging CDN serves shared media from. */
+const SHARED_MEDIA_HOST = /(?:^|\.)(?:fbsbx\.com|cdninstagram\.com|fbcdn\.net)$/i;
+
+function isSharedMediaUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && SHARED_MEDIA_HOST.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const sharedMediaSchema = z.object({
+  provider: z.literal("instagram"),
+  media_id: z.string().regex(/^\d{1,32}$/, "media_id must be numeric"),
+  media_url: z.string().url().refine(isSharedMediaUrl, "media_url must be an https Instagram CDN link"),
+  caption: z.string().max(10_000).nullable().optional(),
+});
+
+/** Internal API: a URL like the public API, or media a channel received. */
+export const createInternalRecognitionRequestSchema = z.union([
+  createRecognitionRequestSchema,
+  z.object({ shared_media: sharedMediaSchema }),
+]);
+
+export function toRecognitionSource(body: z.infer<typeof createInternalRecognitionRequestSchema>): RecognitionSource {
+  if ("source_url" in body) return { kind: "url", url: body.source_url };
+  const media = body.shared_media;
+  return { kind: "shared_media", provider: media.provider, mediaId: media.media_id, mediaUrl: media.media_url, caption: media.caption ?? null };
+}
+
 export const recognitionIdentifierSchema = z.object({
   id: z.string().uuid("Recognition id must be a UUID"),
 });

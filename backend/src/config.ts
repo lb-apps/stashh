@@ -2,10 +2,12 @@ import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
-  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
+  /** Every model call goes through OpenRouter (https://openrouter.ai/keys). */
+  OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
+  /** Video-capable model with structured output support, as an OpenRouter model id. */
+  OPENROUTER_MODEL: z.string().min(1).default("google/gemini-3.8-flash"),
   GOOGLE_PLACES_API_KEY: z.string().min(1, "GOOGLE_PLACES_API_KEY is required"),
   PORT: z.coerce.number().default(3000),
-  TEMP_DIR: z.string().default("/tmp/stashh"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   SUPABASE_URL: z.string().url("SUPABASE_URL is required"),
   /** Dashboard publishable key (`sb_publishable_...`). Preferred. */

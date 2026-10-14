@@ -5,7 +5,7 @@ import { createChannelIdentityService } from "../identities/factory.js";
 import { channelIdentityParamsSchema } from "../identities/types.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
-import { createRecognitionRequestSchema } from "../recognitions/types.js";
+import { createInternalRecognitionRequestSchema, toRecognitionSource } from "../recognitions/types.js";
 
 /**
  * Service-to-service API for trusted channel adapters (the Instagram DM service).
@@ -65,7 +65,7 @@ internalRouter.delete("/channel-identities/:provider/:externalId", async (req, r
 
 internalRouter.post("/users/:userId/recognitions", async (req, res, next) => {
   const params = userParamsSchema.safeParse(req.params);
-  const body = createRecognitionRequestSchema.safeParse(req.body);
+  const body = createInternalRecognitionRequestSchema.safeParse(req.body);
   const rawKey = req.get("idempotency-key");
   const idempotencyKey = rawKey === undefined ? undefined : idempotencyKeySchema.safeParse(rawKey);
 
@@ -81,7 +81,7 @@ internalRouter.post("/users/:userId/recognitions", async (req, res, next) => {
   try {
     const task = await createRecognitionServiceWithServiceRole().enqueueRecognition({
       ownerUserId: params.data.userId,
-      sourceUrl: body.data.source_url,
+      source: toRecognitionSource(body.data),
       idempotencyKey: idempotencyKey?.data,
     });
     sendAccepted(res, req, presentAcceptedRecognition(task));

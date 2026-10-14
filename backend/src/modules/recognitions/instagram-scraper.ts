@@ -226,7 +226,7 @@ export async function fetchInstagramContent(
   }
 
   return {
-    video_url: videoUrl,
+    media_url: videoUrl,
     caption,
     source_type: sourceType,
     platform: "instagram",
