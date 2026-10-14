@@ -153,7 +153,8 @@ function DetailBody({ detail, close }: { detail: RecognitionDetail; close?: Reac
 
       <StatGrid
         size="md"
-        className="grid-cols-3 sm:grid-cols-3"
+        // Places is one digit, cost is up to "$0.0032": share the width accordingly.
+        className="grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1.15fr)] sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1.15fr)]"
         stats={[
           { label: "Places", value: detail.places.length },
           { label: "Duration", value: formatDuration(lastRun?.total_ms) },
