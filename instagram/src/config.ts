@@ -13,6 +13,28 @@ const envSchema = z.object({
   INSTAGRAM_APP_SECRET: z.string().min(1),
   /** Shared string echoed back during the webhook subscription handshake. */
   WEBHOOK_VERIFY_TOKEN: z.string().min(16),
+  /** The Instagram professional account this service answers for (the webhook entry id). */
+  INSTAGRAM_ACCOUNT_ID: z.string().regex(/^\d+$/),
+  /**
+   * Seeds the token store on first run only; after that the service refreshes the
+   * token itself in `instagram_accounts`. Safe to remove once seeded.
+   */
+  INSTAGRAM_ACCESS_TOKEN: z.string().min(1).optional(),
+  GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
+
+  /** Stashh backend internal API (`/internal/v1`). */
+  STASHH_API_URL: z.url(),
+  /** One of the backend's `INTERNAL_API_TOKENS`. */
+  STASHH_API_TOKEN: z.string().min(32),
+
+  /** Supabase project holding the channel's own tables (`instagram_messages`, `instagram_accounts`). */
+  SUPABASE_URL: z.url(),
+  /** Server-only `sb_secret_...` key; the channel's tables are service-role only. */
+  SUPABASE_SECRET_KEY: z.string().min(1),
+
+  /** Messages processed at once by this instance. */
+  WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
+
   /**
    * Development only: when set, every verified webhook body is written here verbatim
    * so real payloads can be turned into test fixtures. Refused in production.
