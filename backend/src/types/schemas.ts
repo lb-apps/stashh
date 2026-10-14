@@ -1,3 +1,5 @@
+import type { ModelUsage } from "../lib/openrouter.js";
+
 // ── Source content result ──────────────────────────────────
 
 /** Platform a recognition source URL belongs to. */
@@ -49,6 +51,11 @@ export interface AIAnalysisResult {
   places: ExtractedPlace[];
   /** What the media turned out to be, from its Content-Type. */
   media_kind: "video" | "image";
+  media_bytes: number;
+  /** Model and upstream provider that answered, and what the call cost. */
+  model: string;
+  provider: string | null;
+  usage: ModelUsage | null;
 }
 
 // ── Google Places enrichment ───────────────────────────────

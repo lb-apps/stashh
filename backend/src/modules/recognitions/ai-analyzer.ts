@@ -160,7 +160,7 @@ export function toMediaPart(contentType: string | null, bytes: Buffer): { kind: 
     : { kind: "image", part: { type: "image_url", image_url: { url } } };
 }
 
-async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaKind; part: ContentPart }> {
+async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaKind; part: ContentPart; bytes: number }> {
   const t0 = Date.now();
   const res = await fetch(mediaUrl);
   if (!res.ok) throw new Error(`Failed to fetch media: HTTP ${res.status} ${res.statusText}`);
@@ -168,7 +168,7 @@ async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaK
   if (buffer.length === 0) throw new Error(`Media response body was empty`);
   const media = toMediaPart(res.headers.get("content-type"), buffer);
   log.info({ kind: media.kind, size: Math.round(buffer.length / 1024), duration: Date.now() - t0 }, "media downloaded");
-  return media;
+  return { ...media, bytes: buffer.length };
 }
 
 export async function analyzeContent(
@@ -253,6 +253,10 @@ export async function analyzeContent(
 
   return {
     media_kind: media.kind,
+    media_bytes: media.bytes,
+    model: completion.model,
+    provider: completion.provider,
+    usage: completion.usage,
     places: parsed.places.map((p) => {
       const raw = p.instagram_username?.trim().replace(/^@/, "") ?? "";
       const instagram_username = enforceInstagramUsernamePolicy(raw || null, caption);

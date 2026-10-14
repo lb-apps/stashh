@@ -2,6 +2,7 @@ import { z } from "zod";
 import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
 import { channelIdentityParamsSchema } from "../identities/types.js";
 import { recognitionEnqueuedSchema, recognitionStatusSchema } from "../recognitions/openapi.js";
+import { OPS_RANGES, opsQuerySchema } from "../ops/types.js";
 import { createInternalRecognitionRequestSchema } from "../recognitions/types.js";
 
 registry.registerComponent("securitySchemes", "ServiceToken", {
@@ -87,6 +88,44 @@ registry.registerPath({
   request: { params: userParams.extend({ id: z.string().uuid() }) },
   responses: {
     200: { description: "Recognition task", content: { "application/json": { schema: successEnvelope(recognitionStatusSchema, "InternalGetRecognition") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/recognitions",
+  summary: "Recognition ops stats",
+  description: `What the recognition system is doing, for the local ops dashboard.
+
+- \`stats\`: \`recognition_ops_stats()\` — the live queue, totals for tasks created in the window, run figures
+  (cache hits, p50/p95 processing, average per step, places matched, tokens and cost), p50/p95 queue wait,
+  a time series (hourly for \`24h\`, daily otherwise) and failures by step. Run figures start on 2026-10-14,
+  when runs began to be recorded.
+- \`queue\`: tasks queued or processing now, oldest first (max 50).
+- \`recent_runs\`: the latest worker attempts with their source (max 50).`,
+  request: { query: opsQuerySchema },
+  responses: {
+    200: {
+      description: "Ops snapshot",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({
+              range: z.enum(OPS_RANGES),
+              since: z.string(),
+              bucket: z.enum(["hour", "day"]),
+              generated_at: z.string(),
+              stats: z.record(z.string(), z.unknown()),
+              queue: z.array(z.record(z.string(), z.unknown())),
+              recent_runs: z.array(z.record(z.string(), z.unknown())),
+            }),
+            "InternalOpsRecognitions",
+          ),
+        },
+      },
+    },
     ...commonErrorResponses,
   },
 });

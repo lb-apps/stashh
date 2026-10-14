@@ -6,6 +6,15 @@ interface StepRecord {
   [key: string]: unknown;
 }
 
+/** How one attempt went, in time: what the worker records as a recognition run. */
+export interface RunTimings {
+  startedAt: Date;
+  totalMs: number;
+  /** Duration of every step that ran, by step name, including the one that failed. */
+  steps: Record<string, number>;
+  failedStep: string | null;
+}
+
 export interface TaskLogger {
   log: Logger;
   /**
@@ -19,6 +28,7 @@ export interface TaskLogger {
   ): Promise<T>;
   done(extra?: Record<string, unknown>): void;
   fail(error: unknown): void;
+  timings(): RunTimings;
 }
 
 function errorMessage(error: unknown): string {
@@ -33,8 +43,10 @@ export function createTaskLogger(
 ): TaskLogger {
   const log = parentLogger.child({ taskId: task.id });
   const taskStartMs = performance.now();
+  const startedAt = new Date();
   const steps: StepRecord[] = [];
   let lastStep: string | null = null;
+  let failedStep: string | null = null;
 
   return {
     log,
@@ -56,6 +68,8 @@ export function createTaskLogger(
         return result;
       } catch (err) {
         const duration = Math.round(performance.now() - t0);
+        steps.push({ step: name, duration, failed: true });
+        failedStep = name;
         log.error({ duration, err }, name);
         throw err;
       }
@@ -72,6 +86,15 @@ export function createTaskLogger(
         { totalDuration, failedAt: lastStep, error: errorMessage(error), err: error },
         "task failed",
       );
+    },
+
+    timings(): RunTimings {
+      return {
+        startedAt,
+        totalMs: Math.round(performance.now() - taskStartMs),
+        steps: Object.fromEntries(steps.map((record) => [record.step, record.duration])),
+        failedStep,
+      };
     },
   };
 }

@@ -3,6 +3,7 @@ import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
 import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
 import type { RecognitionRepository } from "./repository.js";
+import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
   RecognitionSource,
@@ -231,6 +232,18 @@ export class RecognitionService {
       sourceType: sourceContent.source_type,
     });
     return result.id;
+  }
+
+  /**
+   * Records how one attempt went. Metrics are an observer: a failed write is logged
+   * and swallowed so it can never fail or retry the recognition itself.
+   */
+  async recordRun(run: RecognitionRunInsert, log: Logger): Promise<void> {
+    try {
+      await this.recognitionRepository.insertRun(run);
+    } catch (error) {
+      log.warn({ err: error, outcome: run.outcome }, "recognition run not recorded");
+    }
   }
 
   async processRecognitionSuccess(params: ProcessRecognitionSuccessParams): Promise<void> {

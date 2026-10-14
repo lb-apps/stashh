@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../../types/database.js";
 import type { SourceType } from "../../types/schemas.js";
+import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
   RecognitionTaskInsert,
@@ -176,6 +177,11 @@ export class RecognitionRepository {
       .single();
     if (error) throw error;
     return data;
+  }
+
+  async insertRun(run: RecognitionRunInsert): Promise<void> {
+    const { error } = await this.supabaseClient.from("recognition_runs").insert(run);
+    if (error) throw error;
   }
 
   async completeRecognition(params: CompleteRecognitionParams): Promise<void> {

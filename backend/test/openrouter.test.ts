@@ -38,7 +38,7 @@ describe("OpenRouter client", () => {
 
     const completion = await client.complete(request);
 
-    expect(completion).toEqual({ content: '{"places":[]}', finishReason: "stop", model: "google/gemini-3.8-flash" });
+    expect(completion).toEqual({ content: '{"places":[]}', finishReason: "stop", model: "google/gemini-3.8-flash", provider: null, usage: null });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-or-test");
@@ -51,6 +51,25 @@ describe("OpenRouter client", () => {
       provider: { require_parameters: true },
     });
     expect(body.messages[1].content[0]).toEqual({ type: "video_url", video_url: { url: "data:video/mp4;base64,AAAA" } });
+  });
+
+  it("returns the provider and token usage with cost", async () => {
+    stubFetch(200, {
+      model: "google/gemini-3.8-flash",
+      provider: "Google AI Studio",
+      choices: [{ finish_reason: "stop", message: { content: "{}" } }],
+      usage: {
+        prompt_tokens: 1200,
+        completion_tokens: 300,
+        total_tokens: 1500,
+        prompt_tokens_details: { cached_tokens: 40 },
+        completion_tokens_details: { reasoning_tokens: 120 },
+        cost: 0.0021,
+      },
+    });
+    const completion = await client.complete(request);
+    expect(completion.provider).toBe("Google AI Studio");
+    expect(completion.usage).toEqual({ prompt_tokens: 1200, completion_tokens: 300, reasoning_tokens: 120, cached_tokens: 40, cost_usd: 0.0021 });
   });
 
   it("surfaces an HTTP error with OpenRouter's message", async () => {
