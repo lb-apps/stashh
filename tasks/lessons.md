@@ -54,3 +54,7 @@ uncommitted permissions and MCP server approvals were lost; only the committed v
 **How to apply:** When a change untracks a file that must keep living on disk, copy it to the
 scratchpad before any checkout, pull or merge, and restore it afterwards. Check the file still
 exists after switching branches before reporting the switch as done.
+
+## 2026-10-14 — Design source for new surfaces
+- **Mistake:** built the ops dashboard's palette and design language from `web/lib/discovery/tokens`, but the current Stashh design lives in a Claude Design project ("Stashh - stack lists", claude.ai/design/p/16d56bb0-…).
+- **Rule:** before styling a new surface, confirm with the user which design source is current; repo tokens can lag the design project. If the project link can't be opened (no claude.ai session in the browser pane, no `/design-login`), ask for access before styling, not after.
