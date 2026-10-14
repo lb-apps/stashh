@@ -120,9 +120,16 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   only. Depth via the `depth-card` utility (Discovery `--sh-card`), not hairlines.
 - Status hues (green, red, amber) are for marks and badge fills; status text stays ink, because
   they sit under 4.5:1 on white. Muted text is `grey-800`, not Discovery's lighter `grey-600`.
-- Metrics come from `recognition_runs` (one row per worker attempt: step timings, model usage
-  and cost) and `instagram_messages.intent` / `finished_at`. Add a metric there, expose it in the
-  service's ops SQL function, then show it.
+- Metrics come from `recognition_runs` (one row per worker attempt: step timings, fetch method,
+  model usage and cost), `recognition_results.source_thumbnail_url` (covers in the public
+  `source-thumbnails` bucket) and `instagram_messages.intent` / `finished_at`. Add a metric there,
+  expose it in the service's ops SQL function (`recognition_ops_stats/_list/_detail`,
+  `instagram_ops_stats`), then show it. Source type and channel come from the shared SQL helpers
+  `recognition_source_type()` / `recognition_channel()` — never re-derive them elsewhere.
+- Charts follow shadcn's chart blocks (area, interactive bar, donut, radial, line, stacked and
+  horizontal bar) in `ops/components/ops/charts/`. They do not animate: data refreshes every 5 s
+  and a replayed entrance would hide value labels.
+- Only the detail sheet reads `?id=` (inside its own Suspense); pages must hydrate with the layout.
 
 ## Backend / API
 

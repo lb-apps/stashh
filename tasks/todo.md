@@ -1,3 +1,24 @@
+# Stashh Ops v2 — back office (every request visible, richer KPIs, shadcn charts)
+
+Plan: `~/.claude/plans/sunny-zooming-meerkat.md` (approved). Branch `feature/ops-dashboard`.
+
+- [x] A Capture: source covers (bucket `source-thumbnails`), `fetch_method`, og:image / igdl / ttdl thumbnails
+- [x] B Backend stats v2 (previous window, richer series, source/channel mix, quality, users, library, top places/errors, fetch methods) + list/detail RPCs + `GET /ops/recognitions/:id` + in-memory API health
+- [x] C Instagram stats v2 (previous, DM content mix, outcomes, new vs returning, reply series) + webhook counters
+- [x] D UI: dashboard-01 section cards with trend + sparkline, interactive bar, gradient area, donuts, radial gauges, multi-line, stacked/horizontal bars, TanStack (v9) recognition table + cover gallery, detail Sheet (`?id=`)
+- [x] E Verify: backend 66, instagram 62 tests; ops lint + build; fresh Reel + TikTok → covers stored, fetch method recorded; detail sheet; desktop 1440 + 375 px; no console errors
+
+### Review
+- Found while verifying: Suspense around a page whose data the sidebar also fetches caused a
+  hydration mismatch → Suspense now wraps only the `?id=` reader. Bar animations replayed on every
+  5 s refresh and hid value labels → charts no longer animate. Horizontal bar names inside short
+  bars collided with values → names moved to the axis.
+- The Supabase MCP auto-declines "destructive" statements: `drop policy if exists` in a migration
+  made it refuse; a new bucket needs no drop.
+- Old results have no cover (they predate the column); they show a type icon until re-run.
+
+---
+
 # Stashh Ops — local system dashboard (`ops/`)
 
 Plan: `~/.claude/plans/sunny-zooming-meerkat.md` (approved 2026-10-14). Branch `feature/ops-dashboard`.
