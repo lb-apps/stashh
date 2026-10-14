@@ -133,20 +133,31 @@ const responseSchema = {
 
 type MediaKind = AIAnalysisResult["media_kind"];
 
+/** The format a file's first bytes announce, for servers that do not say what they send. */
+function sniffMimeType(bytes: Buffer): string | null {
+  if (bytes.subarray(4, 8).toString("latin1") === "ftyp") return "video/mp4";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  return null;
+}
+
 /**
- * The model input for downloaded media, chosen by what the server says it is: a feed
- * post shared in a DM may be a photo or a video, and only the response knows which.
- * Media goes as a base64 data URL, the only form Gemini accepts on OpenRouter.
+ * The model input for downloaded media. A feed post shared in a DM may be a photo or a
+ * video, so the kind is not known up front. The Content-Type decides when it names a
+ * video or image; otherwise the bytes do — Instagram's video CDN answers with
+ * `application/octet-stream`. Media goes as a base64 data URL, the only form Gemini
+ * accepts on OpenRouter.
  */
-export function toMediaPart(contentType: string | null, base64: string): { kind: MediaKind; part: ContentPart } {
-  const mimeType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
-  if (mimeType.startsWith("video/")) {
-    return { kind: "video", part: { type: "video_url", video_url: { url: `data:${mimeType};base64,${base64}` } } };
-  }
-  if (mimeType.startsWith("image/")) {
-    return { kind: "image", part: { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } } };
-  }
-  throw new Error(`Post media has an unsupported content type: ${mimeType || "unknown"}`);
+export function toMediaPart(contentType: string | null, bytes: Buffer): { kind: MediaKind; part: ContentPart } {
+  const declared = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const mimeType = declared.startsWith("video/") || declared.startsWith("image/") ? declared : sniffMimeType(bytes);
+  if (!mimeType) throw new Error(`Post media has an unsupported content type: ${declared || "unknown"}`);
+
+  const url = `data:${mimeType};base64,${bytes.toString("base64")}`;
+  return mimeType.startsWith("video/")
+    ? { kind: "video", part: { type: "video_url", video_url: { url } } }
+    : { kind: "image", part: { type: "image_url", image_url: { url } } };
 }
 
 async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaKind; part: ContentPart }> {
@@ -155,7 +166,7 @@ async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaK
   if (!res.ok) throw new Error(`Failed to fetch media: HTTP ${res.status} ${res.statusText}`);
   const buffer = Buffer.from(await res.arrayBuffer());
   if (buffer.length === 0) throw new Error(`Media response body was empty`);
-  const media = toMediaPart(res.headers.get("content-type"), buffer.toString("base64"));
+  const media = toMediaPart(res.headers.get("content-type"), buffer);
   log.info({ kind: media.kind, size: Math.round(buffer.length / 1024), duration: Date.now() - t0 }, "media downloaded");
   return media;
 }
