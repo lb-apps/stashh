@@ -73,3 +73,7 @@ supabase/.branches/
 
 # --- Misc ---
 instagram-cookies.txt
+
+# --- Instagram channel ---
+# Raw webhook captures contain real user ids and message content.
+instagram/.captures/
