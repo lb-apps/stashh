@@ -13,6 +13,11 @@
 @import "../../web/lib/discovery/tokens/typography.css";
 @import "../../web/lib/discovery/tokens/spacing.css";
 
+/* Discovery is light only. Tailwind's `dark:` would otherwise follow the OS setting and
+   switch on every dark style the shadcn primitives ship (30% field fills, swapped text
+   colours). Tie it to a `.dark` class this app never sets, so it never applies. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

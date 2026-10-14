@@ -84,3 +84,11 @@ exists after switching branches before reporting the switch as done.
   had already approved; they wanted the dialog back.
 - **Rule:** a design-kit pass restyles; it does not change an approved interaction (dialog vs
   docked, page vs sheet) without asking. List such behaviour changes in the plan as a question.
+
+## 2026-10-14 — "Light only" must be enforced, not assumed
+- **Mistake:** the ops console was declared light-only, but Tailwind v4's `dark:` follows
+  `prefers-color-scheme` by default. On the owner's dark-mode Mac every shadcn `dark:` class
+  applied (search field at 30% opacity), so greys on greys lost contrast. Testing in a light
+  browser profile hid it.
+- **Rule:** in a light-only app, pin `@custom-variant dark` to an unused class on day one; audit
+  contrast with the computed background behind each text node, and test with the OS in dark mode.

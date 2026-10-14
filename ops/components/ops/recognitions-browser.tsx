@@ -377,7 +377,7 @@ export function RecognitionGallery({
                 className="w-full rounded-tile transition-transform duration-200 ease-spring group-hover/cover:scale-[1.02] motion-reduce:transition-none"
               />
               <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
-                <Badge variant="outline" className="bg-card/90">
+                <Badge variant="outline" className="bg-card">
                   {SOURCE_TYPE[item.source_type]}
                 </Badge>
                 <Badge variant={TASK_STATUS[item.status].variant}>{TASK_STATUS[item.status].label}</Badge>

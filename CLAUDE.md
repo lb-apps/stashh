@@ -137,6 +137,11 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   (`text-body`). 13px only for uppercase micro-labels and monospace ids, 11px only for inline
   pill badges. shadcn's `text-sm`/`text-xs` defaults are raised in the primitives — do not
   reintroduce them at call sites.
+- **Light only, for real.** `globals.css` ties Tailwind's `dark:` to a `.dark` class the app never
+  sets; without it the OS dark setting switches on shadcn's dark styles (30% field fills).
+- **Contrast is measured on the actual background**, greys on greys included: micro-label grey
+  (#6E6B66) passes on white and bone but not on a bone-300 field, so field placeholders use
+  `text-muted-foreground`. Text over images sits on an opaque fill.
 - **No statistics jargon in UI copy.** Say "Typical" (median) and "Slowest 5%", never p50 / p95
   / percentile; code and API field names keep the precise terms.
 - Text greys, by the owner's call: secondary `grey-800`, micro-labels `--micro-foreground`
