@@ -133,6 +133,10 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   the merger drops `text-display` beside a text colour. Import `cn` from `@/lib/utils`, never `"cn"`.
 - Focus is an outline (`outline-solid outline-3 outline-cobalt-300`), never a ring: fills carry
   their own box-shadow and would swallow it.
+- **Type floor.** Readable text is never under 15px (`text-caption`); row titles 17px
+  (`text-body`). 13px only for uppercase micro-labels and monospace ids, 11px only for inline
+  pill badges. shadcn's `text-sm`/`text-xs` defaults are raised in the primitives — do not
+  reintroduce them at call sites.
 - Text greys, by the owner's call: secondary `grey-800`, micro-labels `--micro-foreground`
   #6E6B66 (the kit's lighter greys miss 4.5:1). Status hues are marks and soft badge fills;
   Discovery has no red fill — a failure is a grey pill with a red dot.

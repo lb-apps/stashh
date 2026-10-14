@@ -245,7 +245,7 @@ function RunItem({ run }: { run: RecognitionRunDetail }) {
         </ItemTitle>
         {run.fetch_method && <span className="micro-label">{FETCH_METHOD[run.fetch_method]}</span>}
         <StepBar run={run} />
-        {usage && <ItemDescription className="text-xs">{usage}</ItemDescription>}
+        {usage && <ItemDescription>{usage}</ItemDescription>}
         {run.outcome === "failed" && (
           <ItemDescription className="text-caption text-foreground">
             <span className="font-semibold">{stepLabel(run.failed_step)}:</span> {run.error_message ?? "No error message"}

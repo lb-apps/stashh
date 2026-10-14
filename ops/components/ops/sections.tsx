@@ -276,22 +276,22 @@ export function TopPlacesPanel({ ops, className }: { ops: RecognitionOps; classN
         <EmptyState title="No places yet" />
       ) : (
         <ItemGroup className="gap-0!">
-          {places.map((place, index) => (
+          {places.slice(0, 3).map((place, index) => (
             <Item key={place.google_place_id} role="listitem" size="sm" className="flex-nowrap px-0">
               <ItemMedia className="gap-3">
-                <span className="w-4 text-right text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-                <Thumb url={place.thumbnail_url} icon={MapPin} />
+                <span className="numeric w-4 text-right text-caption font-bold text-micro">{index + 1}</span>
+                <Thumb url={place.thumbnail_url} icon={MapPin} className="size-12" />
               </ItemMedia>
               <ItemContent className="min-w-0 gap-0">
                 <ItemTitle className="block w-full truncate">{place.name}</ItemTitle>
                 {place.rating != null && (
-                  <ItemDescription className="flex items-center gap-1 text-xs tabular-nums">
-                    <Star aria-hidden className="size-3 fill-current" />
+                  <ItemDescription className="flex items-center gap-1 tabular-nums">
+                    <Star aria-hidden className="size-3.5 fill-current" />
                     {formatRating(place.rating)}
                   </ItemDescription>
                 )}
               </ItemContent>
-              <ItemActions className="text-sm font-medium tabular-nums">{formatInt(place.count)}×</ItemActions>
+              <ItemActions className="numeric text-headline font-black">{formatInt(place.count)}×</ItemActions>
             </Item>
           ))}
         </ItemGroup>
@@ -331,10 +331,10 @@ export function FailuresPanel({ ops, className }: { ops: RecognitionOps; classNa
             {top_errors.map((error) => (
               <Item key={`${error.step}-${error.message}`} role="listitem" variant="muted" size="sm">
                 <ItemContent className="gap-0.5">
-                  <ItemTitle className="text-xs">
+                  <ItemTitle>
                     {stepLabel(error.step)} · {formatInt(error.count)}×
                   </ItemTitle>
-                  <ItemDescription className="text-xs">{error.message}</ItemDescription>
+                  <ItemDescription>{error.message}</ItemDescription>
                 </ItemContent>
               </Item>
             ))}
@@ -400,7 +400,7 @@ export function ApiHealthPanel({ ops, className }: { ops: RecognitionOps; classN
           ]}
         />
         {api.routes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No API requests since this process started.</p>
+          <p className="text-caption text-muted-foreground">No API requests since this process started.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -415,7 +415,7 @@ export function ApiHealthPanel({ ops, className }: { ops: RecognitionOps; classN
             <TableBody>
               {api.routes.slice(0, 8).map((route) => (
                 <TableRow key={route.route}>
-                  <TableCell className="max-w-56 truncate font-mono text-xs">{route.route}</TableCell>
+                  <TableCell className="max-w-56 truncate font-mono text-[13px]">{route.route}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatInt(route.requests)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatInt(route.errors)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatDuration(route.p50_ms)}</TableCell>

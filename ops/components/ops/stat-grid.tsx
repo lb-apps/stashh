@@ -14,7 +14,7 @@ export function StatGrid({ stats, className, size = "lg" }: { stats: Stat[]; cla
       {stats.map((stat) => (
         <Item key={stat.label} role="listitem" variant="muted" size="sm" className="px-3.5 py-3">
           <ItemContent className="min-w-0 gap-0.5">
-            <ItemDescription className="micro-label line-clamp-1">{stat.label}</ItemDescription>
+            <ItemDescription className="micro-label">{stat.label}</ItemDescription>
             <ItemTitle
               className={cn(
                 "w-full",

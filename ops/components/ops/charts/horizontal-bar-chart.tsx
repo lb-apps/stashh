@@ -30,11 +30,11 @@ export function HorizontalBarChart({
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: Math.max(72, data.length * 36) }}>
       <BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 0, right: 88 }}>
-        <YAxis dataKey="label" type="category" tickLine={false} axisLine={false} width={116} tick={{ fontSize: 12 }} />
+        <YAxis dataKey="label" type="category" tickLine={false} axisLine={false} width={150} tick={{ fontSize: 15, fill: "var(--foreground)" }} />
         <XAxis dataKey="value" type="number" hide />
         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" hideLabel nameKey="label" valueFormatter={valueFormatter} />} />
         <Bar dataKey="value" fill="var(--color-value)" radius={6} barSize={20} minPointSize={2} isAnimationActive={false}>
-          <LabelList dataKey="display" position="right" offset={8} className="fill-foreground" fontSize={12} />
+          <LabelList dataKey="display" position="right" offset={8} className="fill-foreground font-numeric font-bold" fontSize={15} />
         </Bar>
       </BarChart>
     </ChartContainer>

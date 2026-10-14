@@ -39,7 +39,7 @@ export function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen?: (id
                   {item.status === "processing" ? "Processing" : "Queued"}
                 </Badge>
               </TableCell>
-              <TableCell className="max-w-72 truncate font-mono text-xs">{formatSource(item.source_url)}</TableCell>
+              <TableCell className="max-w-72 truncate font-mono text-[13px]">{formatSource(item.source_url)}</TableCell>
               <TableCell className="text-right tabular-nums">{formatDuration((started ?? now) - created)}</TableCell>
               <TableCell className="text-right tabular-nums">{started ? formatDuration(now - started) : DASH}</TableCell>
               <TableCell className="text-right tabular-nums">{item.retry_count + 1}</TableCell>

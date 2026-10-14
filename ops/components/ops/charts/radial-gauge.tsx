@@ -45,8 +45,8 @@ export function RadialGauge({
           </PolarRadiusAxis>
         </RadialBarChart>
       </ChartContainer>
-      <p className="text-sm font-medium">{label}</p>
-      {detail && <p className="text-xs text-muted-foreground tabular-nums">{detail}</p>}
+      <p className="font-heading text-body font-semibold">{label}</p>
+      {detail && <p className="numeric text-caption text-muted-foreground">{detail}</p>}
     </div>
   );
 }

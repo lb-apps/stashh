@@ -387,7 +387,7 @@ export function RecognitionGallery({
               <ItemTitle className="block w-full truncate font-heading text-body font-semibold">
                 {item.place_names?.length ? item.place_names.join(", ") : item.status === "completed" ? "No places found" : DASH}
               </ItemTitle>
-              <ItemDescription className="line-clamp-1 text-xs">
+              <ItemDescription className="line-clamp-1">
                 {CHANNEL[item.channel]} · {formatDuration(item.total_ms)} · {formatRelative(item.created_at, now)}
               </ItemDescription>
             </ItemContent>
