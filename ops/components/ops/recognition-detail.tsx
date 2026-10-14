@@ -85,7 +85,7 @@ function DetailPending({ error }: { error: Error | null }) {
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="grid gap-2">
+    <section className="grid gap-3">
       <h3 className="micro-label">{label}</h3>
       {children}
     </section>
@@ -102,7 +102,7 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
 
   // Read top to bottom: what was read (source, caption), what was found, how the run went.
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-8">
       <div className="flex items-start gap-4">
         <Thumb url={detail.source?.thumbnail_url ?? null} icon={SOURCE_ICON[detail.source_type]} className="size-16" />
         <div className="grid min-w-0 flex-1 gap-1">
