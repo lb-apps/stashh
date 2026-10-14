@@ -50,7 +50,7 @@ export function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" description={`Last ${RANGE_LABELS[range]} across recognitions and Instagram DMs.`} />
+      <PageHeader title="Overview" description={`Last ${RANGE_LABELS[range]} across recognitions and Instagram.`} />
       {recognitions.error && <ServiceError error={recognitions.error} />}
       {instagram.error && <ServiceError error={instagram.error} />}
 

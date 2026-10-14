@@ -53,7 +53,7 @@ export function InstagramPage() {
   const { data: ig, error } = useInstagramOps();
   const { range } = useOpsControls();
   const header = (
-    <PageHeader title="Instagram DMs" description={`Last ${RANGE_LABELS[range]} of the DM channel: messages, replies and what went unanswered.`} />
+    <PageHeader title="Instagram" description={`Last ${RANGE_LABELS[range]} of the DM channel: messages, replies and what went unanswered.`} />
   );
 
   if (!ig) {

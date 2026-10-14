@@ -102,11 +102,6 @@ function sortable(label: string): ColumnDef<typeof features, RecognitionListItem
 function useColumns(now: number): ColumnDef<typeof features, RecognitionListItem>[] {
   return [
     {
-      id: "run",
-      header: "Run",
-      cell: ({ row }) => <span className="font-mono text-caption text-muted-foreground">{shortId(row.original.id)}</span>,
-    },
-    {
       id: "source",
       header: "Source",
       cell: ({ row: { original: item } }) => (

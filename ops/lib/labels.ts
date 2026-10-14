@@ -11,7 +11,7 @@ export const SOURCE_TYPE: Record<SourceType, string> = {
   shared_post: "DM post",
 };
 
-export const CHANNEL: Record<Channel, string> = { app: "App", instagram: "Instagram DM" };
+export const CHANNEL: Record<Channel, string> = { app: "App", instagram: "Instagram" };
 
 export const TASK_STATUS: Record<TaskStatus, { label: string; variant: BadgeVariantName }> = {
   queued: { label: "Queued", variant: "warning" },
