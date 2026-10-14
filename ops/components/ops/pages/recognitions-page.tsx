@@ -3,8 +3,6 @@
 import { useRecognitionOps } from "@/hooks/use-ops-data";
 import { useOpenDetail } from "@/hooks/use-detail-param";
 import { formatDuration } from "@/lib/format";
-import { RANGE_LABELS } from "@/lib/ops-types";
-import { useOpsControls } from "../ops-provider";
 import { MultiLineChart } from "../charts/multi-line-chart";
 import { STEP_COLORS } from "../charts/shared";
 import { StackedBarChart } from "../charts/stacked-bar-chart";
@@ -43,14 +41,10 @@ const stepsConfig = {
 export function RecognitionsPage() {
   const { data: ops, error } = useRecognitionOps();
   const openDetail = useOpenDetail();
-  const { range } = useOpsControls();
 
   return (
     <>
-      <PageHeader
-        title="Recognition runs"
-        description={`Last ${RANGE_LABELS[range]}. Open a run to see every step and what it found.`}
-      />
+      <PageHeader title="Recognition runs" />
       {error && <ServiceError error={error} />}
       {ops ? (
         <KpiGrid>
@@ -72,7 +66,7 @@ export function RecognitionsPage() {
       )}
 
       {ops && ops.queue.length > 0 && (
-        <Panel title="Live queue" description="Recognitions waiting or running; times tick live">
+        <Panel title="Live queue">
           <QueueTable items={ops.queue} onOpen={openDetail} />
         </Panel>
       )}
@@ -80,7 +74,7 @@ export function RecognitionsPage() {
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Durations" description={`Processing and queue time · last ${RANGE_LABELS[ops.range]}`}>
+            <Panel title="Durations">
               <MultiLineChart
                 bucket={ops.bucket}
                 config={durationConfig}
@@ -90,7 +84,7 @@ export function RecognitionsPage() {
                 axisFormatter={formatDuration}
               />
             </Panel>
-            <Panel title="Where the time goes" description="Average time per step in fresh runs">
+            <Panel title="Where the time goes" description="Fresh runs only; cache hits skip these steps">
               <StackedBarChart
                 bucket={ops.bucket}
                 config={stepsConfig}

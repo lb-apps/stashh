@@ -224,7 +224,7 @@ export function SourceMixPanel({ ops, className }: { ops: RecognitionOps; classN
     color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]!,
   }));
   return (
-    <Panel title="Source type" description="What was shared" className={className}>
+    <Panel title="Source type" className={className}>
       {slices.length ? <DonutChart slices={slices} centerLabel="requests" /> : <EmptyState title="No requests yet" />}
     </Panel>
   );
@@ -238,7 +238,7 @@ export function ChannelMixPanel({ ops, className }: { ops: RecognitionOps; class
     color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]!,
   }));
   return (
-    <Panel title="Channel" description="Where requests came from" className={className}>
+    <Panel title="Channel" className={className}>
       {slices.length ? <DonutChart slices={slices} centerLabel="requests" /> : <EmptyState title="No requests yet" />}
     </Panel>
   );
@@ -249,7 +249,7 @@ export function HealthGauges({ ops, className }: { ops: RecognitionOps; classNam
   const { runs, totals } = ops.stats;
   const served = runs.completed + runs.cache_hits;
   return (
-    <Panel title="Health" description="Success, cache and Google match rates" className={className}>
+    <Panel title="Health" className={className}>
       <div className="grid grid-cols-3 gap-2">
         <RadialGauge
           ratio={ratio(totals.completed, totals.requests - totals.in_progress)}
@@ -271,7 +271,7 @@ export function HealthGauges({ ops, className }: { ops: RecognitionOps; classNam
 export function TopPlacesPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const places = ops.stats.top_places;
   return (
-    <Panel title="Top places" description="Most found in this range" className={className}>
+    <Panel title="Top places" className={className}>
       {places.length === 0 ? (
         <EmptyState title="No places yet" />
       ) : (
@@ -312,7 +312,7 @@ export function StepsPanel({ ops, className }: { ops: RecognitionOps; className?
   const avg = ops.stats.runs.steps_avg_ms;
   const items = STEPS.filter(([key]) => avg[key] != null).map(([key, step]) => ({ label: stepLabel(step), value: avg[key] ?? 0 }));
   return (
-    <Panel title="Average per step" description="Where the time goes in fresh runs" className={className}>
+    <Panel title="Average per step" description="Fresh runs only; cache hits skip these steps" className={className}>
       {items.length ? <HorizontalBarChart items={items} valueFormatter={formatDuration} /> : <EmptyState title="No data yet" />}
     </Panel>
   );
@@ -321,7 +321,7 @@ export function StepsPanel({ ops, className }: { ops: RecognitionOps; className?
 export function FailuresPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const { failures_by_step, top_errors } = ops.stats;
   return (
-    <Panel title="Failures" description="The step failed attempts stopped at, and the most common messages" className={className}>
+    <Panel title="Failures" className={className}>
       {failures_by_step.length === 0 ? (
         <EmptyState title="No failures" description="No attempt failed in this range." />
       ) : (
@@ -348,7 +348,7 @@ export function FailuresPanel({ ops, className }: { ops: RecognitionOps; classNa
 export function FetchMethodsPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const methods = ops.stats.fetch_methods;
   return (
-    <Panel title="How content was fetched" description="Ways to reach the source, and how often each failed" className={className}>
+    <Panel title="How content was fetched" className={className}>
       {methods.length === 0 ? (
         <EmptyState title="Nothing recorded yet" description="Fills in with new recognitions." />
       ) : (
@@ -364,7 +364,7 @@ export function FetchMethodsPanel({ ops, className }: { ops: RecognitionOps; cla
 export function LibraryPanel({ ops, className }: { ops: RecognitionOps; className?: string }) {
   const { library } = ops.stats;
   return (
-    <Panel title="Library and catalog" description="What people saved, and the place catalog" className={className}>
+    <Panel title="Library and catalog" className={className}>
       <StatGrid
         className="sm:grid-cols-2"
         stats={[

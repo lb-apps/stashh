@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +17,7 @@ import { useInstagramOps, useRecognitionOps } from "@/hooks/use-ops-data";
 import { NAV } from "./nav";
 import { StatusDot } from "./status-dot";
 
-/** The console kit's sidebar: wordmark with an Internal badge, pill nav, the workspace at the foot. */
+/** The console kit's sidebar: wordmark, pill nav, the services' status at the foot. */
 export function AppSidebar() {
   const pathname = usePathname();
 
@@ -28,7 +26,6 @@ export function AppSidebar() {
       <SidebarHeader className="px-5 pt-7 pb-4">
         <Link href="/" className="flex items-center gap-2.5 rounded-tile outline-none focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-cobalt-300">
           <span className="font-heading text-[22px] leading-none font-black tracking-[-0.032em]">Stashh</span>
-          <Badge variant="secondary">Internal</Badge>
         </Link>
       </SidebarHeader>
 
@@ -53,15 +50,6 @@ export function AppSidebar() {
 
       <SidebarFooter className="gap-4 px-5 pb-6">
         <ServiceHealth />
-        <div className="flex items-center gap-2.5">
-          <Avatar size="sm">
-            <AvatarFallback className="bg-grey-300 font-heading text-[10px] font-bold text-muted-foreground">OP</AvatarFallback>
-          </Avatar>
-          <div className="grid">
-            <span className="font-heading text-caption font-bold">pipeline-ops</span>
-            <span className="micro-label">Local only</span>
-          </div>
-        </div>
       </SidebarFooter>
     </Sidebar>
   );

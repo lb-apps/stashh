@@ -14,13 +14,14 @@ export function KpiGrid({ children }: { children: ReactNode }) {
 
 const TREND_BADGE = { good: "success", bad: "danger", neutral: "secondary" } as const;
 
-function TrendBadge({ trend }: { trend: Trend }) {
+function TrendBadge({ trend, caption }: { trend: Trend; caption?: string }) {
   if (trend.change == null) return null;
   const Icon = trend.direction === "up" ? TrendingUp : trend.direction === "down" ? TrendingDown : Minus;
   return (
     <Badge variant={TREND_BADGE[trend.tone]} className="gap-1 tabular-nums">
       <Icon aria-hidden className="size-3" />
       {formatSignedPercent(trend.change)}
+      {caption && <span className="sr-only">{caption}</span>}
     </Badge>
   );
 }
@@ -46,7 +47,7 @@ export function KpiCard({
   /** One line of context under the number. */
   detail?: ReactNode;
   trend?: Trend;
-  /** "vs the previous 24 hours" — shown with the trend. */
+  /** "vs the previous 24 hours" — read out with the badge; the range is visible in the header. */
   trendCaption?: string;
   spark?: Array<number | null>;
   sparkTone?: "primary" | "danger";
@@ -61,12 +62,11 @@ export function KpiCard({
           {label}
         </CardDescription>
         <CardTitle className="numeric pt-1 text-[28px] leading-none font-black tracking-[-0.02em] @[230px]/kpi:text-[34px]">{value}</CardTitle>
-        <CardAction>{trend ? <TrendBadge trend={trend} /> : badge}</CardAction>
+        <CardAction>{trend ? <TrendBadge trend={trend} caption={trendCaption} /> : badge}</CardAction>
       </CardHeader>
       {/* Context under the number, not a separate band (this style's footer is a grey strip). */}
       <CardFooter className="flex-col items-start gap-1 text-caption">
         {detail && <p className="line-clamp-1 text-muted-foreground tabular-nums">{detail}</p>}
-        {trend?.change != null && trendCaption && <p className="text-xs text-micro">{trendCaption}</p>}
       </CardFooter>
       {spark && spark.length > 1 ? <Sparkline values={spark} tone={sparkTone} /> : <div className="h-3" />}
     </Card>

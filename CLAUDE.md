@@ -70,6 +70,10 @@ reconcile anything back to it.
 - Interactives are pill-shaped and glossy: a short cobalt gradient plus the
   inner top highlight. Glossy 3D objects at empty and loading states. Spring
   motion with a slight overshoot.
+- **If removing it loses nothing, it is not on screen.** Ask of every element: "if we take
+  this off the screen, do we lose anything?" When the answer is no, it does not ship —
+  repetition, decoration, titles restated as descriptions, placeholder text and debug data
+  nobody acts on all fail. Run this check before calling any screen done.
 
 ## Web — Discovery is the base
 

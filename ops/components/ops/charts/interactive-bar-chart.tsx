@@ -26,7 +26,7 @@ export function InteractiveBarChart<K extends string>({
   metrics,
 }: {
   title: string;
-  description: string;
+  description?: string;
   data: Array<{ bucket: string } & Record<K, number | null>>;
   bucket: Bucket;
   metrics: InteractiveMetric<K>[];
@@ -40,7 +40,7 @@ export function InteractiveBarChart<K extends string>({
       <CardHeader className="flex flex-col items-stretch gap-0 p-0! sm:flex-row">
         <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-5 pb-3 sm:py-5">
           <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          {description && <CardDescription>{description}</CardDescription>}
         </div>
         <div className="grid grid-cols-2 sm:flex" role="tablist" aria-label="Metric shown">
           {metrics.map((m) => (

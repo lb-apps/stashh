@@ -4,8 +4,6 @@ import { useInstagramOps, useRecognitionOps } from "@/hooks/use-ops-data";
 import { useDetailHref, useOpenDetail } from "@/hooks/use-detail-param";
 import { useNow } from "@/hooks/use-now";
 import { formatCompact, formatDuration, formatInt, formatUsd } from "@/lib/format";
-import { RANGE_LABELS } from "@/lib/ops-types";
-import { useOpsControls } from "../ops-provider";
 import { InteractiveBarChart } from "../charts/interactive-bar-chart";
 import { StackedAreaChart } from "../charts/stacked-area-chart";
 import { KpiGrid } from "../kpi-card";
@@ -46,11 +44,10 @@ export function OverviewPage() {
   const detailHref = useDetailHref();
   const now = useNow();
   const ops = recognitions.data;
-  const { range } = useOpsControls();
 
   return (
     <>
-      <PageHeader title="Overview" description={`Last ${RANGE_LABELS[range]} across recognitions and Instagram.`} />
+      <PageHeader title="Overview" />
       {recognitions.error && <ServiceError error={recognitions.error} />}
       {instagram.error && <ServiceError error={instagram.error} />}
 
@@ -71,7 +68,6 @@ export function OverviewPage() {
       {ops ? (
         <InteractiveBarChart
           title="Over time"
-          description={`Last ${RANGE_LABELS[ops.range]} · pick a metric`}
           bucket={ops.bucket}
           data={ops.stats.series.map((p) => ({
             bucket: p.bucket,
@@ -99,7 +95,7 @@ export function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Outcomes" description="Fresh runs, cache hits and failed recognitions" className="lg:col-span-2">
+            <Panel title="Outcomes" className="lg:col-span-2">
               <StackedAreaChart
                 bucket={ops.bucket}
                 config={outcomeConfig}
@@ -123,7 +119,7 @@ export function OverviewPage() {
       </div>
 
       {ops && (
-        <Panel title="Latest recognitions" description="Open a cover to see the whole run">
+        <Panel title="Latest recognitions">
           <RecognitionGallery items={ops.recognitions.slice(0, 10)} href={detailHref} now={now} />
         </Panel>
       )}
@@ -147,7 +143,7 @@ export function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {ops ? (
           <>
-            <Panel title="Live queue" description="Recognitions waiting or running" className="lg:col-span-2">
+            <Panel title="Live queue" className="lg:col-span-2">
               <QueueTable items={ops.queue} onOpen={openDetail} />
             </Panel>
             <LibraryPanel ops={ops} />

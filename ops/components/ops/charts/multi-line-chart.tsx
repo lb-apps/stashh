@@ -33,7 +33,7 @@ export function MultiLineChart<K extends string>({
         <XAxis {...timeAxis(bucket)} />
         <YAxis tickLine={false} axisLine={false} width={52} tickFormatter={axisFormatter} />
         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" labelFormatter={bucketLabel(bucket)} valueFormatter={valueFormatter} />} />
-        <ChartLegend itemSorter={null} content={<ChartLegendContent />} />
+        {keys.length > 1 && <ChartLegend itemSorter={null} content={<ChartLegendContent />} />}
         {keys.map((key, index) => (
           <Line
             key={key}

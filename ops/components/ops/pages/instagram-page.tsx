@@ -6,7 +6,7 @@ import { useInstagramOps } from "@/hooks/use-ops-data";
 import { useNow } from "@/hooks/use-now";
 import { formatDateTime, formatDuration, formatInt, formatShare } from "@/lib/format";
 import { DM_CONTENT, intentLabel } from "@/lib/labels";
-import { PREVIOUS_LABELS, RANGE_LABELS, type InstagramOps } from "@/lib/ops-types";
+import { PREVIOUS_LABELS, type InstagramOps } from "@/lib/ops-types";
 import { trend } from "@/lib/trend";
 import { DonutChart } from "../charts/donut-chart";
 import { CATEGORY_COLORS } from "../charts/shared";
@@ -15,7 +15,6 @@ import { MultiLineChart } from "../charts/multi-line-chart";
 import { RadialGauge } from "../charts/radial-gauge";
 import { StackedAreaChart } from "../charts/stacked-area-chart";
 import { KpiCard, KpiGrid } from "../kpi-card";
-import { useOpsControls } from "../ops-provider";
 import { PageHeader } from "../page-header";
 import { Panel } from "../panel";
 import { DmKpis, KpiGridSkeleton, PanelSkeleton } from "../sections";
@@ -51,9 +50,8 @@ function TokenPanel({ account }: { account: InstagramOps["stats"]["account"] }) 
 
 export function InstagramPage() {
   const { data: ig, error } = useInstagramOps();
-  const { range } = useOpsControls();
   const header = (
-    <PageHeader title="Instagram" description={`Last ${RANGE_LABELS[range]} of the DM channel: messages, replies and what went unanswered.`} />
+    <PageHeader title="Instagram" />
   );
 
   if (!ig) {
@@ -116,7 +114,7 @@ export function InstagramPage() {
       </KpiGrid>
 
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-        <Panel title="Messages" description={`By outcome · last ${RANGE_LABELS[ig.range]}`} className="lg:col-span-2">
+        <Panel title="Messages" className="lg:col-span-2">
           <StackedAreaChart
             bucket={ig.bucket}
             config={messagesConfig}
@@ -124,7 +122,7 @@ export function InstagramPage() {
             data={stats.series.map((p) => ({ bucket: p.bucket, replied: p.replied, failed: p.failed, open: Math.max(0, p.messages - p.replied - p.failed) }))}
           />
         </Panel>
-        <Panel title="What was sent" description="DM content">
+        <Panel title="What was sent">
           <DonutChart
             centerLabel="DMs"
             slices={stats.content_mix.map((item, index) => ({
@@ -138,7 +136,7 @@ export function InstagramPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-        <Panel title="How recognitions ended" description="Places found, none found, apology, expired">
+        <Panel title="How recognitions ended">
           <HorizontalBarChart
             items={[
               { label: "Replied with places", value: outcomes.with_places },
@@ -162,7 +160,7 @@ export function InstagramPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-        <Panel title="What was asked" description="Message intent">
+        <Panel title="What was asked">
           <HorizontalBarChart
             tone="muted"
             items={[

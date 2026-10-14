@@ -37,9 +37,6 @@ function useRecognitionDetail(id: string | null) {
   });
 }
 
-/** A short, stable handle for a run: the first block of its id, as the kit's `r-8841`. */
-export const shortId = (id: string) => `r-${id.slice(0, 6)}`;
-
 /** One recognition's whole story in a side sheet (a dialog), opened from any runs list. */
 export function RecognitionDetailSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { data, error } = useRecognitionDetail(id);
@@ -108,7 +105,6 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
       <div className="flex items-start gap-4">
         <Thumb url={detail.source?.thumbnail_url ?? null} icon={SOURCE_ICON[detail.source_type]} className="size-16" />
         <div className="grid min-w-0 flex-1 gap-1">
-          <span className="micro-label font-mono normal-case tracking-normal">{shortId(detail.id)}</span>
           <h2 className="truncate font-heading text-headline font-black">{formatSource(detail.source_url)}</h2>
           <div className="flex flex-wrap gap-1.5 pt-0.5">
             <Badge variant="success">{SOURCE_TYPE[detail.source_type]}</Badge>
@@ -175,11 +171,6 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
         </Button>
       )}
 
-      <p className="font-mono text-xs break-all text-micro">
-        task {detail.id}
-        <br />
-        user {detail.owner_user_id}
-      </p>
     </div>
   );
 }

@@ -11,16 +11,16 @@ import { useOpsControls } from "./ops-provider";
 import { StatusDot } from "./status-dot";
 
 /**
- * The console kit's page head: a heavy display title, one helper sentence, and the
- * controls that apply to the whole page (time range, live refresh) on the right.
+ * The console kit's page head: a heavy display title, a helper sentence only when it adds a
+ * fact the controls do not show, and the page-wide controls (time range, live) on the right.
  */
-export function PageHeader({ title, description }: { title: string; description: string }) {
+export function PageHeader({ title, description }: { title: string; description?: string }) {
   return (
     <header className="flex flex-wrap items-end gap-x-6 gap-y-4">
       <SidebarTrigger className="-ml-2 basis-full justify-start md:hidden" />
       <div className="min-w-60 flex-1">
         <h1 className="font-heading text-display">{title}</h1>
-        <p className="mt-1.5 text-body text-muted-foreground">{description}</p>
+        {description && <p className="mt-1.5 text-body text-muted-foreground">{description}</p>}
       </div>
       <PageControls />
     </header>

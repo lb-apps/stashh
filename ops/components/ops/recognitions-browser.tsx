@@ -36,7 +36,6 @@ import { DASH, formatDuration, formatInt, formatRelative, formatSource, formatUs
 import { CHANNEL, SOURCE_TYPE, TASK_STATUS } from "@/lib/labels";
 import type { Channel, RecognitionListItem, SourceType, TaskStatus } from "@/lib/ops-types";
 import { cn } from "@/lib/utils";
-import { shortId } from "./recognition-detail";
 import { SOURCE_ICON, SourceCover, Thumb } from "./recognition-thumb";
 import { EmptyState } from "./states";
 
@@ -305,7 +304,7 @@ export function RecognitionsBrowser({
                   tabIndex={0}
                   data-state={row.original.id === selectedId ? "selected" : undefined}
                   aria-current={row.original.id === selectedId ? "true" : undefined}
-                  aria-label={`Open ${SOURCE_TYPE[row.original.source_type]} ${shortId(row.original.id)}`}
+                  aria-label={`Open ${SOURCE_TYPE[row.original.source_type]} ${formatSource(row.original.source_url)}`}
                   className="cursor-pointer focus-visible:bg-grey-100 focus-visible:outline-solid focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-cobalt-300"
                   onClick={() => onOpen(row.original.id)}
                   onKeyDown={(event) => {
