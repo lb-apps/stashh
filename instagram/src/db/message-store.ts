@@ -1,7 +1,10 @@
 import { inboundAttachmentsSchema, type InboundMessage } from "../conversation/events.ts";
-import type { MessageStore, Settlement, StoredMessage } from "../conversation/store.ts";
+import type { MessageStatus, MessageStore, Settlement, StoredMessage } from "../conversation/store.ts";
 import type { Db } from "./client.ts";
 import type { InstagramMessageRow, Json } from "./types.ts";
+
+/** Statuses a message never leaves; reaching one stamps `finished_at` (a table constraint requires it). */
+const FINAL_STATUSES: ReadonlySet<MessageStatus> = new Set(["replied", "failed", "expired"]);
 
 /** `MessageStore` on the `instagram_messages` table. */
 export class SupabaseMessageStore implements MessageStore {
@@ -50,6 +53,8 @@ export class SupabaseMessageStore implements MessageStore {
       .update({
         locked_until: null,
         ...(s.status !== undefined && { status: s.status }),
+        ...(s.status !== undefined && FINAL_STATUSES.has(s.status) && { finished_at: new Date().toISOString() }),
+        ...(s.intent !== undefined && { intent: s.intent }),
         ...(s.userId !== undefined && { user_id: s.userId }),
         ...(s.recognitionId !== undefined && { recognition_id: s.recognitionId }),
         ...(s.submittedAt !== undefined && { submitted_at: s.submittedAt.toISOString() }),

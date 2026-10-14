@@ -91,7 +91,7 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
     await next(mid);
 
-    expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2 });
+    expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2, intent: "recognize", finishedAt: time.now() });
     expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var."]);
     const carousel = messenger.sent[1]?.message;
     expect(carousel?.kind).toBe("carousel");
@@ -181,7 +181,7 @@ describe("failures and retries", () => {
     await tick();
 
     const row = store.row(mid);
-    expect(row).toMatchObject({ status: "received", attempts: 1, lastError: "unavailable", lockedUntil: null });
+    expect(row).toMatchObject({ status: "received", attempts: 1, lastError: "unavailable", lockedUntil: null, finishedAt: null });
     expect(row.nextAttemptAt.getTime()).toBeGreaterThan(time.now().getTime());
 
     await next(mid);
@@ -242,7 +242,7 @@ describe("failures and retries", () => {
     time.advance(25 * 60 * 60 * 1000);
     await tick();
 
-    expect(store.row(mid).status).toBe("expired");
+    expect(store.row(mid)).toMatchObject({ status: "expired", intent: "recognize", finishedAt: time.now() });
     expect(messenger.sent).toHaveLength(0);
     expect(stashh.created).toHaveLength(0);
   });
@@ -264,7 +264,8 @@ describe("other intents", () => {
   it("explains what Stashh does for an ordinary message", async () => {
     const mid = await deliver({ text: "merhaba" });
     await tick();
-    expect(store.row(mid).status).toBe("replied");
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
+    expect(store.row(mid).finishedAt).not.toBeNull();
     expect(messenger.texts()).toEqual(['Bir Reel ya da gönderi paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
   });
 

@@ -25,9 +25,16 @@ export interface StoredMessage {
   attempts: number;
 }
 
-/** The outcome of one processing step. Settling always releases the claim. */
+/** What a message was read as; recorded so the ops stats can say what people ask for. */
+export type MessageIntent = "recognize" | "help" | "unsupported" | "erase";
+
+/**
+ * The outcome of one processing step. Settling always releases the claim, and a final
+ * status (replied, failed, expired) stamps the message's finish time.
+ */
 export interface Settlement {
   status?: MessageStatus;
+  intent?: MessageIntent;
   userId?: string;
   recognitionId?: string;
   submittedAt?: Date;

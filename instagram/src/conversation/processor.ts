@@ -4,7 +4,7 @@ import { composeRecognitionReply } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
 import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
 import { interpret } from "./intent.ts";
-import type { MessageStatus, MessageStore, StoredMessage } from "./store.ts";
+import type { MessageStatus, MessageStore, Settlement, StoredMessage } from "./store.ts";
 
 /** Instagram only lets a business reply within 24 hours of the person's message. */
 const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -55,7 +55,7 @@ export class MessageProcessor {
 
     if (this.now().getTime() - message.sentAt.getTime() > REPLY_WINDOW_MS) {
       log.warn("reply window closed; message expired");
-      await this.store.settle(message.mid, { status: "expired" });
+      await this.settle(message, { status: "expired" });
       return;
     }
 
@@ -92,7 +92,7 @@ export class MessageProcessor {
           idempotencyKey: message.mid,
         });
         const now = this.now();
-        await this.store.settle(message.mid, {
+        await this.settle(message, {
           status: "submitted",
           userId,
           recognitionId,
@@ -125,7 +125,7 @@ export class MessageProcessor {
     if (elapsed > RECOGNITION_TIMEOUT_MS) {
       return this.reply(message, [text(copy.failed(kind))], "failed", `recognition timed out after ${Math.round(elapsed / 1000)}s`);
     }
-    await this.store.settle(message.mid, { nextAttemptAt: new Date(now.getTime() + pollDelayMs(elapsed)) });
+    await this.settle(message, { nextAttemptAt: new Date(now.getTime() + pollDelayMs(elapsed)) });
   }
 
   /** Sends what has not been delivered yet, then settles the message. */
@@ -139,7 +139,7 @@ export class MessageProcessor {
       await this.messenger.send(message.senderId, replies[i]!);
       await this.store.recordRepliesSent(message.mid, i + 1);
     }
-    await this.store.settle(message.mid, { status, repliesSent: Math.max(replies.length, message.repliesSent), lastError });
+    await this.settle(message, { status, repliesSent: Math.max(replies.length, message.repliesSent), lastError });
   }
 
   private async fail(message: StoredMessage, error: unknown, log: Logger): Promise<void> {
@@ -149,7 +149,7 @@ export class MessageProcessor {
     if (isRetryable(error) && attempts < MAX_ATTEMPTS) {
       const delay = retryDelayMs(attempts);
       log.warn({ err: error, attempts, retryInMs: delay }, "step failed; will retry");
-      await this.store.settle(message.mid, { attempts, lastError, nextAttemptAt: new Date(this.now().getTime() + delay) });
+      await this.settle(message, { attempts, lastError, nextAttemptAt: new Date(this.now().getTime() + delay) });
       return;
     }
 
@@ -160,7 +160,12 @@ export class MessageProcessor {
         log.warn({ err: sendError }, "apology not sent");
       });
     }
-    await this.store.settle(message.mid, { status: "failed", attempts, lastError });
+    await this.settle(message, { status: "failed", attempts, lastError });
+  }
+
+  /** Settles with the message's intent, so every outcome is attributed to what was asked. */
+  private settle(message: StoredMessage, settlement: Settlement): Promise<void> {
+    return this.store.settle(message.mid, { intent: interpret(message).kind, ...settlement });
   }
 
   private sourceKind(message: StoredMessage): SourceKind {

@@ -24,6 +24,8 @@ export type InstagramMessageRow = {
   next_attempt_at: string;
   locked_until: string | null;
   last_error: string | null;
+  intent: "recognize" | "help" | "unsupported" | "erase" | null;
+  finished_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -55,6 +57,10 @@ export type Database = {
       claim_instagram_messages: {
         Args: { p_limit: number; p_lease_seconds: number };
         Returns: InstagramMessageRow[];
+      };
+      instagram_ops_stats: {
+        Args: { p_since: string; p_bucket: string };
+        Returns: Json;
       };
     };
     Enums: { [_ in never]: never };

@@ -4,6 +4,7 @@ import { MessageWorker } from "./conversation/worker.ts";
 import { createDb } from "./db/client.ts";
 import { SupabaseMessageStore } from "./db/message-store.ts";
 import { createApp } from "./http/app.ts";
+import { createOpsSnapshot } from "./ops/snapshot.ts";
 import { createLogger } from "./lib/logger.ts";
 import { InstagramMessenger } from "./meta/graph-client.ts";
 import { InstagramTokenStore } from "./meta/token-store.ts";
@@ -48,6 +49,10 @@ const app = createApp({
   verifyToken: config.WEBHOOK_VERIFY_TOKEN,
   sink: sinks.length === 1 ? sinks[0]! : new FanOutSink(sinks),
   log,
+  ops: {
+    tokens: config.OPS_API_TOKENS,
+    snapshot: createOpsSnapshot({ db, inFlight: () => worker.inFlightCount, startedAt: new Date() }),
+  },
 });
 
 // Fail fast on a missing or unreadable token rather than on the first reply.

@@ -8,7 +8,11 @@ interface Row extends StoredMessage {
   lockedUntil: Date | null;
   lastError: string | null;
   createdAt: Date;
+  intent: string | null;
+  finishedAt: Date | null;
 }
+
+const FINAL_STATUSES = new Set(["replied", "failed", "expired"]);
 
 /** MessageStore with the same claim semantics as `claim_instagram_messages`. */
 export class MemoryStore implements MessageStore {
@@ -40,6 +44,8 @@ export class MemoryStore implements MessageStore {
         lockedUntil: null,
         lastError: null,
         createdAt: this.now(),
+        intent: null,
+        finishedAt: null,
       });
       stored += 1;
     }
@@ -66,6 +72,8 @@ export class MemoryStore implements MessageStore {
     const row = this.rows.get(mid);
     if (!row) return;
     Object.assign(row, Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined)), { lockedUntil: null });
+    // Same rule as the database constraint: a final status carries its finish time.
+    if (s.status && FINAL_STATUSES.has(s.status)) row.finishedAt = this.now();
   }
 
   async deleteBySender(senderId: string): Promise<void> {
