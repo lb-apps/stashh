@@ -55,7 +55,7 @@ export async function fetchTikTokContent(
   );
 
   return {
-    video_url: videoUrl,
+    media_url: videoUrl,
     caption,
     source_type: "tiktok",
     platform: "tiktok",

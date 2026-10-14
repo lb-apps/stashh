@@ -1,3 +1,246 @@
+# Instagram DM channel (`instagram/`) — Stashh goes live through Instagram
+
+## ▶ Resume here — handoff 2026-10-14 (new session: Supabase/Railway/Cloudflare/Meta MCPs loaded)
+
+**State:** branch `feature/instagram-dm-channel`, PR https://github.com/lb-apps/stashh/pull/1
+(→ develop, 4 commits). Uncommitted: Phase 3 work-in-progress files under `instagram/src/`
+(events, intent, stashh client, graph client, text) + fixtures + this plan. `.captures/` holds
+raw webhook bodies (real ids, gitignored) — delete after fixtures are final.
+
+**Live infrastructure**
+- Meta app **Stashh** `4523750807883075` (Live, Standard Access) · Instagram app Stashh-IG
+  `2320260325466973` · account **stashh.me** (BUSINESS) user_id `17841429946098008`,
+  Instagram Tester role (pending accept). Webhook → `https://ig-dev.stashh.me/webhooks/instagram`,
+  fields `messages` + `messaging_postbacks`; account subscribed via `POST /me/subscribed_apps`.
+- `instagram/.env` (gitignored): `INSTAGRAM_APP_SECRET`, `WEBHOOK_VERIFY_TOKEN`,
+  `INSTAGRAM_ACCESS_TOKEN` all set. Never print them.
+- Tunnel `stashh-ig-dev` (`npm run tunnel` in `instagram/`), cert in `~/.cloudflared/`.
+- stashh.me: Cloudflare DNS → Vercel project `stashh` (team Little Big Apps), live with
+  /privacy and /data-deletion.
+
+**Done this session (2026-10-14, afternoon)**
+- Applied `channel_identities` + `instagram_channel` migrations to Supabase; advisors clean
+  (only the intended "RLS on, no policy" infos). `claim_instagram_messages` verified in a
+  rolled-back transaction (lease + SKIP LOCKED, no anon/authenticated execute).
+- Regenerated `backend/src/types/database.ts` from the live schema (it had been hand-kept);
+  fixed the two optional-RPC-arg mismatches it exposed in `places/repository.ts`.
+- **Backend models now go through OpenRouter** (`src/lib/openrouter.ts`), not the Gemini SDK.
+  Model `google/gemini-3.8-flash` (newest Flash; `gemini-2.5-flash` retires on OpenRouter
+  2026-10-20), video as base64 `video_url`, strict JSON schema, reasoning effort low.
+  `@google/genai` removed; `OPENROUTER_API_KEY` required, `OPENROUTER_MODEL` optional.
+- Pre-existing definer-RPC exposure handed to a separate session (task_cc77fa02).
+
+**Done later the same afternoon**
+- OpenRouter verified live: uncached Reel `Dd31ojZOgKL` → Forno Di Roma (Moda), ~26 s of model
+  time on `google/gemini-3.8-flash`. Unused env keys removed (`GEMINI_API_KEY`, APIHUT,
+  `SUPABASE_DB_URL`, `RECOGNITIONS_BYPASS_RESULT_CACHE`, `TEMP_DIR`) and 8 stale
+  credential-bearing permission entries dropped from `.claude/settings.local.json`.
+- **Phase 3 code complete**: processor, worker, Supabase store, token store (seeded live),
+  store sink, copy/compose, config + `start.ts`. 54 tests, typecheck clean.
+- `INTERNAL_API_TOKENS` / `STASHH_API_TOKEN` generated and set; channel ↔ backend auth verified.
+
+**Next, in order**
+1. **You**: start the tunnel (`cd instagram && npm run tunnel`) — the agent may not open ingress.
+2. Phase 4 E2E — **first Reel DM green (2026-10-14 12:34 UTC)**: webhook → queue → identity →
+   recognition (cache hit, Forno Di Roma) → text + carousel accepted by Instagram, replied 8 s
+   after the DM; our two echoes were filtered. Also green: uncached Reel from a second account
+   (18 s), kill + restart mid-job (resumed, no duplicate), shared feed post (6 venues).
+   Still to check: a pasted link, "merhaba", "sil".
+3. Privacy page: add OpenRouter as processor (content-writer flow, owner's call).
+4. Commit (backend OpenRouter + Phase 3) on `feature/instagram-dm-channel`.
+5. Phase 5 Railway (backend + instagram services); production webhook callback.
+
+## Context
+The iOS app is paused. Stashh's frontend becomes the Instagram DM inbox: a person shares a
+Reel / post / story (or pastes a link) to @stashh, we extract the venues and reply in the
+same thread with a place carousel — the iPhone result screen, rendered in Instagram.
+
+Two hard facts shape the design (verified against Meta docs + our code):
+1. ~~A DM share carries no permalink~~ — **disproved for Reels by a real payload
+   (2026-10-14):** `ig_reel.payload.url` is the public permalink, so the backend's URL
+   pipeline works unchanged. Meta's docs describe a CDN URL; stories and feed posts are
+   still unverified.
+2. **Backend only knows Supabase users.** Every route needs a user JWT, there is no
+   service-to-service auth, and `recognition_tasks.owner_user_id` is a NOT NULL FK to
+   `auth.users`. Instagram senders have no Stashh account.
+
+Decisions taken: replies in **Turkish** (strings centralised for later i18n); dev webhooks
+via a **named Cloudflare tunnel on a fixed subdomain**; **Instagram API with Instagram
+Login** (graph.instagram.com, no Facebook Page needed).
+
+## Architecture
+
+```
+Instagram ──webhook──▶ instagram/ (channel adapter)            backend/ (domain)
+                        ├ verify X-Hub-Signature-256            ├ /internal/v1/* (service auth)
+                        ├ persist event (dedupe on mid) → 200   │   ├ PUT  channel-identities
+                        ├ worker: claim → interpret message     │   ├ POST recognitions (url | media)
+                        │   → resolve identity ───────────────▶ │   └ GET  recognitions/:id
+                        │   → create recognition ─────────────▶ ├ existing recognition worker
+                        │   → poll status (async req-reply) ──▶ │   (Gemini → Google Places)
+                        └ compose reply → Send API ──▶ Instagram
+```
+
+- **Bounded contexts.** `backend/` owns places, users, recognition. `instagram/` is a channel
+  adapter: it owns Meta protocol, conversation state and reply rendering, and talks to the
+  backend **only over HTTP**. It never reads backend tables.
+- **Durability.** Meta retries for 36h and extraction takes 10–60 s, so the webhook only
+  verifies, persists and returns 200. A worker (claim with `FOR UPDATE SKIP LOCKED`, same
+  pattern as `claim_recognitions`) drives each message through
+  `received → submitted → replied | failed | ignored`. Restarts and deploys lose nothing.
+- **Async Request-Reply.** The backend already exposes 202 + status resource; the channel
+  polls it with backoff. No backend → channel coupling.
+- **Idempotency end to end.** Dedupe on `message.mid` in the channel; the backend accepts an
+  `Idempotency-Key` (the mid) per owner on recognition creation.
+
+## Tooling — project MCPs (`.mcp.json`)
+`supabase` (migrations, advisors) · `railway` (deploy, env, logs) · `cloudflare` (tunnel,
+DNS, WAF skip rule) · `meta-devtools` (webhook subscriptions, test payloads, App Review
+status) · `vercel-lba` (web). App *creation* has no MCP tool → done in Chrome.
+
+## Phase 0 — Meta app + tunnel (Chrome + MCPs, you + me)
+- [x] Me: create app **Stashh** (App ID 4523750807883075; Instagram app "Stashh-IG",
+      2320260325466973) under Little Big Apps, use case "Manage messaging & content on Instagram"
+- [x] Permissions: only `instagram_business_basic` + `instagram_business_manage_messages`
+      (least privilege — comments permission deliberately not added)
+- [x] Publish the app — **Live** since 2026-10-14. https://stashh.me/privacy and
+      /data-deletion (Discovery design system, copy drafted by content-writer, reviewed),
+      app domain stashh.me, category Lifestyle
+- [x] Instagram Tester role → `stashh.me` (the only account this app serves; Meta requires the
+      role to generate its token). No separate test accounts or dev/prod app split — the owner
+      tests by DMing from a personal account
+- [ ] **You**: accept the tester invite as stashh.me; click *Add account* (Generate access
+      tokens) and log in as stashh.me; enable *Allow access to messages* in the Instagram app
+- [ ] **You**: paste the Instagram app secret into `instagram/.env` (never in chat); the access
+      token goes to the DB-backed token store in Phase 3
+- [x] stashh.me moved to Cloudflare DNS (you); apex A → Vercel (216.198.79.1, 64.29.17.1)
+      and `www` CNAME → Vercel, both DNS-only; Vercel project `stashh` (Little Big Apps,
+      `lb-apps/stashh`, root `web/`, prod branch `master`) owns both domains
+- [x] Named tunnel `stashh-ig-dev` → `https://ig-dev.stashh.me` → `localhost:3002`
+      (`npm run tunnel` in `instagram/`). Verified end to end: handshake 200 + challenge,
+      wrong token 403, unsigned POST 401
+- [x] Callback `https://ig-dev.stashh.me/webhooks/instagram` verified (v26.0). Fields
+      subscribed: only `messages`, `messaging_postbacks` (Meta pre-subscribed comments,
+      live_comments, message_edit, reactions, referral, seen — all turned off)
+- [x] **Signing secret confirmed:** Meta's test delivery verified against the *Instagram app
+      secret*. Note: the dashboard Test tool sends `entry[].changes[]`; real DMs are documented
+      as `entry[].messaging[]` — the parser must accept both
+
+## Phase 1 — Capture real payloads (gate before building ingestion)
+- [x] Minimal `instagram/` skeleton: GET handshake + signed POST that logs raw bodies
+      (Node 24 native TS, Express 5, Zod 4, vitest — 9 tests)
+- [x] **Reel captured** (scrubbed fixture `instagram/test/fixtures/ig-reel-share.json`).
+      Shape: `entry[].messaging[].message.attachments[{ type: "ig_reel", payload: { url,
+      reel_video_id, title } }]`. **`payload.url` is the public permalink**
+      (`https://www.instagram.com/reel/<code>/`), not a CDN link, and `title` is the caption.
+      → Reels go through the backend's existing URL pipeline; no media source type needed.
+- [x] Signing secret = **Instagram app secret** (Meta test delivery verified).
+      Dashboard Test tool sends `entry[].changes[]` (`dashboard-test-messages.json`).
+- [x] **Feed posts (2026-10-14)** — `ig_post` carries **no permalink**: `payload.url` is a
+      signed `lookaside.fbsbx.com` CDN link (image/jpeg for a photo post), plus `title`
+      (caption) and `ig_post_media_id`. Instagram Login cannot resolve another account's media
+      id (`code 100 / subcode 33`). → New source kind **shared media**: the channel sends
+      `{ shared_media: { media_id, media_url, caption } }`; the task is keyed
+      `instagram-media:<id>` (result cache survives the CDN link expiring) and carries its
+      content in `recognition_tasks.source_media`; the analyzer picks video/image by
+      Content-Type. Verified live: müdavimmet jazz list → 6/6 venues + handles, ~10 s; repeat
+      → cache hit. Fixture `ig-post-share.json`.
+      Known limits: carousel posts read only the cover item; a backend retry after the CDN
+      link expires fails (apology); pasted image-only `/p/` links still fail in the scraper.
+- [ ] *Deferred by the owner:* stories (capture the shape first)
+
+## Phase 2 — Backend: internal API
+- [x] **Service auth**: `createServiceAuth` middleware — Bearer service token, SHA-256 +
+      `timingSafeEqual`, token(s) from `INTERNAL_API_TOKENS` env; mounted on `/internal/v1`;
+      own rate limit; not reachable with a user JWT and vice versa
+- [x] **Channel identities** migration `20261014120000_channel_identities.sql` (**not yet
+      applied**). `PUT` resolves-or-creates, `DELETE` erases (auth.users cascade). Admin
+      `createUser` refuses users without email/phone (verified live), anonymous sign-in would
+      open a public surface → **UUIDv5-derived id** + reserved never-mailed address
+      `instagram-<id>@identities.stashh.me`, pre-confirmed
+- [~] ~~Recognition media sources~~ — not needed for Reels (permalink). Revisit with stories.
+- [x] `POST /internal/v1/users/:userId/recognitions` (+ `Idempotency-Key`, unique per owner,
+      race returns the winner) and `GET /internal/v1/users/:userId/recognitions/:id`;
+      `recognitions/factory.ts` + shared `presenter.ts`
+- [x] OpenAPI: internal routes under an "Internal" tag (own server + `ServiceToken`)
+- [x] Fixes: story-link validation, typed worker steps, worker→service layering, thumbnail
+      failures logged, `backend/docs/deployment.md` replaces the stale Railway doc
+- [x] vitest for the backend — 28 tests
+
+## Phase 3 — `instagram/` service (Reels + pasted links)
+Done (typechecked, **not yet unit-tested, uncommitted**):
+- `src/conversation/events.ts` — Zod + `extractInboundMessages()`: accepts `messaging[]`
+  and `changes[]`, drops echoes (`is_echo` / `sender.id == entry.id`), deletions, non-messages
+- `src/conversation/intent.ts` — `interpret()` → `recognize{sourceUrl}` (ig_reel permalink or
+  first IG/TikTok link in text) | `erase` ("sil"/"delete", tr-lowercased) | `unsupported` | `help`
+- `src/stashh/client.ts` — `HttpStashhApi` for `/internal/v1` (resolve/erase identity,
+  create/get recognition), typed `StashhApiError.retryable`
+- `src/meta/graph-client.ts` + `meta/text.ts` — `InstagramMessenger` (text, generic-template
+  carousel, `typing_on`), all Send API limits enforced (1000 UTF-8 bytes, 80-char
+  title/subtitle, ≤10 cards, ≤3 buttons, grapheme-safe truncation), `GraphApiError.retryable`
+
+To do, in order:
+- [x] Migration `20261014130000_instagram_channel.sql` — **applied** (tables owned by the
+      channel; RLS on, no policies = service role only). As built: also `text`, `attachments`,
+      `submitted_at`, `replies_sent` columns; status set has no `ignored`:
+      - `instagram_messages(mid pk, account_id, sender_id, sent_at, payload jsonb, status
+        check in (received, submitted, replied, ignored, failed, expired), user_id uuid,
+        recognition_id uuid, attempts int, next_attempt_at, locked_until, last_error,
+        created_at, updated_at)` + partial index on `next_attempt_at` for open statuses.
+        No FK to backend tables (bounded context).
+      - `claim_instagram_messages(p_limit, p_lease_seconds)` — `FOR UPDATE SKIP LOCKED`,
+        sets `locked_until`; execute revoked from public/anon/authenticated.
+      - `instagram_accounts(account_id pk, access_token, expires_at, refreshed_at, updated_at)`
+- [x] `src/db/` supabase-js service client (+ hand-written types for the two tables)
+- [x] `webhooks/db-sink.ts` — `extractInboundMessages` → insert `on conflict (mid) do nothing`;
+      production sink (CaptureSink stays dev-only, optionally alongside)
+- [x] `meta/token-store.ts` — `AccessTokenSource` backed by `instagram_accounts`; bootstrap
+      from `INSTAGRAM_ACCESS_TOKEN` when the row is missing; daily refresh via
+      `GET graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token` when
+      < 30 days left and token ≥ 24h old. **Current token issued 2026-10-14 → expires ~2026-12-13.**
+- [x] `replies/copy.tr.ts` (Discovery voice: plain, warm, "sen", **no emoji**, no "!"):
+      intro "Bu Reel'de {n} mekân var." · empty "Bu Reel'de bir mekân bulamadık. Başka bir
+      Reel gönder, içindekileri çıkaralım." · help "Bir Reel gönder, içindeki mekânları sana
+      listeleyelim. Verilerini silmek için sil yaz." · unsupported "Şimdilik yalnızca Reel'leri
+      okuyabiliyoruz. …" · failed "Bu Reel'i şu an okuyamadık. Birazdan tekrar gönderir misin?"
+      · erased "Stashh'teki verilerini sildik."
+- [x] `replies/compose.ts` — places → `[text intro, carousel]`; card: title = name, subtitle =
+      `★ 4,6 · {address}` (tr decimal comma), image = `thumbnail_url`, default action + button
+      "Haritada aç" = `https://www.google.com/maps/search/?api=1&query=<name>&query_place_id=<id>`,
+      button "Instagram" when `instagram_username`; >10 places → several carousels
+- [x] `conversation/processor.ts` — per-message state machine:
+      received → (ignore | erase→reply | help/unsupported→reply | recognize: typing_on,
+      resolve identity, create recognition with Idempotency-Key = mid → submitted) ;
+      submitted → poll GET (backoff 2s→10s, give up ~5 min) → compose+send → replied |
+      failed→apology. Retryable errors back off on `attempts`; > 24h old → expired, no reply.
+- [x] `conversation/worker.ts` — claim loop (concurrency 4, idle poll 1s), hourly purge of
+      `instagram_messages` older than 30 days (privacy policy), graceful shutdown
+- [x] `config.ts` additions: `STASHH_API_URL`, `STASHH_API_TOKEN`, `SUPABASE_URL`,
+      `SUPABASE_SECRET_KEY`, `INSTAGRAM_ACCESS_TOKEN` (bootstrap only),
+      `GRAPH_API_VERSION=v26.0`; update `.env.example`; `start.ts` wires DB sink + worker
+- [x] Tests: events (both fixtures, echo/self filtering), intent, text truncation,
+      `toGraphMessage` limits, compose, processor with fake StashhApi + fake Messenger +
+      in-memory repo (happy path, empty, failure, retry, duplicate mid, 24h expiry, erase)
+
+## Phase 4 — End-to-end on the dev tunnel
+- [ ] Backend (:3000) + instagram (:3002) + tunnel; DM a Reel, post, story and a link from the
+      tester account; verify carousel, maps links, empty-result path, retries (kill the
+      service mid-job → it resumes), duplicate webhook delivery → one reply
+- [ ] Update `CLAUDE.md` repo map + `docs/` with the channel architecture
+
+## Phase 5 — Production (after dev E2E is green)
+- [ ] Railway: deploy `backend` (API + worker) and `instagram` as separate services, secrets
+      in Railway env, production callback URL
+- [x] ~~App Review / Advanced Access / Tech Provider~~ — not needed: the app only ever serves
+      our own @stashh account (Standard Access on an asset of the same portfolio). Business
+      Verification of Little Big Apps is already complete.
+
+## Out of scope (explicit)
+Saving to library from Instagram, lists, multi-account support, non-Turkish replies.
+The identity model is built so "Kaydet" can be added later without migration.
+
+---
+
 # Web app boilerplate (`web/`)
 
 ## Goal
@@ -11,6 +254,11 @@ Add a web project to the Stashh monorepo. Boilerplate only — no page developme
 - HeroUI v3.2.4 (`@heroui/react` + `@heroui/styles`) + `tailwind-variants`
 
 ## Component library ruling
+> **Superseded.** HeroUI was removed in favour of the Discovery design system
+> (`web/lib/discovery/`). The reasoning below is kept as a record of why a
+> second Radix-based kit was rejected — that reasoning still holds, and now
+> applies to HeroUI itself.
+
 **HeroUI is the only component library.** It owns design tokens and component base.
 
 shadcn was considered and rejected: HeroUI v3 (React Aria + tailwind-variants) and

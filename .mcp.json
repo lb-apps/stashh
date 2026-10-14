@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=ucpktmkakdjmpspulxjx"
+    },
+    "vercel-lba": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
+    },
+    "railway": {
+      "type": "http",
+      "url": "https://mcp.railway.com"
+    },
+    "cloudflare": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "meta-devtools": {
+      "type": "http",
+      "url": "https://mcp.facebook.com/devtools"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+/* Discovery — font stacks.
+
+   Stashh edit: SF Pro is NOT self-hosted — Apple's SF Pro licence forbids serving it from a public website.
+   Apple devices get the installed SF Pro through -apple-system / BlinkMacSystemFont (and ui-rounded for the
+   rounded face). Everywhere else falls back to Figtree and Nunito, loaded by next/font/google in
+   app/fonts.ts, which exposes them as --font-figtree / --font-nunito; this file only assembles the stacks. */
+:root {
+  --font-display: -apple-system, BlinkMacSystemFont, var(--font-figtree), "Helvetica Neue", Arial, sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, var(--font-figtree), "Helvetica Neue", Arial, sans-serif;
+  --font-rounded: ui-rounded, -apple-system, BlinkMacSystemFont, var(--font-nunito), sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}

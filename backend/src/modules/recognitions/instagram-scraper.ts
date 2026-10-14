@@ -8,17 +8,15 @@ function extractShortcode(url: string): string {
   const path = new URL(url).pathname.replace(/\/$/, "");
   const segments = path.split("/");
   for (let i = segments.length - 1; i >= 0; i--) {
-    if (["p", "reel", "tv"].includes(segments[i]!) && segments[i + 1]) {
+    if (["p", "reel", "reels", "tv"].includes(segments[i]!) && segments[i + 1]) {
       return segments[i + 1]!;
     }
   }
   throw new Error(`Cannot extract shortcode from URL: ${url}`);
 }
 
-function detectSourceType(url: string): "reel" | "post" | "story" {
-  if (/\/reel\//i.test(url)) return "reel";
-  if (/\/stories\//i.test(url)) return "story";
-  return "post";
+function detectSourceType(url: string): "reel" | "post" {
+  return /\/reels?\//i.test(url) ? "reel" : "post";
 }
 
 function decodeHtmlEntitiesOnce(str: string): string {
@@ -228,7 +226,7 @@ export async function fetchInstagramContent(
   }
 
   return {
-    video_url: videoUrl,
+    media_url: videoUrl,
     caption,
     source_type: sourceType,
     platform: "instagram",

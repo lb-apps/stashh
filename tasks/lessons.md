@@ -25,3 +25,20 @@ that library's tokens.
 
 **Cost of the miss:** low — caught before `shadcn init` ran, so no dependencies or
 `components.json` landed. Only the plan file needed rewriting.
+
+## 2026-10-14 — Don't add test infrastructure the owner's setup doesn't need
+
+**Correction:** "test diye ayrı bir şeye gerek yok bu proje için" / "app'i kullanacak hesap da sadece bu".
+
+**What happened:** For the Instagram DM channel I planned a second Instagram account as an
+Instagram Tester and recommended separate dev and prod Meta apps — the generic "safe" setup
+from Meta's docs.
+
+**Why it was wrong:** The app serves exactly one account the owner controls, and the owner
+tests by messaging it from a personal account. A tester account and a second app add setup,
+secrets and drift for no gain. The one role Meta actually requires (the serving account as
+Instagram Tester, to generate its token) is not a test setup.
+
+**How to apply:** Before proposing staging/test duplicates (accounts, apps, projects), check
+who the system serves and how the owner already tests. Default to the single real setup and
+add duplicates only when a concrete risk demands it — and name that risk.

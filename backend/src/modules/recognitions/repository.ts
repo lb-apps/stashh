@@ -36,7 +36,7 @@ interface FailRecognitionParams {
 interface UpsertRecognitionResultParams {
   sourceUrl: string;
   places: Json;
-  videoUrl: string;
+  videoUrl: string | null;
   caption: string | null;
   sourceType: SourceType;
 }
@@ -50,6 +50,21 @@ export class RecognitionRepository {
       .insert(recognition)
       .select("*")
       .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getRecognitionByIdempotencyKey(
+    ownerUserId: string,
+    idempotencyKey: string,
+  ): Promise<RecognitionTaskRow | null> {
+    const { data, error } = await this.supabaseClient
+      .from("recognition_tasks")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
 
     if (error) throw error;
     return data;

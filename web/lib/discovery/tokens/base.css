@@ -1,0 +1,32 @@
+/* Discovery — base resets and the two screen modes.
+   Every screen commits to one mode: .ds-mode-utility (bone) or
+   .ds-mode-brand (full-bleed cobalt). Never both on one screen. */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--surface-app);
+  color: var(--text-primary);
+  font: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  text-wrap: pretty;
+}
+a { color: var(--text-link); text-decoration: none; font-weight: var(--fw-semibold); transition: opacity var(--dur-fast) var(--ease-out); }
+a:hover { opacity: 0.7; }
+a:active { color: var(--cobalt-600); }
+button { font-family: inherit; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+img { display: block; max-width: 100%; }
+
+.ds-mode-utility { background: var(--surface-app); color: var(--text-primary); }
+.ds-mode-brand { background: var(--surface-brand); color: var(--text-on-brand); }
+.ds-mode-brand a { color: var(--white); }
+
+/* uppercase micro section label, e.g. FILL YOUR MAP WITH FRIENDS */
+.ds-section-label { font: var(--fw-bold) var(--fs-micro) / var(--lh-micro) var(--font-display); letter-spacing: var(--tr-micro); text-transform: uppercase; color: var(--text-tertiary); }
+
+/* the standard white content card */
+.ds-card { background: var(--surface-card); border-radius: var(--r-card); box-shadow: var(--sh-card); }
+
+.ds-scroll-hide::-webkit-scrollbar { display: none; }
+.ds-scroll-hide { scrollbar-width: none; }

@@ -1,0 +1,18 @@
+/* Discovery — shape. Heavy rounding everywhere; borders almost never. */
+:root {
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-button: 16px;   /* compact action button ("Add") */
+  --r-cta: 20px;      /* full-width primary CTA */
+  --r-field: 18px;    /* search / text field */
+  --r-icon-sq: 20px;  /* cobalt square icon button */
+  --r-card: 24px;     /* white content card */
+  --r-card-lg: 28px;  /* row card, alert dialog */
+  --r-sheet: 32px;    /* bottom sheet top corners */
+  --r-pill: 999px;
+  --r-circle: 50%;
+
+  --grabber-w: 40px; /* @kind spacing */
+  --grabber-h: 5px; /* @kind spacing */
+  --stroke-icon: 2.25px; /* @kind spacing */
+}

@@ -8,8 +8,8 @@ export type SourceType = "reel" | "post" | "story" | "tiktok";
 
 /** Normalised scrape result, whichever platform it came from. */
 export interface SourceContent {
-  /** Directly fetchable video URL, handed to Gemini. */
-  video_url: string;
+  /** Directly fetchable video or image URL, downloaded and handed to the model. */
+  media_url: string;
   /** Post caption. Instagram: og:description. TikTok: the post title. */
   caption: string | null;
   source_type: SourceType;
@@ -47,6 +47,8 @@ export interface ExtractedPlace {
 
 export interface AIAnalysisResult {
   places: ExtractedPlace[];
+  /** What the media turned out to be, from its Content-Type. */
+  media_kind: "video" | "image";
 }
 
 // ── Google Places enrichment ───────────────────────────────

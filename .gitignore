@@ -70,6 +70,21 @@ supabase/.branches/
 
 # --- Local agent / IDE overrides (secrets, machine paths) ---
 .claude/settings.local.json
+.claude/worktrees/
+
+# --- Deploy CLIs (project links, tokens) ---
+.vercel/
+
+# --- Keys and certificates (Apple signing, APNs, TLS) ---
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
 
 # --- Misc ---
 instagram-cookies.txt
+
+# --- Instagram channel ---
+# Raw webhook captures contain real user ids and message content.
+instagram/.captures/

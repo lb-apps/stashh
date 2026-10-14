@@ -1,0 +1,50 @@
+/* Discovery — type. Geometric grotesque, tight tracking at display sizes,
+   near-black weights for headlines. Sizes are iOS points = px 1:1. */
+:root {
+  --fs-display-1: 40px;  --lh-display-1: 40px;  /* screen-owning title: "My places" */
+  --fs-display-2: 34px;  --lh-display-2: 38px;  /* place-detail title */
+  --fs-title-1: 30px;    --lh-title-1: 35px;    /* centered two-line moment headline */
+  --fs-title-2: 24px;    --lh-title-2: 29px;
+  --fs-headline: 20px;   --lh-headline: 25px;   /* dialog title, row title */
+  --fs-body-lg: 19px;    --lh-body-lg: 26px;    /* address, dialog body */
+  --fs-body: 17px;       --lh-body: 23px;
+  --fs-label: 17px;      --lh-label: 20px;      /* button label */
+  --fs-caption: 15px;    --lh-caption: 20px;
+  --fs-micro: 13px;      --lh-micro: 15px;      /* 50+ FRIENDS, OPEN */
+  --fs-nano: 11px;       --lh-nano: 12px;       /* inline pill badge */
+
+  --fw-regular: 400; /* @kind font */
+  --fw-medium: 500; /* @kind font */
+  --fw-semibold: 600; /* @kind font */
+  --fw-bold: 700; /* @kind font */
+  --fw-heavy: 800; /* @kind font */
+  --fw-black: 900; /* @kind font */
+
+  --tr-display: -0.032em; /* @kind font */
+  --tr-title: -0.022em; /* @kind font */
+  --tr-tight: -0.012em; /* @kind font */
+  --tr-normal: 0em; /* @kind font */
+  /* uppercase micro-labels */
+  --tr-micro: 0.08em; /* @kind font */
+  --tr-nano: 0.04em; /* @kind font */
+
+  /* semantic type aliases */
+  --text-display-weight: var(--fw-black); /* @kind font */
+  --text-title-weight: var(--fw-semibold); /* @kind font */
+  --text-row-weight: var(--fw-semibold); /* @kind font */
+}
+
+/* Ready-made type classes. Components use tokens directly; these exist for
+   prose, cards and quick composition. */
+.ds-display-1 { font: var(--fw-black) var(--fs-display-1) / var(--lh-display-1) var(--font-display); letter-spacing: var(--tr-display); color: var(--text-primary); }
+.ds-display-2 { font: var(--fw-heavy) var(--fs-display-2) / var(--lh-display-2) var(--font-display); letter-spacing: var(--tr-display); color: var(--text-primary); }
+.ds-title-1 { font: var(--fw-semibold) var(--fs-title-1) / var(--lh-title-1) var(--font-display); letter-spacing: var(--tr-title); color: var(--text-primary); }
+.ds-title-2 { font: var(--fw-bold) var(--fs-title-2) / var(--lh-title-2) var(--font-display); letter-spacing: var(--tr-title); color: var(--text-primary); }
+.ds-headline { font: var(--fw-bold) var(--fs-headline) / var(--lh-headline) var(--font-display); letter-spacing: var(--tr-tight); color: var(--text-primary); }
+.ds-body-lg { font: var(--fw-regular) var(--fs-body-lg) / var(--lh-body-lg) var(--font-text); color: var(--text-secondary); }
+.ds-body { font: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-text); color: var(--text-primary); }
+.ds-label { font: var(--fw-semibold) var(--fs-label) / var(--lh-label) var(--font-display); letter-spacing: var(--tr-tight); }
+.ds-caption { font: var(--fw-regular) var(--fs-caption) / var(--lh-caption) var(--font-text); color: var(--text-secondary); }
+.ds-micro { font: var(--fw-bold) var(--fs-micro) / var(--lh-micro) var(--font-display); letter-spacing: var(--tr-micro); text-transform: uppercase; color: var(--text-tertiary); }
+.ds-nano { font: var(--fw-heavy) var(--fs-nano) / var(--lh-nano) var(--font-display); letter-spacing: var(--tr-nano); text-transform: uppercase; }
+.ds-numeric { font-family: var(--font-rounded); font-weight: var(--fw-heavy); font-variant-numeric: tabular-nums; }

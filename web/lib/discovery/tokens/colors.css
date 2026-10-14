@@ -1,0 +1,89 @@
+/* Discovery — color. THIS FILE IS THE SOURCE OF TRUTH.
+   It supersedes DESIGN.md and ios/Discovery/Design/DesignSystem.swift in the
+   product repo; both are deprecated. Do not reconcile back to them.
+
+   One saturated cobalt carries every interactive element.
+   Bone is the base surface; pure white is reserved for floating content.
+   Acid / magenta / yellow live ONLY inside 3D artwork and stickers. */
+:root {
+  /* --- base neutrals: warm, never pure --- */
+  --bone-50: #F7F5F2;
+  --bone-100: #F0EDE8; /* app background */
+  --bone-200: #E9E6E0;
+  --bone-300: #E3E0DB; /* field fill on bone */
+  --bone-400: #D8D4CD;
+  --white: #FFFFFF;
+  --grey-100: #F3F3F1; /* sunken block inside a white card */
+  --grey-200: #EDEDEB; /* row card inside a white sheet */
+  --grey-300: #E2E2DF;
+  --grey-500: #B5B2AC;
+  --grey-600: #8E8B86;
+  --grey-800: #4A4844;
+  --ink: #0A0A0A;
+
+  /* --- cobalt: the only UI accent --- */
+  --cobalt-50: #EDF2FF;
+  --cobalt-100: #D9E4FF;
+  --cobalt-300: #7FA3FF;
+  --cobalt-500: #0138FF; /* brand */
+  --cobalt-600: #012FD8;
+  --cobalt-700: #0125AC;
+  --cobalt-tint-08: rgba(1, 56, 255, 0.08);
+  --cobalt-tint-14: rgba(1, 56, 255, 0.14);
+
+  /* Interactive fills are a short cobalt gradient, light top-left to
+     indigo bottom-right — it is what makes the pills read as glossy. */
+  --cobalt-gradient: linear-gradient(152deg, #2E7BFF 0%, #0138FF 46%, #2A20E6 100%); /* @kind color */
+  --cobalt-gradient-press: linear-gradient(152deg, #1E63E6 0%, #012FD8 46%, #1F17C4 100%); /* @kind color */
+
+  /* --- semantic --- */
+  --green-500: #34C759; /* switch on, selected checkbox */
+  --green-600: #12B76A; /* OPEN text */
+  --green-100: #DFF7E5;
+  --red-500: #FF453A;   /* destructive text */
+  --amber-500: #F5B301; /* count badges */
+  --amber-100: #FFF0C2;
+  --gold-500: #FFC53D;
+
+  /* --- art-only palette. Never a UI color. --- */
+  --art-acid: #C6FF3D;
+  --art-magenta: #FF2D9B;
+  --art-yellow: #FFE01B;
+
+  /* --- map pin categories --- */
+  --pin-coffee: #A8541B;
+  --pin-food: #E4572E;
+  --pin-bar: #7A2FF2;
+  --pin-rooftop: #0EA5E9;
+  --pin-sweets: #FF2D9B;
+  --pin-default: var(--cobalt-500);
+
+  /* --- semantic aliases: use these in components --- */
+  --surface-app: var(--bone-100);
+  --surface-card: var(--white);
+  --surface-sunken: var(--grey-200);
+  --surface-sunken-on-white: var(--grey-100);
+  --surface-field: var(--bone-300);
+  --surface-field-on-white: var(--grey-200);
+  --surface-brand: var(--cobalt-500);
+
+  --text-primary: var(--ink);
+  --text-secondary: var(--grey-600);
+  --text-tertiary: var(--grey-500);
+  --text-on-brand: var(--white);
+  --text-link: var(--cobalt-500);
+  --text-danger: var(--red-500);
+  --text-open: var(--green-600);
+
+  --fill-primary: var(--cobalt-gradient); /* @kind color */
+  --fill-primary-press: var(--cobalt-gradient-press); /* @kind color */
+  --fill-secondary: var(--bone-300);
+  --fill-secondary-on-white: var(--grey-200);
+  --fill-selected: var(--green-500);
+
+  /* Borders are almost never used. These exist for the two places that need
+     a hairline: the segmented-control thumb and a focus ring. */
+  --hairline: rgba(10, 10, 10, 0.06);
+  --focus-ring: 0 0 0 4px var(--cobalt-tint-14); /* @kind shadow */
+  --scrim: rgba(10, 10, 10, 0.28);
+}

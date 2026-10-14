@@ -1,15 +1,25 @@
+import { z } from "zod";
 import type { Logger } from "../../lib/logger.js";
 import type { SourceContent, SourcePlatform } from "../../types/schemas.js";
 import { fetchInstagramContent } from "./instagram-scraper.js";
 import { fetchTikTokContent, isTikTokUrl } from "./tiktok-scraper.js";
+import type { RecognitionTaskRow } from "./types.js";
 
 /**
- * Routes a source URL to the right scraper.
+ * Turns a task into the content the model reads.
  *
- * The worker should not know which platform a task came from; it asks for content
- * and gets a normalised `SourceContent` back. Adding a platform means adding a
+ * The worker should not know where a task came from; it asks for content and gets a
+ * normalised `SourceContent` back. Content a channel supplied (`source_media`) is used
+ * as is; a URL is routed to its platform's scraper. Adding a platform means adding a
  * scraper and a branch here, nothing else.
  */
+
+const suppliedContentSchema = z.object({
+  media_url: z.string().url(),
+  caption: z.string().nullable(),
+  platform: z.enum(["instagram", "tiktok"]),
+  source_type: z.enum(["reel", "post", "story", "tiktok"]),
+});
 
 export function detectPlatform(url: string): SourcePlatform | null {
   if (isTikTokUrl(url)) return "tiktok";
@@ -21,9 +31,16 @@ export function detectPlatform(url: string): SourcePlatform | null {
 }
 
 export async function fetchSourceContent(
-  url: string,
+  task: Pick<RecognitionTaskRow, "source_url" | "source_media">,
   log: Logger,
 ): Promise<SourceContent> {
+  if (task.source_media !== null) {
+    const supplied = suppliedContentSchema.safeParse(task.source_media);
+    if (!supplied.success) throw new Error(`Task source_media is malformed: ${supplied.error.message}`);
+    return supplied.data;
+  }
+
+  const url = task.source_url;
   const platform = detectPlatform(url);
 
   if (platform === "tiktok") {

@@ -1,0 +1,27 @@
+/* Discovery — spacing. Generous whitespace; screen gutter is 24. */
+:root {
+  --sp-0: 0px;
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 10px;
+  --sp-6: 12px;
+  --sp-7: 16px;
+  --sp-8: 20px;
+  --sp-9: 24px;
+  --sp-10: 32px;
+  --sp-11: 40px;
+  --sp-12: 48px;
+  --sp-13: 64px;
+  --sp-14: 80px;
+
+  --gutter: 24px;          /* screen side margin, iOS */
+  --gutter-web: 32px;
+  --row-gap: 12px;         /* between stacked row cards */
+  --list-row-h: 68px;      /* avatar row: 48 avatar + 10 padding */
+  --place-row-h: 84px;     /* place card row */
+  --hit-min: 44px;         /* never smaller */
+  --sheet-top-inset: 12px; /* grabber zone */
+  --tap-inset: 12px;
+}

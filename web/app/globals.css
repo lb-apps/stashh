@@ -1,215 +1,228 @@
 /*
  * Stashh Web — global stylesheet.
  *
- * Import order is load-bearing: Tailwind v4 must come first, HeroUI second.
- * HeroUI's stylesheet defines every design token (oklch CSS variables) and the
- * BEM component classes, so it has to be able to layer over Tailwind's reset.
- *
- * Design tokens are owned by @heroui/styles — do NOT redefine colour, radius,
- * or spacing scales here. To adjust the theme, override HeroUI's variables in
- * the block below rather than inventing a parallel set.
+ * Tailwind v4 first, then the Discovery design system token layer.
+ * Discovery owns colour, type, shape, elevation and motion. There is no
+ * component library underneath: the components in `lib/discovery` are the
+ * base. Do not add a parallel token scale here — edit the files under
+ * `lib/discovery/tokens/` instead, they are generated from the design system.
  */
 
 @import "tailwindcss";
-@import "@heroui/styles";
+/* Into `base`, after Tailwind's preflight: Discovery's resets beat preflight,
+   and Tailwind utilities still beat Discovery's element rules (`a`, `.ds-mode-brand a`).
+   Unlayered, those element rules would silently override every utility. */
+@import "../lib/discovery/discovery.css" layer(base);
 
-/* HeroUI switches its token values on `.dark` OR `[data-theme="dark"]`
-   (themes/default/variables.css). Tailwind's `dark:` variant has to match the
-   same selectors, otherwise utilities and component tokens disagree. */
-@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
-
+/*
+ * Discovery tokens → Tailwind utilities.
+ *
+ * `inline` keeps the var() reference, so a token edit propagates without a
+ * rebuild of the theme. Tailwind namespaces are fixed (--color-*, --radius-*,
+ * --text-*, --shadow-*, --spacing-*, --font-*, --ease-*), so a few keys are
+ * renamed to avoid colliding with the Discovery variable of the same name.
+ */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* type families — `font-ui`, `font-body`, `font-round` */
+  --font-ui: var(--font-display);
+  --font-body: var(--font-text);
+  --font-round: var(--font-rounded);
+  --font-mono: var(--font-mono);
 
-  /* CSS's built-in easings are too weak to read as intentional. Expo-out is the
-     curve the console leans on — it moves immediately, which is where the eye
-     is. Never `ease-in` on UI: it delays the first frame. */
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  /* neutrals */
+  --color-bone-50: var(--bone-50);
+  --color-bone-100: var(--bone-100);
+  --color-bone-200: var(--bone-200);
+  --color-bone-300: var(--bone-300);
+  --color-bone-400: var(--bone-400);
+  --color-grey-100: var(--grey-100);
+  --color-grey-200: var(--grey-200);
+  --color-grey-300: var(--grey-300);
+  --color-grey-500: var(--grey-500);
+  --color-grey-600: var(--grey-600);
+  --color-grey-800: var(--grey-800);
+  --color-ink: var(--ink);
 
-  /* Cobalt is a *background* colour — as text on a dark surface it measures
-     2.75:1, well under WCAG AA. `text-accent-strong` is the readable sibling:
-     same hue, lifted lightness. Use it for any accent-coloured text. */
-  --color-accent-strong: var(--console-accent-text);
+  /* the one accent */
+  --color-cobalt-50: var(--cobalt-50);
+  --color-cobalt-100: var(--cobalt-100);
+  --color-cobalt-300: var(--cobalt-300);
+  --color-cobalt-500: var(--cobalt-500);
+  --color-cobalt-600: var(--cobalt-600);
+  --color-cobalt-700: var(--cobalt-700);
+
+  /* semantic */
+  --color-surface-app: var(--surface-app);
+  --color-surface-card: var(--surface-card);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-field: var(--surface-field);
+  --color-surface-brand: var(--surface-brand);
+  --color-ink-primary: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-tertiary: var(--text-tertiary);
+  --color-ink-on-brand: var(--text-on-brand);
+  --color-ink-link: var(--text-link);
+  --color-ink-danger: var(--text-danger);
+  --color-ink-open: var(--text-open);
+  --color-green-500: var(--green-500);
+  --color-green-600: var(--green-600);
+  --color-red-500: var(--red-500);
+  --color-amber-500: var(--amber-500);
+
+  /* map pin categories */
+  --color-pin-coffee: var(--pin-coffee);
+  --color-pin-food: var(--pin-food);
+  --color-pin-bar: var(--pin-bar);
+  --color-pin-rooftop: var(--pin-rooftop);
+  --color-pin-sweets: var(--pin-sweets);
+
+  /* type scale — `text-display-1` … `text-nano` */
+  --text-display-1: var(--fs-display-1);
+  --text-display-1--line-height: var(--lh-display-1);
+  --text-display-2: var(--fs-display-2);
+  --text-display-2--line-height: var(--lh-display-2);
+  --text-title-1: var(--fs-title-1);
+  --text-title-1--line-height: var(--lh-title-1);
+  --text-title-2: var(--fs-title-2);
+  --text-title-2--line-height: var(--lh-title-2);
+  --text-headline: var(--fs-headline);
+  --text-headline--line-height: var(--lh-headline);
+  --text-body-lg: var(--fs-body-lg);
+  --text-body-lg--line-height: var(--lh-body-lg);
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-body);
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: var(--lh-caption);
+  --text-micro: var(--fs-micro);
+  --text-micro--line-height: var(--lh-micro);
+  --text-nano: var(--fs-nano);
+  --text-nano--line-height: var(--lh-nano);
+
+  /* shape — `rounded-card`, `rounded-sheet`, … */
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-button: var(--r-button);
+  --radius-cta: var(--r-cta);
+  --radius-field: var(--r-field);
+  --radius-icon-sq: var(--r-icon-sq);
+  --radius-card: var(--r-card);
+  --radius-card-lg: var(--r-card-lg);
+  --radius-sheet: var(--r-sheet);
+
+  /* elevation — `shadow-card`, `shadow-cobalt`, … */
+  --shadow-card: var(--sh-card);
+  --shadow-card-lg: var(--sh-card-lg);
+  --shadow-float: var(--sh-float);
+  --shadow-sheet: var(--sh-sheet);
+  --shadow-thumb: var(--sh-thumb);
+  --shadow-pin: var(--sh-pin);
+  --shadow-cobalt: var(--sh-cobalt);
+  --shadow-cobalt-sm: var(--sh-cobalt-sm);
+
+  /* named spacing — `p-gutter`, `gap-row` */
+  --spacing-gutter: var(--gutter);
+  --spacing-gutter-web: var(--gutter-web);
+  --spacing-row: var(--row-gap);
+
+  /* motion — `ease-pop` is the Discovery signature (slight overshoot) */
+  --ease-pop: var(--ease-spring);
+  --ease-pop-soft: var(--ease-spring-soft);
+  --ease-smooth: var(--ease-out);
 }
 
 /*
- * Brand overrides.
+ * Focus.
  *
- * HeroUI tokens are semantic: a bare name is a background (--accent), the
- * `-foreground` suffix is the text colour on it (--accent-foreground).
- * Values use oklch. Keep this list short and intentional.
+ * Discovery's ring (`--focus-ring`, a 14% cobalt box-shadow) is under 3:1 on
+ * bone, invisible on cobalt, and lost on every component that sets its own
+ * inline box-shadow. An outline survives all three and follows border-radius.
  */
-:root {
-  /* Electric cobalt — DESIGN.md `colors.primary` #0138FF, converted to oklch. */
-  --accent: oklch(0.4909 0.2871 264.09);
-  --accent-foreground: oklch(1 0 0);
-
-  --brand-primary: oklch(0.4909 0.2871 264.09); /* #0138FF */
-  --brand-primary-pressed: oklch(0.4297 0.2517 264.13); /* #012DD6 */
-  --brand-primary-subtle: oklch(0.9612 0.0182 269.09); /* #EDF2FF */
-  --brand-secondary: oklch(0.6234 0.2052 283.45); /* #7C6DFC */
-
-  /* On light surfaces the brand cobalt is already readable as text. */
-  --console-accent-text: var(--brand-primary);
+:focus-visible {
+  outline: 2px solid var(--cobalt-500);
+  outline-offset: 2px;
+}
+.ds-mode-brand :focus-visible {
+  outline-color: var(--white);
 }
 
 /*
- * Console surface stack.
+ * Console surfaces.
  *
- * The console commits to dark: it is a developer tool, read for long stretches,
- * next to a terminal. Depth is what separates panels here — not 1px borders on a
- * flat plane. Each surface is a slight vertical gradient with a bright top edge,
- * so it reads as a lit physical layer rather than a rectangle.
- *
- * Deliberately not pure #000 — black clips OLED subpixels and makes motion smear.
+ * These are app-specific classes for the internal recognition console, not
+ * design-system API. They are expressed entirely in Discovery tokens: bone
+ * base, white cards, warm-tinted shadows. Depth comes from the surface
+ * contrast, never from a 1px border on a flat plane.
  */
-[data-theme="dark"] {
-  --console-bg: oklch(0.1683 0.0243 265.75);
-  --console-surface: oklch(0.2168 0.0261 264.6);
-  --console-surface-raised: oklch(0.2543 0.0288 264.4);
-  --console-hairline: oklch(1 0 0 / 0.07);
-  --console-edge-light: oklch(1 0 0 / 0.1);
-  --console-glow: oklch(0.4909 0.2871 264.09 / 0.1);
-  /* Lifted cobalt so accent text clears 4.5:1 against the panel surfaces. */
-  --console-accent-text: oklch(0.78 0.1418 264.09);
-}
-
 .console-shell {
-  background:
-    radial-gradient(
-      90% 40% at 50% -8%,
-      var(--console-glow) 0%,
-      transparent 60%
-    ),
-    var(--console-bg);
+  background: var(--surface-app);
 }
 
 .surface-panel {
-  background: linear-gradient(
-    to bottom,
-    var(--console-surface-raised),
-    var(--console-surface)
-  );
-  border: 1px solid var(--console-hairline);
-  box-shadow:
-    inset 0 1px 0 0 var(--console-edge-light),
-    0 1px 2px oklch(0 0 0 / 0.3),
-    0 8px 24px -12px oklch(0 0 0 / 0.6);
+  background: var(--surface-card);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-card);
 }
 
-/* Bigger surfaces read as thicker — deeper shadow, stronger top edge. */
+/* Bigger surfaces read as thicker — deeper shadow, larger radius. */
 .surface-hero {
-  background: linear-gradient(
-    to bottom,
-    var(--console-surface-raised),
-    var(--console-surface)
-  );
-  border: 1px solid var(--console-hairline);
-  box-shadow:
-    inset 0 1px 0 0 var(--console-edge-light),
-    0 2px 4px oklch(0 0 0 / 0.35),
-    0 24px 48px -20px oklch(0 0 0 / 0.75);
+  background: var(--surface-card);
+  border-radius: var(--r-card-lg);
+  box-shadow: var(--sh-card-lg);
 }
 
 /* Press feedback belongs on pointer-down, and it has to be instant. */
 .press {
-  transition: transform 120ms var(--ease-out-strong);
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
 .press:active {
-  transform: scale(0.97);
+  transform: scale(var(--press-scale));
 }
 
-/* One-shot entrance for appended rows. Keyframes are fine here: these mount once
-   and are never retargeted mid-flight (unlike toasts, which need transitions). */
+/* One-shot entrance for appended rows. */
 @keyframes enter-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
 .animate-enter-rise {
-  animation: enter-rise 300ms var(--ease-expo) both;
+  animation: enter-rise var(--dur-slow) var(--ease-out) both;
 }
 
-/* Slow breathing pulse on the active pipeline node. Kept well away from the
-   ~0.2Hz band that triggers motion discomfort, and it only ever runs on one
-   element at a time. */
+/* Slow breathing pulse on the active pipeline node. Well away from the ~0.2Hz
+   band that triggers motion discomfort, and only ever on one element. */
 @keyframes node-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--console-glow);
-  }
-  50% {
-    box-shadow: 0 0 0 5px transparent;
-  }
+  0%, 100% { box-shadow: 0 0 0 0 var(--cobalt-tint-14); }
+  50% { box-shadow: 0 0 0 6px transparent; }
 }
-
 .animate-node-pulse {
-  animation: node-pulse 1.8s var(--ease-in-out-strong) infinite;
+  animation: node-pulse 1.8s var(--ease-in-out) infinite;
 }
 
 /* Indeterminate sweep for the active phase rail. */
 @keyframes rail-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
 }
-
 .animate-rail-sweep {
-  animation: rail-sweep 1.4s var(--ease-in-out-strong) infinite;
+  animation: rail-sweep 1.4s var(--ease-in-out) infinite;
 }
 
 /* Reduced motion means gentler, not none — the fade still says "something new
    arrived"; only the movement and the looping pulses go away. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-enter-rise {
-    animation: none;
-    opacity: 1;
-    transform: none;
-    transition: opacity 200ms ease;
-  }
-  .animate-node-pulse,
-  .animate-rail-sweep {
-    animation: none;
-  }
-  .press:active {
-    transform: none;
-  }
-}
-
-/* Frostier and flatter when the user asks for less transparency / more contrast. */
-@media (prefers-reduced-transparency: reduce) {
-  .console-shell {
-    background: var(--console-bg);
-  }
+  .animate-enter-rise { animation: none; opacity: 1; transform: none; transition: opacity 200ms ease; }
+  .animate-node-pulse, .animate-rail-sweep { animation: none; }
+  .press:active { transform: none; }
 }
 
 @media (prefers-contrast: more) {
-  .surface-panel,
-  .surface-hero {
-    border-color: oklch(1 0 0 / 0.35);
-    background: var(--console-surface);
-  }
-}
-
-body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  .surface-panel, .surface-hero { box-shadow: 0 0 0 1px var(--grey-500), var(--sh-card); }
 }
 
 /* Large numerals: tracking goes negative as type grows, leading goes tight.
-   A single letter-spacing value across sizes is wrong somewhere. */
+   Discovery sets these in the rounded face — the numeric personality. */
 .numerals-display {
+  font-family: var(--font-rounded);
+  font-weight: var(--fw-black);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;

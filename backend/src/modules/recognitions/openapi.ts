@@ -12,7 +12,7 @@ import {
 
 // ── Response data schemas (documentation-only) ───────────────────────────────
 
-const recognitionEnqueuedSchema = z
+export const recognitionEnqueuedSchema = z
   .object({
     recognition_id: z.string().uuid(),
     status: z.string(),
@@ -20,7 +20,7 @@ const recognitionEnqueuedSchema = z
   })
   .openapi("RecognitionEnqueued");
 
-const recognitionStatusSchema = z
+export const recognitionStatusSchema = z
   .object({
     recognition_id: z.string().uuid(),
     status: z.string(),

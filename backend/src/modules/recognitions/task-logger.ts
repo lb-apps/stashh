@@ -8,7 +8,15 @@ interface StepRecord {
 
 export interface TaskLogger {
   log: Logger;
-  step<T>(name: string, fn: (stepLog: Logger) => Promise<T>): Promise<T>;
+  /**
+   * Runs one pipeline step, timing it and logging a summary. The step's value is
+   * returned as-is and fully typed; `summarize` picks what goes into the log line.
+   */
+  step<T>(
+    name: string,
+    fn: (stepLog: Logger) => Promise<T>,
+    summarize?: (result: T) => Record<string, unknown>,
+  ): Promise<T>;
   done(extra?: Record<string, unknown>): void;
   fail(error: unknown): void;
 }
@@ -31,15 +39,17 @@ export function createTaskLogger(
   return {
     log,
 
-    async step<T>(name: string, fn: (stepLog: Logger) => Promise<T>): Promise<T> {
+    async step<T>(
+      name: string,
+      fn: (stepLog: Logger) => Promise<T>,
+      summarize?: (result: T) => Record<string, unknown>,
+    ): Promise<T> {
       lastStep = name;
       const t0 = performance.now();
       try {
         const result = await fn(log);
         const duration = Math.round(performance.now() - t0);
-        // Strip underscore-prefixed carrier keys (e.g. _result, _urls) before logging
-        const raw = (typeof result === "object" && result !== null) ? result as Record<string, unknown> : {};
-        const meta = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith("_")));
+        const meta = summarize?.(result) ?? {};
         const record: StepRecord = { step: name, duration, ...meta };
         steps.push(record);
         log.info({ duration, ...meta }, name);

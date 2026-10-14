@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { withConsoleGate } from "@/lib/console-gate";
 
 const BACKEND_URL = process.env.STASHH_API_URL ?? "http://localhost:3000";
 
 /** Unauthenticated probe — mirrors the backend's own uptime endpoint. */
-export async function GET() {
+export const GET = withConsoleGate(async () => {
   const startedAt = performance.now();
 
   try {
@@ -25,4 +26,4 @@ export async function GET() {
       error: cause instanceof Error ? cause.message : String(cause),
     });
   }
-}
+});

@@ -11,14 +11,15 @@
     "start:worker": "node --import tsx src/modules/recognitions/worker.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "db:types": "sh -c 'supabase gen types typescript --project-id \"${SUPABASE_PROJECT_REF}\" --schema public > src/types/database.ts'"
+    "db:types": "sh -c 'supabase gen types typescript --project-id \"${SUPABASE_PROJECT_REF}\" --schema public > src/types/database.ts'",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
-    "@google/genai": "^1.0.0",
     "@scalar/express-api-reference": "^0.8.48",
     "@supabase/supabase-js": "^2.102.1",
     "@types/fluent-ffmpeg": "^2.1.28",
@@ -32,6 +33,7 @@
     "jose": "^6.2.2",
     "pg": "^8.20.0",
     "pino": "^10.3.1",
+    "uuid": "^14.0.3",
     "zod": "^3.24.0"
   },
   "devDependencies": {
