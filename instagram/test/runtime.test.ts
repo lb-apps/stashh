@@ -5,6 +5,7 @@ import type { StoredMessage } from "../src/conversation/store.ts";
 import { MessageWorker } from "../src/conversation/worker.ts";
 import { isRefreshDue } from "../src/meta/token-store.ts";
 import type { WebhookEnvelope } from "../src/webhooks/routes.ts";
+import { createWebhookCounters } from "../src/webhooks/counters.ts";
 import { StoreSink } from "../src/webhooks/store-sink.ts";
 import { MemoryStore } from "./support/fakes.ts";
 
@@ -82,7 +83,8 @@ describe("MessageWorker", () => {
 describe("StoreSink", () => {
   it("queues only messages addressed to our account", async () => {
     const store = new MemoryStore(() => new Date());
-    const sink = new StoreSink({ store, accountId: "17841400000000001", log });
+    const counters = createWebhookCounters();
+    const sink = new StoreSink({ store, accountId: "17841400000000001", log, counters });
     const fixture = (name: string) =>
       JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")) as WebhookEnvelope;
 
@@ -92,6 +94,7 @@ describe("StoreSink", () => {
     await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("ig-reel-share.json"), receivedAt: new Date() });
 
     expect([...store.rows.values()].map((r) => r.senderId)).toEqual(["1234567890123456"]);
+    expect(counters).toMatchObject({ messages_queued: 1, messages_duplicate: 1, other_account: 1 });
   });
 });
 

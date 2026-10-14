@@ -1,6 +1,7 @@
 import { extractInboundMessages } from "../conversation/events.ts";
 import type { MessageStore } from "../conversation/store.ts";
 import type { Logger } from "../lib/logger.ts";
+import type { WebhookCounters } from "./counters.ts";
 import type { VerifiedDelivery, WebhookSink } from "./routes.ts";
 
 /**
@@ -12,11 +13,13 @@ export class StoreSink implements WebhookSink {
   private readonly store: MessageStore;
   private readonly accountId: string;
   private readonly log: Logger;
+  private readonly counters: WebhookCounters | undefined;
 
-  constructor(options: { store: MessageStore; accountId: string; log: Logger }) {
+  constructor(options: { store: MessageStore; accountId: string; log: Logger; counters?: WebhookCounters }) {
     this.store = options.store;
     this.accountId = options.accountId;
     this.log = options.log;
+    this.counters = options.counters;
   }
 
   async accept({ body }: VerifiedDelivery): Promise<void> {
@@ -27,6 +30,11 @@ export class StoreSink implements WebhookSink {
       this.log.info({ dropped: all.length - ours.length }, "webhook messages for another account ignored");
     }
     const stored = await this.store.insert(ours);
+    if (this.counters) {
+      this.counters.messages_queued += stored;
+      this.counters.messages_duplicate += ours.length - stored;
+      this.counters.other_account += all.length - ours.length;
+    }
     this.log.info({ received: ours.length, stored }, "webhook messages queued");
   }
 }

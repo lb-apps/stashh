@@ -5,6 +5,7 @@ import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/http/app.ts";
 import type { VerifiedDelivery, WebhookSink } from "../src/webhooks/routes.ts";
+import { createWebhookCounters } from "../src/webhooks/counters.ts";
 import { isValidSignature } from "../src/webhooks/signature.ts";
 
 const APP_SECRET = "test-app-secret";
@@ -48,11 +49,12 @@ describe("isValidSignature", () => {
 
 describe("webhook routes", () => {
   const sink = new RecordingSink();
+  const counters = createWebhookCounters();
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    const app = createApp({ appSecret: APP_SECRET, verifyToken: VERIFY_TOKEN, sink, log: pino({ level: "silent" }) });
+    const app = createApp({ appSecret: APP_SECRET, verifyToken: VERIFY_TOKEN, sink, counters, log: pino({ level: "silent" }) });
     server = app.listen(0);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/webhooks/instagram`;
@@ -101,6 +103,17 @@ describe("webhook routes", () => {
     const body = JSON.stringify({ object: "page", entry: [] });
     expect((await post(body)).status).toBe(200);
     expect(sink.deliveries).toHaveLength(0);
+  });
+
+  it("counts deliveries, rejected signatures and ignored envelopes for the ops dashboard", async () => {
+    const before = { ...counters };
+    const body = JSON.stringify({ object: "instagram", entry: [] });
+    await post(body);
+    await post(body, sign(body, "wrong"));
+    await post(JSON.stringify({ object: "page", entry: [] }));
+    expect(counters.deliveries - before.deliveries).toBe(1);
+    expect(counters.rejected_signature - before.rejected_signature).toBe(1);
+    expect(counters.ignored_envelope - before.ignored_envelope).toBe(1);
   });
 
   it("returns 500 when the sink cannot persist, so Meta redelivers", async () => {

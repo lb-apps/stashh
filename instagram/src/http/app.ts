@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import type { Logger } from "../lib/logger.ts";
 import { createOpsRouter, type OpsDeps } from "../ops/routes.ts";
+import type { WebhookCounters } from "../webhooks/counters.ts";
 import { createWebhookRouter, type WebhookSink } from "../webhooks/routes.ts";
 
 export interface AppDeps {
@@ -8,6 +9,7 @@ export interface AppDeps {
   verifyToken: string;
   sink: WebhookSink;
   log: Logger;
+  counters?: WebhookCounters;
   /** Operator stats for the local ops dashboard; omitted (or tokenless) means no route. */
   ops?: OpsDeps;
 }

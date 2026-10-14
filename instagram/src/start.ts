@@ -11,6 +11,7 @@ import { InstagramTokenStore } from "./meta/token-store.ts";
 import { HttpStashhApi } from "./stashh/client.ts";
 import { CaptureSink } from "./webhooks/capture-sink.ts";
 import type { WebhookSink } from "./webhooks/routes.ts";
+import { createWebhookCounters } from "./webhooks/counters.ts";
 import { FanOutSink, StoreSink } from "./webhooks/store-sink.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -41,7 +42,8 @@ const worker = new MessageWorker({
   log: log.child({ component: "worker" }),
 });
 
-const sinks: WebhookSink[] = [new StoreSink({ store, accountId: config.INSTAGRAM_ACCOUNT_ID, log })];
+const webhookCounters = createWebhookCounters();
+const sinks: WebhookSink[] = [new StoreSink({ store, accountId: config.INSTAGRAM_ACCOUNT_ID, log, counters: webhookCounters })];
 if (config.WEBHOOK_CAPTURE_DIR) sinks.push(new CaptureSink(config.WEBHOOK_CAPTURE_DIR, log));
 
 const app = createApp({
@@ -49,9 +51,10 @@ const app = createApp({
   verifyToken: config.WEBHOOK_VERIFY_TOKEN,
   sink: sinks.length === 1 ? sinks[0]! : new FanOutSink(sinks),
   log,
+  counters: webhookCounters,
   ops: {
     tokens: config.OPS_API_TOKENS,
-    snapshot: createOpsSnapshot({ db, inFlight: () => worker.inFlightCount, startedAt: new Date() }),
+    snapshot: createOpsSnapshot({ db, inFlight: () => worker.inFlightCount, startedAt: new Date(), webhooks: webhookCounters }),
   },
 });
 
