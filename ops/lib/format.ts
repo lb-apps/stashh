@@ -57,3 +57,23 @@ export function formatSource(url: string | null): string {
     return url;
   }
 }
+
+const relative = new Intl.RelativeTimeFormat("tr-TR", { numeric: "auto" });
+
+/** "3 dakika önce", "dün" — relative to `now`. */
+export function formatRelative(iso: string | null | undefined, now: number = Date.now()): string {
+  if (!iso) return DASH;
+  const seconds = Math.round((Date.parse(iso) - now) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 60) return relative.format(seconds, "second");
+  if (abs < 3_600) return relative.format(Math.round(seconds / 60), "minute");
+  if (abs < 86_400) return relative.format(Math.round(seconds / 3_600), "hour");
+  return relative.format(Math.round(seconds / 86_400), "day");
+}
+
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return DASH;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString("tr-TR", { maximumFractionDigits: 0 })} KB`;
+  return `${(bytes / 1024 / 1024).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} MB`;
+}
