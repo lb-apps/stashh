@@ -1,3 +1,30 @@
+# Stashh Ops — local system dashboard (`ops/`)
+
+Plan: `~/.claude/plans/sunny-zooming-meerkat.md` (approved 2026-10-14). Branch `feature/ops-dashboard`.
+
+- [x] 1a Backend metrics: `recognition_runs` (one row per worker attempt), task-logger timings, OpenRouter usage + cost
+- [x] 1b Instagram metrics: `intent` + `finished_at` (constraint: final status ⇔ finish time)
+- [x] 2a Backend `GET /internal/v1/ops/recognitions` + `recognition_ops_stats()` (service role only)
+- [x] 2b Instagram `GET /ops/stats` behind `OPS_API_TOKENS` + `instagram_ops_stats()` + in-process state
+- [x] 3 `ops/` app: Next 16.4 + shadcn (radix-nova) on Discovery tokens; Genel bakış / Tanımalar / Instagram
+- [x] 4 Docs + wiring: CLAUDE.md (ops section, ports), launch.json `ops`, env examples, local tokens
+- [x] 5 Verify: backend 59, instagram 61 tests; ops lint + build; live runs recorded; browser checked
+      at desktop and 375 px
+
+### Review
+- **Regression found by the new metrics and fixed** (`3004004`): the shared-media change chose
+  video/image from Content-Type only; Instagram's video CDN sends `application/octet-stream`, so
+  every fresh Reel failed. Now falls back to the file signature. Was on `develop` since PR #1.
+- Live numbers after the fix: fresh Reel 30.8 s (fetch 4.9 / model 23.2 / match 1.3 /
+  thumbnails 1.2 / save 0.1), 1,659 tokens, $0.0016; cache hit 394 ms.
+- Design: Discovery tokens imported from `web/` (not copied); grey-800 for muted text and
+  status colours only as marks (contrast); `depth-card` shadow utility (Tailwind's shadow scale
+  cannot take a var(), and `shadow-card` collides with the shadow-colour namespace).
+- Open: the Instagram scraper failed attempts 2–4 on one Reel ("Could not extract video URL",
+  likely rate limiting) — visible now under "Hatalar adıma göre".
+
+---
+
 # Instagram DM channel (`instagram/`) — Stashh goes live through Instagram
 
 ## ▶ Resume here — handoff 2026-10-14 (new session: Supabase/Railway/Cloudflare/Meta MCPs loaded)

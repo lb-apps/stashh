@@ -42,3 +42,15 @@ Instagram Tester, to generate its token) is not a test setup.
 **How to apply:** Before proposing staging/test duplicates (accounts, apps, projects), check
 who the system serves and how the owner already tests. Default to the single real setup and
 add duplicates only when a concrete risk demands it — and name that risk.
+
+## 2026-10-14 — Untracking a file: back it up before switching branches
+
+**What happened:** `.claude/settings.local.json` was untracked (`git rm --cached`) on a feature
+branch while `develop` still tracked it. After the PR merged, `git checkout develop` overwrote the
+now-ignored local file with develop's committed copy (git replaces ignored files without asking),
+and the fast-forward pull that brought in the deletion removed it from disk. The owner's
+uncommitted permissions and MCP server approvals were lost; only the committed version survived.
+
+**How to apply:** When a change untracks a file that must keep living on disk, copy it to the
+scratchpad before any checkout, pull or merge, and restore it afterwards. Check the file still
+exists after switching branches before reporting the switch as done.

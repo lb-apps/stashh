@@ -19,6 +19,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `backend/` | Express + Zod + OpenAPI API |
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
+| `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -105,6 +106,24 @@ kit splits the token system in half — if a component is missing, add it to
 **Light only.** Discovery is a single warm-bone light system. There is no dark
 theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
+## Ops dashboard — `ops/` (local only)
+
+`ops/` is an internal tool, never deployed: `cd ops && npm run dev` serves it on
+`127.0.0.1:3003` only. It reads each service's own ops endpoint with its own token
+(backend `GET /internal/v1/ops/recognitions`, instagram `GET /ops/stats`); it never reads a
+table. Tokens and URLs live in `ops/.env.local` and stay server-side.
+
+- **shadcn/ui is allowed here and only here.** `web/` stays Discovery-only. The exception holds
+  because `ops/` is a separate app with its own component kit, so web's token system is not split.
+- **The palette is still Discovery.** `ops/app/globals.css` imports
+  `web/lib/discovery/tokens/*.css` (never copies) and maps shadcn's variables onto them. Light
+  only. Depth via the `depth-card` utility (Discovery `--sh-card`), not hairlines.
+- Status hues (green, red, amber) are for marks and badge fills; status text stays ink, because
+  they sit under 4.5:1 on white. Muted text is `grey-800`, not Discovery's lighter `grey-600`.
+- Metrics come from `recognition_runs` (one row per worker attempt: step timings, model usage
+  and cost) and `instagram_messages.intent` / `finished_at`. Add a metric there, expose it in the
+  service's ops SQL function, then show it.
+
 ## Backend / API
 
 - **Canonical reference:** the running Scalar UI at `/docs` and the spec at `/openapi.json`.
@@ -118,6 +137,7 @@ theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
   `ios/Config/*.plist` holds real credentials and is **gitignored** — on a fresh clone, copy each `ios/Config/<Env>.plist.example` to `ios/Config/<Env>.plist` and fill in the values before building.
 - **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`).
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
+- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only).
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
 ## Conventions
