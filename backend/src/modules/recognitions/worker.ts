@@ -16,7 +16,8 @@ import { createRecognitionServiceWithServiceRole } from "./factory.js";
 import { buildRunRecord } from "./run-record.js";
 import type { RecognitionService } from "./service.js";
 import type { RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
-import type { AIAnalysisResult } from "../../types/schemas.js";
+import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
+import { uploadSourceThumbnail } from "../../lib/sourceThumbnailUploader.js";
 
 let shouldKeepRunning = true;
 let wakeResolver: (() => void) | null = null;
@@ -84,6 +85,7 @@ async function processRecognition(
   const attempt = recognition.retry_count + 1;
   // Kept outside the try so a run that fails after the model call still records its cost.
   let analyzed: AIAnalysisResult | undefined;
+  let fetchMethod: SourceContent["fetch_method"] | undefined;
 
   try {
     const cachedResultId = taskOptions.bypass_cache
@@ -111,8 +113,14 @@ async function processRecognition(
     const sourceContent = await tl.step(
       "content fetched",
       (stepLog) => fetchSourceContent(recognition, stepLog),
-      (content) => ({ supplied: recognition.source_media !== null, captionLength: content.caption?.length ?? 0 }),
+      (content) => ({ method: content.fetch_method, captionLength: content.caption?.length ?? 0 }),
     );
+    fetchMethod = sourceContent.fetch_method;
+
+    // The cover is copied while the model works; it never fails the recognition.
+    const sourceThumbnail = sourceContent.thumbnail_url
+      ? uploadSourceThumbnail(sourceContent.thumbnail_url, recognition.source_url, createSupabaseServiceClient(), tl.log)
+      : Promise.resolve(null);
 
     const analysis = await tl.step(
       "media analyzed",
@@ -176,7 +184,9 @@ async function processRecognition(
           { status: "completed", source_url: recognition.source_url, source_content: sourceContent, extracted_places: extractedPlaces },
           thumbnailUrls,
         );
-        return recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis.media_kind);
+        return sourceThumbnail.then((thumbnailUrl) =>
+          recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis.media_kind, thumbnailUrl),
+        );
       },
       (id) => ({ resultId: id }),
     );
@@ -190,6 +200,7 @@ async function processRecognition(
         attempt,
         outcome: "completed",
         timings: tl.timings(),
+        fetchMethod,
         analysis: { ...analysis, places_extracted: analysis.places.length },
         placesMatched: matchedPlaces.length,
       }),
@@ -203,6 +214,7 @@ async function processRecognition(
         attempt,
         outcome: "failed",
         timings: tl.timings(),
+        fetchMethod,
         analysis: analyzed && { ...analyzed, places_extracted: analyzed.places.length },
         errorMessage: (error instanceof Error ? error.message : String(error)).slice(0, 2000),
       }),

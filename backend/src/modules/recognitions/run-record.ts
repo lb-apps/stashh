@@ -1,5 +1,5 @@
 import type { Database } from "../../types/database.js";
-import type { AIAnalysisResult } from "../../types/schemas.js";
+import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
 import type { RunTimings } from "./task-logger.js";
 
 export type RecognitionRunInsert = Database["public"]["Tables"]["recognition_runs"]["Insert"];
@@ -18,6 +18,8 @@ export interface RunRecordInput {
   attempt: number;
   outcome: "completed" | "cache_hit" | "failed";
   timings: RunTimings;
+  /** Known once content was fetched. */
+  fetchMethod?: SourceContent["fetch_method"];
   analysis?: Pick<AIAnalysisResult, "media_kind" | "media_bytes" | "model" | "provider" | "usage"> & { places_extracted: number };
   placesMatched?: number;
   errorMessage?: string;
@@ -41,6 +43,7 @@ export function buildRunRecord(input: RunRecordInput): RecognitionRunInsert {
     match_ms: step("places found"),
     thumbnails_ms: step("thumbnails saved"),
     save_ms: step("result saved"),
+    fetch_method: input.fetchMethod ?? null,
     media_kind: analysis?.media_kind ?? null,
     media_bytes: analysis?.media_bytes ?? null,
     model: analysis?.model ?? null,

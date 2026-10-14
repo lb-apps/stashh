@@ -16,6 +16,7 @@ import { createServiceAuth } from "./middleware/serviceAuth.js";
 import { internalRouter } from "./modules/internal/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestIdMiddleware } from "./http/requestId.js";
+import { apiMetrics, apiMetricsMiddleware } from "./lib/api-metrics.js";
 import { sendSuccess, sendError } from "./http/response.js";
 import { mountDocs } from "./docs.js";
 import { signInDevTestUser } from "./lib/devSupabasePasswordSignIn.js";
@@ -58,6 +59,8 @@ app.use(
 
 app.use(express.json({ limit: "512kb" }));
 app.use(requestIdMiddleware);
+// API health for the ops dashboard; its own polling, health checks and docs are not traffic.
+app.use(apiMetricsMiddleware(apiMetrics, (path) => /^\/(internal\/v1\/ops|health|docs|openapi)/.test(path)));
 app.use(express.static(resolve(__dirname, "../public")));
 
 // Dev-only: return a fresh Supabase access token for the test UI

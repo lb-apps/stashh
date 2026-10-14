@@ -2,7 +2,12 @@ import { Router } from "express";
 import { createSupabaseServiceClient } from "../../db/supabaseClient.js";
 import { sendError, sendSuccess } from "../../http/response.js";
 import { OpsRepository } from "./repository.js";
+import { z } from "zod";
+import { config } from "../../config.js";
+import { apiMetrics } from "../../lib/api-metrics.js";
 import { opsQuerySchema, resolveOpsRange } from "./types.js";
+
+const startedAt = new Date();
 
 /**
  * What the recognition system is doing, for the local ops dashboard. Mounted under
@@ -20,10 +25,10 @@ opsRouter.get("/recognitions", async (req, res, next) => {
   try {
     const range = resolveOpsRange(query.data.range);
     const repository = new OpsRepository(createSupabaseServiceClient());
-    const [stats, queue, recentRuns] = await Promise.all([
+    const [stats, queue, recognitions] = await Promise.all([
       repository.recognitionStats(range),
       repository.liveQueue(),
-      repository.recentRuns(),
+      repository.recentRecognitions(),
     ]);
     sendSuccess(res, req, 200, {
       range: range.range,
@@ -32,8 +37,34 @@ opsRouter.get("/recognitions", async (req, res, next) => {
       generated_at: new Date().toISOString(),
       stats,
       queue,
-      recent_runs: recentRuns,
+      recognitions,
+      // This instance only: API traffic since start, and how the worker is configured.
+      process: {
+        started_at: startedAt.toISOString(),
+        memory_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        worker_concurrency: config.RECOGNITIONS_WORKER_CONCURRENCY,
+        model: config.OPENROUTER_MODEL,
+        api: apiMetrics.snapshot(),
+      },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+opsRouter.get("/recognitions/:id", async (req, res, next) => {
+  const params = z.object({ id: z.string().uuid() }).safeParse(req.params);
+  if (!params.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Recognition id must be a UUID");
+    return;
+  }
+  try {
+    const detail = await new OpsRepository(createSupabaseServiceClient()).recognitionDetail(params.data.id);
+    if (!detail) {
+      sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
+      return;
+    }
+    sendSuccess(res, req, 200, detail);
   } catch (error) {
     next(error);
   }

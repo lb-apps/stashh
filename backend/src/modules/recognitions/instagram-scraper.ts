@@ -113,7 +113,7 @@ async function isVideoUrlPlayable(videoUrl: string, log: Logger): Promise<boolea
 }
 
 /** Fallback resolver for when Instagram's HTML carries no usable video URL. */
-async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promise<string | null> {
+async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promise<{ url: string; thumbnail: string | null } | null> {
   try {
     const result = await igdl(postUrl);
     const items = Array.isArray(result) ? result : (result?.result ?? []);
@@ -121,7 +121,8 @@ async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promi
       const candidate = typeof item === "string" ? item : item?.url;
       if (typeof candidate === "string" && candidate.length > 0) {
         log.info({ host: new URL(candidate).host }, "video url resolved via downloader");
-        return candidate;
+        const thumbnail = typeof item === "string" ? null : item?.thumbnail;
+        return { url: candidate, thumbnail: typeof thumbnail === "string" && thumbnail ? thumbnail : null };
       }
     }
     log.warn("downloader returned no video url");
@@ -133,6 +134,12 @@ async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promi
     );
     return null;
   }
+}
+
+/** The post's cover image (`og:image`), entity-decoded; null when the page has none. */
+export function extractThumbnail(html: string): string | null {
+  const match = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/);
+  return match ? decodeHtmlEntities(match[1]!) : null;
 }
 
 function extractCaption(html: string): string | null {
@@ -210,13 +217,18 @@ export async function fetchInstagramContent(
   const caption = extractCaption(html);
   const scrapedVideoUrl = extractVideoUrl(html);
 
+  let thumbnailUrl = extractThumbnail(html);
   let videoUrl: string | null = null;
+  let fetchMethod: "scrape" | "downloader" = "scrape";
   if (scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log))) {
     videoUrl = scrapedVideoUrl;
   } else {
     // Anonymous Instagram markup no longer reliably embeds a signed video URL.
     const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
-    videoUrl = await resolveVideoUrlViaDownloader(canonicalUrl, log);
+    const downloaded = await resolveVideoUrlViaDownloader(canonicalUrl, log);
+    videoUrl = downloaded?.url ?? null;
+    thumbnailUrl ??= downloaded?.thumbnail ?? null;
+    fetchMethod = "downloader";
   }
 
   if (!videoUrl) {
@@ -227,6 +239,8 @@ export async function fetchInstagramContent(
 
   return {
     media_url: videoUrl,
+    thumbnail_url: thumbnailUrl,
+    fetch_method: fetchMethod,
     caption,
     source_type: sourceType,
     platform: "instagram",

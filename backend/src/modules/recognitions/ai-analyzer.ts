@@ -1,4 +1,5 @@
 import { config } from "../../config.js";
+import { detectMediaType } from "../../lib/media-type.js";
 import { createOpenRouterClient, type ContentPart } from "../../lib/openrouter.js";
 import type { Logger } from "../../lib/logger.js";
 import type {
@@ -133,15 +134,6 @@ const responseSchema = {
 
 type MediaKind = AIAnalysisResult["media_kind"];
 
-/** The format a file's first bytes announce, for servers that do not say what they send. */
-function sniffMimeType(bytes: Buffer): string | null {
-  if (bytes.subarray(4, 8).toString("latin1") === "ftyp") return "video/mp4";
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
-  return null;
-}
-
 /**
  * The model input for downloaded media. A feed post shared in a DM may be a photo or a
  * video, so the kind is not known up front. The Content-Type decides when it names a
@@ -150,9 +142,11 @@ function sniffMimeType(bytes: Buffer): string | null {
  * accepts on OpenRouter.
  */
 export function toMediaPart(contentType: string | null, bytes: Buffer): { kind: MediaKind; part: ContentPart } {
-  const declared = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
-  const mimeType = declared.startsWith("video/") || declared.startsWith("image/") ? declared : sniffMimeType(bytes);
-  if (!mimeType) throw new Error(`Post media has an unsupported content type: ${declared || "unknown"}`);
+  const mimeType = detectMediaType(contentType, bytes);
+  if (!mimeType) {
+    const declared = contentType?.split(";")[0]?.trim().toLowerCase();
+    throw new Error(`Post media has an unsupported content type: ${declared || "unknown"}`);
+  }
 
   const url = `data:${mimeType};base64,${bytes.toString("base64")}`;
   return mimeType.startsWith("video/")

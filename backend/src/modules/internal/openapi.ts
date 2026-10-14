@@ -104,7 +104,8 @@ registry.registerPath({
   a time series (hourly for \`24h\`, daily otherwise) and failures by step. Run figures start on 2026-10-14,
   when runs began to be recorded.
 - \`queue\`: tasks queued or processing now, oldest first (max 50).
-- \`recent_runs\`: the latest worker attempts with their source (max 50).`,
+- \`recognitions\`: the latest 60 recognitions with source type, channel, cover, places and cost.
+- \`process\`: this instance only — uptime, memory, worker concurrency, model, API traffic since start.`,
   request: { query: opsQuerySchema },
   responses: {
     200: {
@@ -119,13 +120,27 @@ registry.registerPath({
               generated_at: z.string(),
               stats: z.record(z.string(), z.unknown()),
               queue: z.array(z.record(z.string(), z.unknown())),
-              recent_runs: z.array(z.record(z.string(), z.unknown())),
+              recognitions: z.array(z.record(z.string(), z.unknown())),
+              process: z.record(z.string(), z.unknown()),
             }),
             "InternalOpsRecognitions",
           ),
         },
       },
     },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/recognitions/{id}",
+  summary: "One recognition, in full",
+  description: "Source (type, channel, caption, cover), timestamps, every worker attempt with step timings, model usage and cost, and the result places. For the ops dashboard's detail view.",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "Recognition detail", content: { "application/json": { schema: successEnvelope(z.record(z.string(), z.unknown()), "InternalOpsRecognitionDetail") } } },
     ...commonErrorResponses,
   },
 });

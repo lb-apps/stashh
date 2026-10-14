@@ -222,6 +222,7 @@ export class RecognitionService {
     places: RecognitionResultPlace[],
     sourceContent: SourceContent,
     mediaKind: "video" | "image",
+    sourceThumbnailUrl: string | null,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
       sourceUrl,
@@ -230,6 +231,7 @@ export class RecognitionService {
       videoUrl: mediaKind === "video" ? sourceContent.media_url : null,
       caption: sourceContent.caption,
       sourceType: sourceContent.source_type,
+      sourceThumbnailUrl,
     });
     return result.id;
   }

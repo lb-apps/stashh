@@ -12,6 +12,10 @@ export type SourceType = "reel" | "post" | "story" | "tiktok";
 export interface SourceContent {
   /** Directly fetchable video or image URL, downloaded and handed to the model. */
   media_url: string;
+  /** The post's cover image, if the source offers one (copied to storage by the worker). */
+  thumbnail_url: string | null;
+  /** How the media was obtained; recorded per run for scraper health. */
+  fetch_method: "scrape" | "downloader" | "tiktok" | "supplied";
   /** Post caption. Instagram: og:description. TikTok: the post title. */
   caption: string | null;
   source_type: SourceType;

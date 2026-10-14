@@ -55,7 +55,15 @@ describe("fetchSourceContent", () => {
       log,
     );
 
-    expect(content).toEqual({ media_url: CDN, caption: "jazz", platform: "instagram", source_type: "post" });
+    expect(content).toEqual({
+      media_url: CDN,
+      caption: "jazz",
+      platform: "instagram",
+      source_type: "post",
+      // A shared post's media is its own thumbnail (stored only if it turns out to be an image).
+      thumbnail_url: CDN,
+      fetch_method: "supplied",
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

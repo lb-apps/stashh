@@ -40,6 +40,8 @@ interface UpsertRecognitionResultParams {
   videoUrl: string | null;
   caption: string | null;
   sourceType: SourceType;
+  /** Written only when present, so a failed copy never erases an earlier cover. */
+  sourceThumbnailUrl: string | null;
 }
 
 export class RecognitionRepository {
@@ -170,6 +172,7 @@ export class RecognitionRepository {
           video_url: params.videoUrl,
           caption: params.caption,
           source_type: params.sourceType,
+          ...(params.sourceThumbnailUrl ? { source_thumbnail_url: params.sourceThumbnailUrl } : {}),
         },
         { onConflict: "source_url" },
       )

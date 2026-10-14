@@ -37,7 +37,8 @@ export async function fetchSourceContent(
   if (task.source_media !== null) {
     const supplied = suppliedContentSchema.safeParse(task.source_media);
     if (!supplied.success) throw new Error(`Task source_media is malformed: ${supplied.error.message}`);
-    return supplied.data;
+    // The shared media is its own cover; the worker keeps it only if it is an image.
+    return { ...supplied.data, thumbnail_url: supplied.data.media_url, fetch_method: "supplied" };
   }
 
   const url = task.source_url;

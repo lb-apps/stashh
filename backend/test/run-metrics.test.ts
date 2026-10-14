@@ -44,6 +44,7 @@ describe("buildRunRecord", () => {
       attempt: 1,
       outcome: "completed",
       timings,
+      fetchMethod: "downloader",
       analysis: {
         media_kind: "image",
         media_bytes: 172_323,
@@ -68,6 +69,7 @@ describe("buildRunRecord", () => {
       match_ms: 700,
       thumbnails_ms: 900,
       save_ms: 400,
+      fetch_method: "downloader",
       media_kind: "image",
       media_bytes: 172_323,
       model: "google/gemini-3.8-flash",
