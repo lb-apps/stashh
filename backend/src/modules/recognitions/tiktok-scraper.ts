@@ -55,7 +55,7 @@ export async function fetchTikTokContent(
   );
 
   return {
-    media_url: videoUrl,
+    media: [{ url: videoUrl }],
     thumbnail_url: result.thumbnail?.trim() || null,
     fetch_method: "tiktok",
     caption,

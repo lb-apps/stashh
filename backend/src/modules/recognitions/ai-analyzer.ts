@@ -4,6 +4,7 @@ import { createOpenRouterClient, type ContentPart } from "../../lib/openrouter.j
 import type { Logger } from "../../lib/logger.js";
 import type {
   AIAnalysisResult,
+  SourceMediaItem,
   SourcePlatform,
   VenueCategory,
   VenueRecommendation,
@@ -74,7 +75,7 @@ function normalizeRecommendations(
 
 const openRouter = createOpenRouterClient({ apiKey: config.OPENROUTER_API_KEY });
 
-const SYSTEM_PROMPT = `You extract featured venues from one social post (caption + its video or image).
+const SYSTEM_PROMPT = `You extract featured venues from one social post (caption + its video, image or carousel slides).
 
 Rules:
 - Return only specific businesses likely to have a Google Maps listing.
@@ -184,7 +185,14 @@ export function toMediaPart(contentType: string | null, bytes: Buffer): { kind: 
     : { kind: "image", part: { type: "image_url", image_url: { url } } };
 }
 
-async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaKind; part: ContentPart; bytes: number }> {
+interface DownloadedMedia {
+  url: string;
+  kind: MediaKind;
+  part: ContentPart;
+  bytes: number;
+}
+
+async function fetchMedia(mediaUrl: string, log: Logger): Promise<DownloadedMedia> {
   const t0 = Date.now();
   const res = await fetch(mediaUrl);
   if (!res.ok) throw new Error(`Failed to fetch media: HTTP ${res.status} ${res.statusText}`);
@@ -192,38 +200,85 @@ async function fetchMedia(mediaUrl: string, log: Logger): Promise<{ kind: MediaK
   if (buffer.length === 0) throw new Error(`Media response body was empty`);
   const media = toMediaPart(res.headers.get("content-type"), buffer);
   log.info({ kind: media.kind, size: Math.round(buffer.length / 1024), duration: Date.now() - t0 }, "media downloaded");
-  return { ...media, bytes: buffer.length };
+  return { url: mediaUrl, ...media, bytes: buffer.length };
 }
 
-export async function analyzeContent(
-  mediaUrl: string,
-  caption: string | null,
-  log: Logger,
-  platform: SourcePlatform = "instagram",
-): Promise<AIAnalysisResult> {
-  log.debug({
-    hasCaption: Boolean(caption?.trim()),
-    captionHasAt: Boolean(caption?.includes("@")),
-    captionLength: caption?.length ?? 0,
-  }, "analyze start");
+/** The items that fit the byte budget, in post order; a slide past it is dropped, never truncated. */
+function withinBudget(items: DownloadedMedia[], budgetBytes: number, log: Logger): DownloadedMedia[] {
+  const kept: DownloadedMedia[] = [];
+  let total = 0;
+  for (const item of items) {
+    if (kept.length > 0 && total + item.bytes > budgetBytes) break;
+    kept.push(item);
+    total += item.bytes;
+  }
+  if (kept.length < items.length) {
+    log.warn({ slides: items.length, kept: kept.length, budgetBytes }, "media over the byte budget; trailing slides dropped");
+  }
+  return kept;
+}
 
-  const media = await fetchMedia(mediaUrl, log);
-
-  const t = Date.now();
+/**
+ * The instruction that goes with the media. A carousel is named as one so the model
+ * reads every slide: the names of a "15 places" post sit as text on slides 2–15 while
+ * the caption only introduces the list.
+ */
+export function buildUserText(input: { platform: SourcePlatform; mediaKind: MediaKind; slideCount: number; caption: string | null }): string {
+  const { platform, mediaKind, slideCount, caption } = input;
+  const carousel = slideCount > 1;
 
   // An @handle in a TikTok caption is a TikTok handle, not an Instagram one.
   // Writing it into `instagram_username` would store wrong data, so on TikTok we
   // explicitly ask the model to leave the field null.
   const handleRule =
     platform === "instagram"
-      ? `For instagram_username: only if that @handle appears in this caption or as a clear @ on-screen for that venue in the ${media.kind}.`
+      ? `For instagram_username: only if that @handle appears in this caption or as a clear @ on-screen for that venue in the ${carousel ? "slides" : mediaKind}.`
       : "For instagram_username: always return null. This post is from TikTok, so any @handle here is a TikTok handle, not an Instagram one.";
 
-  const postNoun = platform === "tiktok" ? "TikTok video" : `Instagram ${media.kind === "image" ? "photo post" : "post"}`;
+  const postNoun =
+    platform === "tiktok"
+      ? "TikTok video"
+      : carousel
+        ? `Instagram carousel post of ${slideCount} slides`
+        : `Instagram ${mediaKind === "image" ? "photo post" : "post"}`;
 
-  const userText = caption
-    ? `Extract featured venues and any concrete per-venue recommendations from this ${postNoun}.\n\nPost caption:\n${caption}\n\n${handleRule}`
-    : `Extract featured venues and any concrete per-venue recommendations visible or audible in this ${postNoun}.\n\n${handleRule}`;
+  const carouselRule = carousel
+    ? "\n\nRead every slide. Venue names often appear as text on the slides, in any language, while the caption only introduces the list; return every venue the post features, in slide order."
+    : "";
+
+  return caption
+    ? `Extract featured venues and any concrete per-venue recommendations from this ${postNoun}.${carouselRule}\n\nPost caption:\n${caption}\n\n${handleRule}`
+    : `Extract featured venues and any concrete per-venue recommendations visible or audible in this ${postNoun}.${carouselRule}\n\n${handleRule}`;
+}
+
+/** Media parts for the model: each slide of a carousel is announced by its number so the model can refer to it. */
+export function buildMediaParts(items: Array<{ part: ContentPart }>): ContentPart[] {
+  if (items.length === 1) return [items[0]!.part];
+  return items.flatMap((item, index) => [{ type: "text" as const, text: `Slide ${index + 1} of ${items.length}:` }, item.part]);
+}
+
+export async function analyzeContent(
+  media: SourceMediaItem[],
+  caption: string | null,
+  log: Logger,
+  platform: SourcePlatform = "instagram",
+): Promise<AIAnalysisResult> {
+  if (media.length === 0) throw new Error("No media to analyze");
+  log.debug({
+    hasCaption: Boolean(caption?.trim()),
+    captionHasAt: Boolean(caption?.includes("@")),
+    captionLength: caption?.length ?? 0,
+    media: media.length,
+  }, "analyze start");
+
+  const downloaded = await Promise.all(media.map((item) => fetchMedia(item.url, log)));
+  const items = withinBudget(downloaded, config.RECOGNITIONS_MAX_MEDIA_BYTES, log);
+  const mediaKind: MediaKind = items.some((item) => item.kind === "video") ? "video" : "image";
+  const mediaBytes = items.reduce((sum, item) => sum + item.bytes, 0);
+
+  const t = Date.now();
+
+  const userText = buildUserText({ platform, mediaKind, slideCount: items.length, caption });
 
   let completion;
   try {
@@ -234,7 +289,7 @@ export async function analyzeContent(
         {
           role: "user",
           content: [
-            media.part,
+            ...buildMediaParts(items),
             { type: "text", text: userText },
           ],
         },
@@ -275,11 +330,13 @@ export async function analyzeContent(
     throw new Error(`Failed to parse model JSON response: ${error instanceof Error ? error.message : String(error)}${truncationNote}`);
   }
 
-  log.info({ duration: Date.now() - t, model: completion.model, kind: media.kind }, "media analyzed");
+  log.info({ duration: Date.now() - t, model: completion.model, kind: mediaKind, media: items.length }, "media analyzed");
 
   return {
-    media_kind: media.kind,
-    media_bytes: media.bytes,
+    media_kind: mediaKind,
+    media_bytes: mediaBytes,
+    media_count: items.length,
+    video_url: items.find((item) => item.kind === "video")?.url ?? null,
     model: completion.model,
     provider: completion.provider,
     usage: completion.usage,

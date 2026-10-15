@@ -222,14 +222,14 @@ export class RecognitionService {
     sourceUrl: string,
     places: RecognitionResultPlace[],
     sourceContent: SourceContent,
-    mediaKind: "video" | "image",
+    /** The first video the model read; null for a photo post or carousel of photos. */
+    videoUrl: string | null,
     sourceThumbnailUrl: string | null,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
       sourceUrl,
       places: places as unknown as Json,
-      // The stored field means "video"; a photo post has none.
-      videoUrl: mediaKind === "video" ? sourceContent.media_url : null,
+      videoUrl,
       caption: sourceContent.caption,
       sourceType: sourceContent.source_type,
       sourceThumbnailUrl,

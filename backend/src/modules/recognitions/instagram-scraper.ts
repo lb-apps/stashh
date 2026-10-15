@@ -1,6 +1,7 @@
 import { igdl } from "btch-downloader";
+import { config } from "../../config.js";
 import type { Logger } from "../../lib/logger.js";
-import type { SourceContent } from "../../types/schemas.js";
+import type { SourceContent, SourceMediaItem } from "../../types/schemas.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -119,28 +120,101 @@ async function isVideoUrlPlayable(videoUrl: string, log: Logger): Promise<boolea
   }
 }
 
-/** Fallback resolver for when Instagram's HTML carries no usable video URL. */
-async function resolveVideoUrlViaDownloader(postUrl: string, log: Logger): Promise<{ url: string; thumbnail: string | null } | null> {
+export interface DownloaderItem {
+  url: string;
+  thumbnail: string | null;
+}
+
+/**
+ * What one downloader link points at. The links are proxied, and the real CDN path sits
+ * in the token's payload; a carousel comes back with every slide listed several times
+ * (one link per rendition), so this is what tells the renditions of one slide apart.
+ */
+function mediaIdentity(item: DownloaderItem): string {
   try {
-    const result = await igdl(postUrl);
-    const items = Array.isArray(result) ? result : (result?.result ?? []);
-    for (const item of items) {
-      const candidate = typeof item === "string" ? item : item?.url;
-      if (typeof candidate === "string" && candidate.length > 0) {
-        log.info({ host: new URL(candidate).host }, "video url resolved via downloader");
-        const thumbnail = typeof item === "string" ? null : item?.thumbnail;
-        return { url: candidate, thumbnail: typeof thumbnail === "string" && thumbnail ? thumbnail : null };
-      }
+    const token = new URL(item.url).searchParams.get("token");
+    const payload = token?.split(".")[1];
+    if (payload) {
+      const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { url?: unknown };
+      if (typeof decoded.url === "string") return new URL(decoded.url).pathname;
     }
-    log.warn("downloader returned no video url");
-    return null;
-  } catch (downloaderError) {
-    log.warn(
-      { err: downloaderError instanceof Error ? downloaderError.message : String(downloaderError) },
-      "downloader failed",
-    );
-    return null;
+  } catch {
+    // Not a token link; the thumbnail or the link itself identifies the slide.
   }
+  return item.thumbnail ?? item.url;
+}
+
+/** One link per slide, in post order. */
+export function dedupeDownloaderItems(items: DownloaderItem[]): DownloaderItem[] {
+  const seen = new Set<string>();
+  const slides: DownloaderItem[] = [];
+  for (const item of items) {
+    const identity = mediaIdentity(item);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    slides.push(item);
+  }
+  return slides;
+}
+
+const DOWNLOADER_LINK_KEYS = ["url", "download_url", "downloadUrl", "src", "link", "video", "image", "media"];
+const DOWNLOADER_THUMBNAIL_KEYS = ["thumbnail", "thumb", "cover", "poster"];
+
+/** The first http link under any of the keys, as a string or inside an array; the service's field names drift. */
+function firstLink(item: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = item[key];
+    const candidates = Array.isArray(value) ? value : [value];
+    const link = candidates.find((v): v is string => typeof v === "string" && /^https?:\/\//.test(v));
+    if (link) return link;
+  }
+  return null;
+}
+
+async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+  const result = await igdl(postUrl);
+  const raw: unknown[] = Array.isArray(result) ? result : (result?.result ?? []);
+  const items: DownloaderItem[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      if (/^https?:\/\//.test(item)) items.push({ url: item, thumbnail: null });
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const url = firstLink(record, DOWNLOADER_LINK_KEYS);
+    if (url) items.push({ url, thumbnail: firstLink(record, DOWNLOADER_THUMBNAIL_KEYS) });
+  }
+  const slides = dedupeDownloaderItems(items);
+  if (slides.length === 0) {
+    const status = Array.isArray(result) ? null : (result as { status?: unknown; message?: unknown } | undefined);
+    log.warn({ status: status?.status ?? null, message: status?.message ?? null, items: raw.length }, "downloader returned no media");
+  }
+  return slides;
+}
+
+/**
+ * Every media item of a post, through the downloader service: the only route that lists
+ * a carousel's slides, and the fallback when Instagram's HTML carries no usable video.
+ * The service answers unevenly from one call to the next, so an empty answer is asked once more.
+ */
+async function resolveMediaViaDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const slides = await askDownloader(postUrl, log);
+      if (slides.length > 0) {
+        log.info({ host: new URL(slides[0]!.url).host, slides: slides.length, attempt }, "media resolved via downloader");
+        return slides;
+      }
+    } catch (downloaderError) {
+      log.warn(
+        { err: downloaderError instanceof Error ? downloaderError.message : String(downloaderError), attempt },
+        "downloader failed",
+      );
+    }
+    if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, 1_500));
+  }
+  return [];
 }
 
 /** The post's cover image (`og:image`), entity-decoded; null when the page has none. */
@@ -224,29 +298,43 @@ export async function fetchInstagramContent(
 
   const caption = extractCaption(html);
   const scrapedVideoUrl = extractVideoUrl(html);
+  const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
   let thumbnailUrl = extractThumbnail(html);
-  let videoUrl: string | null = null;
+  let media: SourceMediaItem[] = [];
   let fetchMethod: "scrape" | "downloader" = "scrape";
-  if (scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log))) {
-    videoUrl = scrapedVideoUrl;
-  } else {
-    // Anonymous Instagram markup no longer reliably embeds a signed video URL.
-    const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
-    const downloaded = await resolveVideoUrlViaDownloader(canonicalUrl, log);
-    videoUrl = downloaded?.url ?? null;
-    thumbnailUrl ??= downloaded?.thumbnail ?? null;
+
+  // A Reel is one video, and the page sometimes still carries a signed URL for it. A post
+  // may be a carousel, whose slides only the downloader lists, so it goes there first.
+  const pageVideo = async (): Promise<SourceMediaItem[]> =>
+    scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log)) ? [{ url: scrapedVideoUrl }] : [];
+  const downloaded = async (): Promise<SourceMediaItem[]> => {
+    const slides = await resolveMediaViaDownloader(canonicalUrl, log);
+    if (slides.length === 0) return [];
+    if (slides.length > config.RECOGNITIONS_MAX_MEDIA) {
+      log.warn({ slides: slides.length, kept: config.RECOGNITIONS_MAX_MEDIA }, "carousel longer than the slide cap; trailing slides dropped");
+    }
+    thumbnailUrl ??= slides[0]!.thumbnail;
     fetchMethod = "downloader";
+    return slides.slice(0, config.RECOGNITIONS_MAX_MEDIA).map((slide) => ({ url: slide.url }));
+  };
+
+  if (sourceType === "reel") {
+    media = await pageVideo();
+    if (media.length === 0) media = await downloaded();
+  } else {
+    media = await downloaded();
+    if (media.length === 0) media = await pageVideo();
   }
 
-  if (!videoUrl) {
+  if (media.length === 0) {
     throw new Error(
-      `Could not extract video URL from Instagram page (shortcode: ${shortcode}). The post may be private, image-only, or Instagram changed their HTML structure.`,
+      `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.`,
     );
   }
 
   return {
-    media_url: videoUrl,
+    media,
     thumbnail_url: thumbnailUrl,
     fetch_method: fetchMethod,
     caption,

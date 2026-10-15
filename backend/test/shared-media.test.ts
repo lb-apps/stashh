@@ -71,7 +71,7 @@ describe("fetchSourceContent", () => {
     );
 
     expect(content).toEqual({
-      media_url: CDN,
+      media: [{ url: CDN }],
       caption: "jazz",
       platform: "instagram",
       source_type: "post",
@@ -91,7 +91,7 @@ describe("fetchSourceContent", () => {
       },
       log,
     );
-    expect(content).toMatchObject({ media_url: CDN, caption: null, source_type: "story", fetch_method: "supplied" });
+    expect(content).toMatchObject({ media: [{ url: CDN }], caption: null, source_type: "story", fetch_method: "supplied" });
   });
 
   it("rejects malformed supplied content", async () => {

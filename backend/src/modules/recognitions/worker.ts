@@ -113,7 +113,7 @@ async function processRecognition(
     const sourceContent = await tl.step(
       "content fetched",
       (stepLog) => fetchSourceContent(recognition, stepLog),
-      (content) => ({ method: content.fetch_method, captionLength: content.caption?.length ?? 0 }),
+      (content) => ({ method: content.fetch_method, media: content.media.length, captionLength: content.caption?.length ?? 0 }),
     );
     fetchMethod = sourceContent.fetch_method;
 
@@ -126,8 +126,8 @@ async function processRecognition(
 
     const analysis = await tl.step(
       "media analyzed",
-      (stepLog) => analyzeContent(sourceContent.media_url, sourceContent.caption, stepLog, sourceContent.platform),
-      (result) => ({ kind: result.media_kind, placeCount: result.places.length }),
+      (stepLog) => analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform),
+      (result) => ({ kind: result.media_kind, media: result.media_count, placeCount: result.places.length }),
     );
     analyzed = analysis;
 
@@ -187,7 +187,7 @@ async function processRecognition(
           thumbnailUrls,
         );
         return sourceThumbnail.then((thumbnailUrl) =>
-          recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis.media_kind, thumbnailUrl),
+          recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis.video_url, thumbnailUrl),
         );
       },
       (id) => ({ resultId: id }),

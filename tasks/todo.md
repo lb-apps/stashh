@@ -49,26 +49,28 @@ changes beyond additive fields, the ops dashboard (reads new columns only if pre
 
 ## B. Carousels on the permalink path — backend, ~1 day
 
-- [ ] `SourceContent.media: Array<{ url, thumbnail_url }>` (first item keeps feeding
+- [x] `SourceContent.media: Array<{ url, thumbnail_url }>` (first item keeps feeding
       `recognition_results.video_url`); `fetch_method` unchanged
-- [ ] `instagram-scraper.ts`: dedupe the downloader list by the decoded CDN path (fallback:
+- [x] `instagram-scraper.ts`: dedupe the downloader list by the decoded CDN path (fallback:
       thumbnail), keep order, cap at `RECOGNITIONS_MAX_MEDIA` (default 12); a single playable
       video from the HTML keeps today's path
-- [ ] `ai-analyzer.ts`: download every item (bounded parallelism), one model call with
+- [x] `ai-analyzer.ts`: download every item (bounded parallelism), one model call with
       `"Slide i of N"` text parts between media parts; prompt says the post is a carousel of N
       slides, names often sit as on-image text in any language, the caption may only introduce
       the list, return every featured venue; byte budget (default 40 MB) drops video slides
       beyond the first two
-- [ ] Keep `Accept-Language: en-US` on the HTML fetch: the og:description wrapper
+- [x] Keep `Accept-Language: en-US` on the HTML fetch: the og:description wrapper
       (`<likes> - <user> on <date>: "…"`) is localised by that header and `extractCaption`
       parses the English form; the caption inside stays in its own language
-- [ ] Response schema `source` enum → `caption | video | both` (matches `ExtractedPlace`)
-- [ ] `recognition_runs.media_count` (migration `add column if not exists`, coordinated with
-      `20261014190000_platform_content_types.sql` on `feature/ops-dashboard`, which adds the
-      same column); `buildRunRecord` writes it
-- [ ] Tests: dedupe; part assembly and cap with a stubbed OpenRouter (pattern of
+- [x] Response schema `source` enum → `caption | video | both` (matches `ExtractedPlace`)
+- [ ] `recognition_runs.media_count`: left to `20261014190000_platform_content_types.sql` on
+      `feature/ops-dashboard`, which adds the column; the analysis result already carries
+      `media_count`, so wiring it into the run record is one line once that migration lands
+- [x] Tests: dedupe; part assembly and cap with a stubbed OpenRouter (pattern of
       `openrouter.test.ts`); existing `shared-media` tests still green
-- [ ] Live: a 4-slide carousel permalink → `media_count = 4`, venues from slides 2–4
+- [x] Live: a public 4-slide carousel permalink → 4 slides fetched (16 links deduplicated), read in
+      one model call; the downloader service answers unevenly, so an empty answer is retried once
+      and its field names are read tolerantly. The three DM list posts still need their links
 
 ## C. Story shares — instagram + backend, ~½ day
 

@@ -9,9 +9,14 @@ export type SourcePlatform = "instagram" | "tiktok";
 export type SourceType = "reel" | "post" | "story" | "tiktok";
 
 /** Normalised scrape result, whichever platform it came from. */
+/** One video or image the model reads, by a directly fetchable URL. */
+export interface SourceMediaItem {
+  url: string;
+}
+
 export interface SourceContent {
-  /** Directly fetchable video or image URL, downloaded and handed to the model. */
-  media_url: string;
+  /** What the model reads, in post order: one item for a Reel, photo or story, one per slide for a carousel. */
+  media: SourceMediaItem[];
   /** The post's cover image, if the source offers one (copied to storage by the worker). */
   thumbnail_url: string | null;
   /** How the media was obtained; recorded per run for scraper health. */
@@ -68,9 +73,14 @@ export interface ExtractedPlace {
 
 export interface AIAnalysisResult {
   places: ExtractedPlace[];
-  /** What the media turned out to be, from its Content-Type. */
+  /** What the media turned out to be: "video" when any item the model read is one. */
   media_kind: "video" | "image";
+  /** Bytes the model read, over every item. */
   media_bytes: number;
+  /** Items the model read; a carousel's slides, up to the configured cap. */
+  media_count: number;
+  /** The first video the model read, or null when the post is photos only. */
+  video_url: string | null;
   /** Model and upstream provider that answered, and what the call cost. */
   model: string;
   provider: string | null;
