@@ -1,6 +1,14 @@
 import "server-only";
 import { OPS_RANGES, type OpsRange } from "./ops-types";
-import { OpsConfigError, ServiceUnavailableError } from "./services";
+import { BackendRequestError, OpsConfigError, ServiceUnavailableError } from "./services";
+
+/** A service failure as the dashboard's own JSON error; anything else is a bug and rethrown. */
+export function errorResponse(error: unknown): Response {
+  if (error instanceof BackendRequestError) return Response.json({ error: error.message }, { status: error.status });
+  if (error instanceof ServiceUnavailableError) return Response.json({ error: error.message }, { status: 502 });
+  if (error instanceof OpsConfigError) return Response.json({ error: error.message }, { status: 500 });
+  throw error;
+}
 
 /** Shared GET handler: validate `?range`, call the service, map failures to readable errors. */
 export function opsRoute(load: (range: OpsRange) => Promise<unknown>) {
@@ -12,9 +20,7 @@ export function opsRoute(load: (range: OpsRange) => Promise<unknown>) {
     try {
       return Response.json(await load(range as OpsRange), { headers: { "cache-control": "no-store" } });
     } catch (error) {
-      if (error instanceof ServiceUnavailableError) return Response.json({ error: error.message }, { status: 502 });
-      if (error instanceof OpsConfigError) return Response.json({ error: error.message }, { status: 500 });
-      throw error;
+      return errorResponse(error);
     }
   };
 }

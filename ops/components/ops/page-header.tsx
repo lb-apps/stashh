@@ -13,8 +13,9 @@ import { StatusDot } from "./status-dot";
 /**
  * The console kit's page head: a heavy display title, a helper sentence only when it adds a
  * fact the controls do not show, and the page-wide controls (time range, live) on the right.
+ * A page that reads no time window (the link tester) leaves the controls out.
  */
-export function PageHeader({ title, description }: { title: string; description?: string }) {
+export function PageHeader({ title, description, controls = true }: { title: string; description?: string; controls?: boolean }) {
   return (
     <header className="flex flex-wrap items-end gap-x-6 gap-y-4">
       <SidebarTrigger className="-ml-2 basis-full justify-start md:hidden" />
@@ -22,7 +23,7 @@ export function PageHeader({ title, description }: { title: string; description?
         <h1 className="font-heading text-display">{title}</h1>
         {description && <p className="mt-1.5 text-body text-muted-foreground">{description}</p>}
       </div>
-      <PageControls />
+      {controls && <PageControls />}
     </header>
   );
 }

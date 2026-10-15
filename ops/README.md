@@ -21,6 +21,14 @@ The backend (`:3000`) and the Instagram service (`:3002`) must be running.
 
 Give the dashboard its own entries so they can be revoked without touching the channel's token.
 
+## Recognize a link
+
+The link tester (`/recognize`) sends one link through the backend's public API exactly as
+the app does, as the backend's dev test user (`GET /dev/token`, which needs `DEV_TEST_EMAIL`
+and `DEV_TEST_PASSWORD` in `backend/.env`), polls it until it settles and shows the places.
+One recognition at a time; nothing is kept — a reload forgets the run. It replaced the test
+page the backend used to serve at `localhost:3000/`.
+
 ## Where the numbers come from
 
 - Backend `GET /internal/v1/ops/recognitions` → `recognition_ops_stats()` plus the live queue

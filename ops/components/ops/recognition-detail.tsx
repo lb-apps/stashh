@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, CircleAlert, ExternalLink, MapPin, Star } from "lucide-react";
+import { ChevronDown, CircleAlert, ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,14 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DASH, formatBytes, formatDateTime, formatDuration, formatInt, formatRating, formatSource, formatUsd } from "@/lib/format";
+import { DASH, formatBytes, formatDateTime, formatDuration, formatInt, formatSource, formatUsd } from "@/lib/format";
 import { CHANNEL, FETCH_METHOD, RUN_OUTCOME, SOURCE_TYPE, TASK_STATUS, stepLabel } from "@/lib/labels";
-import type { RecognitionDetail, RecognitionPlace, RecognitionRunDetail } from "@/lib/ops-types";
+import type { RecognitionDetail, RecognitionRunDetail } from "@/lib/ops-types";
 import { STEP_COLORS } from "./charts/shared";
+import { PlaceItem } from "./place-item";
 import { SOURCE_ICON, Thumb } from "./recognition-thumb";
 import { StatGrid } from "./stat-grid";
 
@@ -175,55 +176,6 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
         )}
       </Section>
     </div>
-  );
-}
-
-/** A found place as a sunken row: photo, name, rating, where it is, what to order. */
-function PlaceItem({ place }: { place: RecognitionPlace }) {
-  const maps =
-    place.google_maps_uri ??
-    `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query: place.name, query_place_id: place.google_place_id })}`;
-  const meta = [place.category, place.district].filter(Boolean).join(" · ");
-  return (
-    <Item role="listitem" variant="muted" size="sm" className="items-start px-3.5 py-3">
-      <ItemMedia>
-        <Thumb url={place.thumbnail_url ?? null} icon={MapPin} className="size-12" />
-      </ItemMedia>
-      <ItemContent className="min-w-0 gap-0.5">
-        <ItemTitle className="w-full font-heading text-body font-bold">
-          <span className="truncate">{place.name}</span>
-          {place.rating != null && (
-            <Badge variant="success" className="ml-auto">
-              <Star aria-hidden className="fill-current" />
-              {formatRating(place.rating)}
-            </Badge>
-          )}
-        </ItemTitle>
-        {place.address && <ItemDescription className="line-clamp-1 text-caption">{place.address}</ItemDescription>}
-        {meta && <span className="micro-label pt-1">{meta}</span>}
-        {place.recommendations && place.recommendations.length > 0 && (
-          <div className="mt-1.5 grid gap-0.5 text-caption">
-            {place.recommendations.slice(0, 3).map((tip) => (
-              <p key={tip.summary}>{tip.summary}</p>
-            ))}
-          </div>
-        )}
-        <div className="flex flex-wrap gap-1.5 pt-2">
-          <Button asChild variant="outline" size="xs">
-            <a href={maps} target="_blank" rel="noreferrer">
-              Maps <ExternalLink aria-hidden />
-            </a>
-          </Button>
-          {place.instagram_username && (
-            <Button asChild variant="ghost" size="xs">
-              <a href={`https://www.instagram.com/${encodeURIComponent(place.instagram_username)}/`} target="_blank" rel="noreferrer">
-                @{place.instagram_username}
-              </a>
-            </Button>
-          )}
-        </div>
-      </ItemContent>
-    </Item>
   );
 }
 

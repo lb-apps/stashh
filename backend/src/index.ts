@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import http from "node:http";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { listsRouter } from "./modules/lists/routes.js";
@@ -20,8 +20,6 @@ import { apiMetrics, apiMetricsMiddleware } from "./lib/api-metrics.js";
 import { sendSuccess, sendError } from "./http/response.js";
 import { mountDocs } from "./docs.js";
 import { signInDevTestUser } from "./lib/devSupabasePasswordSignIn.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
@@ -61,10 +59,9 @@ app.use(express.json({ limit: "512kb" }));
 app.use(requestIdMiddleware);
 // API health for the ops dashboard; its own polling, health checks and docs are not traffic.
 app.use(apiMetricsMiddleware(apiMetrics, (path) => /^\/(internal\/v1\/ops|health|docs|openapi)/.test(path)));
-app.use(express.static(resolve(__dirname, "../public")));
 
-// Dev-only: return a fresh Supabase access token for the test UI
-// Returns 404 in production
+// Dev-only: a fresh Supabase access token for the test user, which the ops dashboard's
+// link tester (ops/, "Recognize a link") uses to act as the app would. 404 in production.
 app.get("/dev/token", async (req, res) => {
   const result = await signInDevTestUser();
   if (!result.ok) {
