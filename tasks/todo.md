@@ -48,20 +48,30 @@ connector, not the Mac's.
 - [x] Docker Engine + Compose from Docker's apt repo; `daemon.json` log rotation; user in `docker`
       group; `cgroup_enable=memory` queued for the next reboot (limits are ignored until then)
 - [x] `/srv/stashh/env/{backend,instagram,tunnel,deploy}.env` copied (600); `/srv/stashh/repo` clone follows the push
-- [ ] Timer installed; first run builds and starts everything; `--wait` green
-- [ ] Verify: `/health` on both ports from the LAN, container DNS, Pi connector listed on the tunnel,
+- [x] Timer installed; first run builds and starts everything; `--wait` green
+- [x] Verify: `/health` on both ports from the LAN, container DNS, Pi connector listed on the tunnel,
       `https://ig-dev.stashh.me/health` 200, shared services (nginx, unbound, homebridge…) still active
 
 ## D. Cutover
 
-- [ ] Stop the Mac's `npm run tunnel` connector; only the Pi's connector remains; webhook probe 200
-- [ ] Stop the Mac's backend/instagram preview servers
-- [ ] `ops/.env.local` points at the Pi; the dashboard and its link tester work against it
+- [x] Stop the Mac's `npm run tunnel` connector; only the Pi's connector remains; webhook probe 200
+- [x] Stop the Mac's backend/instagram preview servers
+- [x] `ops/.env.local` points at the Pi; the dashboard and its link tester work against it
 - [ ] Live DM test: a Reel share answered from the Pi (`replies_sent` 1 in the ops DMs view)
 
 ## Review
 
-(filled in when done)
+- Proven on 2026-10-15: the push of `9aa3476` was picked up by the Pi's timer within a minute and
+  built, started and health-checked all four containers by itself (`journalctl -u stashh-update`).
+  The Mac's connector was then stopped; only the Pi's `linux_arm64` connector serves
+  `ig-dev.stashh.me` (5/5 probes 200). Both ops routes answer the dashboard's tokens from the Pi.
+- The Pi follows `feature/docker-deploy` until PR #3 is merged; then set `STASHH_BRANCH=develop`
+  in `/srv/stashh/env/deploy.env` and `sudo systemctl start stashh-update`.
+- Memory limits are discarded until the Pi is rebooted (`cgroup_enable=memory` is in cmdline.txt).
+- Found while building: the backend logger imported `pino-pretty` statically, so the pruned image
+  crashed at boot; a fresh clone is already at the branch head, so the installer's first deploy
+  needs `--force`. Both fixed in the branch.
+- Left for the owner: a live DM through the Pi (package D's last item).
 
 ---
 
