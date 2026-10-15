@@ -1,3 +1,80 @@
+# Stashh in Docker — deploy anywhere, auto-deploy on the home Pi
+
+Plan written 2026-10-15. Branch `feature/docker-deploy` from `origin/develop` in the main checkout.
+
+**Goal.** `backend/` and `instagram/` run as containers from one `compose.yaml`, with the Cloudflare
+tunnel beside them, so the whole production can be brought up on any Docker host from a clone and
+three env files. The home Pi 5 (`homeserver`, 192.168.68.60) follows the GitHub repo: a push to the
+tracked branch is pulled, rebuilt and restarted by itself. Meta's webhook reaches the Pi's tunnel
+connector, not the Mac's.
+
+**Decisions.**
+- Images build from source on the target (`docker compose up --build`); no registry, no secrets in
+  images. Backend compiles with `tsc` and runs `node dist/start.js`; the Instagram service runs its
+  TypeScript directly on Node 24. Both `node:24-bookworm-slim`, non-root.
+- Auto-deploy is pull-based: a systemd timer on the Pi runs `deploy/update.sh` every minute, which
+  fetches the tracked branch and only rebuilds when the commit moved. The repo is public, so a
+  GitHub Actions self-hosted runner on the Pi was rejected (GitHub's own guidance: forks can run code
+  on it); a webhook receiver would need a second public hostname. GitHub Actions still runs CI.
+- The Pi tracks `develop` for now: that is what has been deployed by hand so far, and `master` holds
+  only the initial commit. `STASHH_BRANCH` in `/srv/stashh/env/deploy.env` flips it.
+- The tunnel runs from its token (`TUNNEL_TOKEN`) with `--url http://instagram:3002`; no cert or
+  credentials file leaves the Mac.
+- `/dev/token` (unauthenticated, 404 in production) becomes `GET /internal/v1/ops/test-user-token`
+  behind the service token, so the ops "Recognize a link" page works against the Pi. The Scalar
+  docs prefill stays dev-only.
+
+## A. Repo — containers and compose
+
+- [x] `backend/Dockerfile` (multi-stage: `npm ci` → `tsc` → prune dev deps → runtime), `.dockerignore`
+- [x] `instagram/Dockerfile`, `.dockerignore`
+- [x] `compose.yaml`: `backend`, `instagram`, `tunnel`, `dozzle` (logs/status UI on 3004, owner's ask); healthchecks on `/health`; `restart:
+      unless-stopped`; memory limits (1 GB / 256 MB / 128 MB); env from `${STASHH_ENV_DIR:-./deploy}`
+- [x] `deploy/tunnel.env.example` + `deploy.env.example` (backend/instagram reuse their own `.env.example`); `.gitignore` excludes `deploy/*.env`
+- [x] `backend/package.json` `start*` scripts run the compiled `dist/`, not `tsx`
+- [x] Backend: `/internal/v1/ops/test-user-token`; `/dev/token` kept for the web console, dev only; ops client uses it with its
+      token; OpenAPI + tests
+- [x] CI: `.github/workflows/ci.yml` — typecheck + tests for backend and instagram on Node 24
+
+## B. Repo — auto-deploy and docs
+
+- [x] `deploy/update.sh` (fetch, compare, reset, build, `up --wait`, prune) and
+      `deploy/install.sh` (clone, env dir, systemd units) + `deploy/systemd/stashh-update.{service,timer}`
+- [x] `docs/deploy.md` runbook (any host; the Pi; cutover; rollback); `backend/docs/deployment.md`
+      rewritten for Docker; `CLAUDE.md` repo map, build/run and ops sections; `ops/README.md`
+
+## C. The Pi
+
+- [x] Docker Engine + Compose from Docker's apt repo; `daemon.json` log rotation; user in `docker`
+      group; `cgroup_enable=memory` queued for the next reboot (limits are ignored until then)
+- [x] `/srv/stashh/env/{backend,instagram,tunnel,deploy}.env` copied (600); `/srv/stashh/repo` clone follows the push
+- [x] Timer installed; first run builds and starts everything; `--wait` green
+- [x] Verify: `/health` on both ports from the LAN, container DNS, Pi connector listed on the tunnel,
+      `https://ig-dev.stashh.me/health` 200, shared services (nginx, unbound, homebridge…) still active
+
+## D. Cutover
+
+- [x] Stop the Mac's `npm run tunnel` connector; only the Pi's connector remains; webhook probe 200
+- [x] Stop the Mac's backend/instagram preview servers
+- [x] `ops/.env.local` points at the Pi; the dashboard and its link tester work against it
+- [ ] Live DM test: a Reel share answered from the Pi (`replies_sent` 1 in the ops DMs view)
+
+## Review
+
+- Proven on 2026-10-15: the push of `9aa3476` was picked up by the Pi's timer within a minute and
+  built, started and health-checked all four containers by itself (`journalctl -u stashh-update`).
+  The Mac's connector was then stopped; only the Pi's `linux_arm64` connector serves
+  `ig-dev.stashh.me` (5/5 probes 200). Both ops routes answer the dashboard's tokens from the Pi.
+- The Pi follows `feature/docker-deploy` until PR #3 is merged; then set `STASHH_BRANCH=develop`
+  in `/srv/stashh/env/deploy.env` and `sudo systemctl start stashh-update`.
+- Memory limits are discarded until the Pi is rebooted (`cgroup_enable=memory` is in cmdline.txt).
+- Found while building: the backend logger imported `pino-pretty` statically, so the pruned image
+  crashed at boot; a fresh clone is already at the branch head, so the installer's first deploy
+  needs `--force`. Both fixed in the branch.
+- Left for the owner: a live DM through the Pi (package D's last item).
+
+---
+
 # Stashh Recognition v2 — carousels, stories, honest matching
 
 Plan written 2026-10-15 from the diagnosis of the DM shares that found nothing. Packages A–D

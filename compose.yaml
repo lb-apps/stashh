@@ -1,0 +1,104 @@
+# Stashh in production: the API + recognition worker, the Instagram DM channel, the Cloudflare
+# tunnel that brings Meta's webhook to it, and Dozzle to watch the containers. Runs on any Docker
+# host from a clone:
+#
+#   cp backend/.env.example deploy/backend.env       # fill in (see docs/deploy.md)
+#   cp instagram/.env.example deploy/instagram.env   # fill in; leave WEBHOOK_CAPTURE_DIR out
+#   cp deploy/tunnel.env.example deploy/tunnel.env   # the tunnel's token
+#   docker compose up -d --build --wait
+#
+# STASHH_ENV_DIR points at the env files when they live outside the checkout (the home Pi
+# keeps them in /srv/stashh/env, where a git reset cannot touch them).
+name: stashh
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  backend:
+    build: ./backend
+    image: stashh/backend
+    restart: unless-stopped
+    init: true
+    env_file: ${STASHH_ENV_DIR:-./deploy}/backend.env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    # In-flight recognitions get this long to finish before the worker is killed.
+    stop_grace_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *logging
+
+  instagram:
+    build: ./instagram
+    image: stashh/instagram
+    restart: unless-stopped
+    init: true
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file: ${STASHH_ENV_DIR:-./deploy}/instagram.env
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      STASHH_API_URL: http://backend:3000
+    ports:
+      - "3002:3002"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *logging
+
+  # Meta's webhook → https://ig-dev.stashh.me → this connector → the instagram service.
+  # The tunnel (stashh-ig-dev) is run from its token; no certificate or credentials file is needed.
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run --url http://instagram:3002
+    env_file: ${STASHH_ENV_DIR:-./deploy}/tunnel.env
+    depends_on:
+      instagram:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *logging
+
+  # Container logs, status and live CPU/memory in the browser: http://<host>:3004 (Dozzle).
+  # Reads the Docker socket read-only and has no login, so the port stays on the LAN.
+  dozzle:
+    image: amir20/dozzle:v11.3.2
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "3004:8080"
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *logging

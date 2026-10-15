@@ -20,6 +20,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
 | `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
+| `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel + Dozzle; the home Pi auto-deploys `develop` ([docs/deploy.md](docs/deploy.md)) |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -161,8 +162,11 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   and a replayed entrance would hide value labels.
 - Only the detail sheet reads `?id=` (inside its own Suspense); pages must hydrate with the layout.
 - **Recognize a link** (`/recognize`) is the one page that writes: one recognition at a time through the
-  backend's public API as its dev test user (`GET /dev/token`), polled until it settles, nothing persisted.
-  It replaced the backend's old test page; the backend serves no HTML of its own.
+  backend's public API as its test user (`GET /internal/v1/ops/test-user-token`, behind the dashboard's
+  service token), polled until it settles, nothing persisted. It replaced the backend's old test page; the
+  backend serves no HTML of its own.
+- `STASHH_API_URL` / `INSTAGRAM_API_URL` in `ops/.env.local` point at production on the Pi or at local dev
+  servers; the tokens are the same entries either way.
 - **UI is English** (`en-US` formats in `ops/lib/format.ts`, every label in `ops/lib/labels.ts`).
 - **shadcn components first.** No raw `ul/li/dl/label/button/img` in `ops/components/ops/`: row
   lists are `ItemGroup`/`Item`, number tiles are `StatGrid` (muted `Item`s), thumbnails are
@@ -180,14 +184,15 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
 
 - **iOS:** build in Xcode. Configs in `ios/Configurations/*.xcconfig`; runtime values (API base URL, Supabase keys) in `ios/Config/*.plist` per environment (Testing/Staging/Production).
   `ios/Config/*.plist` holds real credentials and is **gitignored** — on a fresh clone, copy each `ios/Config/<Env>.plist.example` to `ios/Config/<Env>.plist` and fill in the values before building.
-- **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`).
+- **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`). `npm start` runs the compiled `dist/` (`npm run build` first), which is what the image does.
+- **Production:** containers from the root `compose.yaml` — `docker compose up -d --build --wait` on any Docker host with `deploy/*.env` filled in. The home Pi follows `develop`: a push is live within about a minute (`deploy/update.sh` on a systemd timer). Runbook: [docs/deploy.md](docs/deploy.md). Nothing runs in production on the Mac.
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
-- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only).
+- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only), Dozzle `3004` (production host only).
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
 ## Conventions
 
-- Branches: `develop` (integration), `master` (production). Match commit style from `git log`.
+- Branches: `develop` (integration; the home Pi deploys it), `master` (releases; untouched so far). Match commit style from `git log`.
 - Small, root-cause changes — no drive-by refactors, no backwards-compat shims, no speculative abstractions.
 - Never commit secrets (`.env*`, plists with real keys).
 - Don't reimplement what the platform or the existing abstraction already gives you — extend the chain, theme the native control.

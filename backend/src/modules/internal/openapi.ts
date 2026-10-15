@@ -145,3 +145,26 @@ registry.registerPath({
     ...commonErrorResponses,
   },
 });
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/test-user-token",
+  summary: "Test-user token",
+  description:
+    "A fresh access token for the backend's test user (`DEV_TEST_EMAIL` / `DEV_TEST_PASSWORD`), so an operator tool (the ops dashboard's link tester) can call the public API exactly as the app does. `503` when the test user is not configured.",
+  responses: {
+    200: {
+      description: "Token",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({ access_token: z.string(), email: z.string().email().nullable() }).openapi("InternalOpsTestUserToken"),
+            "InternalOpsTestUserTokenResponse",
+          ),
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});

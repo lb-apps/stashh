@@ -6,6 +6,7 @@ import { z } from "zod";
 import { config } from "../../config.js";
 import { apiMetrics } from "../../lib/api-metrics.js";
 import { opsQuerySchema, resolveOpsRange } from "./types.js";
+import { sendTestUserToken } from "./test-user-token.js";
 
 const startedAt = new Date();
 
@@ -71,3 +72,6 @@ opsRouter.get("/recognitions/:id", async (req, res, next) => {
     next(error);
   }
 });
+
+/** The test user's token, so the ops dashboard's link tester calls the public API as the app does. */
+opsRouter.get("/test-user-token", sendTestUserToken);

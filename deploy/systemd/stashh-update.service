@@ -1,0 +1,15 @@
+# Installed by deploy/install.sh (__USER__ becomes the deploying user). Runs deploy/update.sh
+# once; stashh-update.timer starts it every minute. Logs: journalctl -u stashh-update.
+[Unit]
+Description=Stashh: deploy the tracked branch when it moved
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=__USER__
+EnvironmentFile=/srv/stashh/env/deploy.env
+WorkingDirectory=/srv/stashh/repo
+ExecStart=/srv/stashh/repo/deploy/update.sh
+TimeoutStartSec=30min

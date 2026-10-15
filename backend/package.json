@@ -6,9 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/start.ts",
-    "start": "node --import tsx src/start.ts",
-    "start:api": "node --import tsx src/index.ts",
-    "start:worker": "node --import tsx src/modules/recognitions/worker.ts",
+    "start": "node dist/start.js",
+    "start:api": "node dist/index.js",
+    "start:worker": "node dist/modules/recognitions/worker.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "db:types": "sh -c 'supabase gen types typescript --project-id \"${SUPABASE_PROJECT_REF}\" --schema public > src/types/database.ts'",

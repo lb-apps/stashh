@@ -58,7 +58,7 @@ export async function fetchInstagramOps(range: OpsRange): Promise<unknown> {
   return getJson(service("Instagram", "INSTAGRAM_API_URL", "INSTAGRAM_OPS_TOKEN"), `/ops/stats?range=${range}`);
 }
 
-/* ── Recognition tester: the public API, as the backend's dev test user ─────────────── */
+/* ── Recognition tester: the public API, as the backend's test user ──────────────────── */
 
 /** The backend refused the request itself (a bad link, an unknown id); the status and message are its own. */
 export class BackendRequestError extends Error {
@@ -70,27 +70,25 @@ export class BackendRequestError extends Error {
   }
 }
 
-function backend(): { name: string; url: string } {
-  const url = process.env["STASHH_API_URL"];
-  if (!url) throw new OpsConfigError("Backend: set STASHH_API_URL in ops/.env.local");
-  return { name: "Backend", url: url.replace(/\/$/, "") };
-}
-
 /** A Supabase token lives an hour; this is renewed a little before. */
-const DEV_TOKEN_TTL_MS = 50 * 60_000;
-let devToken: { token: string; expiresAt: number } | null = null;
+const TEST_USER_TOKEN_TTL_MS = 50 * 60_000;
+let testUserToken: { token: string; expiresAt: number } | null = null;
 
 /**
- * The backend's dev-only token for its test user (`GET /dev/token`, 404 in production).
- * The tester acts as that user, exactly as the old test page did, so a run from here is
- * indistinguishable from one the app sends.
+ * A token for the backend's test user (`GET /internal/v1/ops/test-user-token`, behind the
+ * dashboard's service token). The tester acts as that user, exactly as the old test page did,
+ * so a run from here is indistinguishable from one the app sends.
  */
-async function devBearer(): Promise<string> {
-  if (devToken && devToken.expiresAt > Date.now()) return devToken.token;
-  const { name, url } = backend();
+async function testUserBearer(): Promise<string> {
+  if (testUserToken && testUserToken.expiresAt > Date.now()) return testUserToken.token;
+  const { name, url, token } = service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN");
   let response: Response;
   try {
-    response = await fetch(`${url}/dev/token`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    response = await fetch(`${url}/internal/v1/ops/test-user-token`, {
+      headers: { authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch (error) {
     throw new ServiceUnavailableError(name, `${name} is unreachable at ${url} (${(error as Error).message})`);
   }
@@ -98,16 +96,16 @@ async function devBearer(): Promise<string> {
   if (!response.ok || !body?.ok || !body.data?.access_token) {
     throw new ServiceUnavailableError(
       name,
-      body?.error?.message ?? `${name} gave no dev token (${response.status}); set DEV_TEST_EMAIL and DEV_TEST_PASSWORD in backend/.env`,
+      body?.error?.message ?? `${name} gave no test-user token (${response.status}); set DEV_TEST_EMAIL and DEV_TEST_PASSWORD in its env`,
     );
   }
-  devToken = { token: body.data.access_token, expiresAt: Date.now() + DEV_TOKEN_TTL_MS };
-  return devToken.token;
+  testUserToken = { token: body.data.access_token, expiresAt: Date.now() + TEST_USER_TOKEN_TTL_MS };
+  return testUserToken.token;
 }
 
 async function asTestUser(path: string, init: { method?: string; body?: string; bypassCache?: boolean } = {}): Promise<unknown> {
-  const { name, url } = backend();
-  const token = await devBearer();
+  const { name, url } = service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN");
+  const token = await testUserBearer();
   let response: Response;
   try {
     response = await fetch(`${url}${path}`, {
@@ -125,7 +123,7 @@ async function asTestUser(path: string, init: { method?: string; body?: string; 
     throw new ServiceUnavailableError(name, `${name} is unreachable at ${url} (${(error as Error).message})`);
   }
   // A refused token is forgotten, so the next call signs in again.
-  if (response.status === 401) devToken = null;
+  if (response.status === 401) testUserToken = null;
   const body = (await response.json().catch(() => null)) as { ok?: boolean; data?: unknown; error?: { message?: string } } | null;
   if (!response.ok || !body?.ok) throw new BackendRequestError(response.status, body?.error?.message ?? `${name} answered ${response.status}`);
   return body.data;

@@ -12,7 +12,8 @@ npm install
 npm run dev                  # http://127.0.0.1:3003
 ```
 
-The backend (`:3000`) and the Instagram service (`:3002`) must be running.
+`STASHH_API_URL` and `INSTAGRAM_API_URL` point at production on the home Pi (`http://<pi>:3000`,
+`http://<pi>:3002`; see [docs/deploy.md](../docs/deploy.md)) or at local dev servers.
 
 ## Tokens
 
@@ -24,8 +25,9 @@ Give the dashboard its own entries so they can be revoked without touching the c
 ## Recognize a link
 
 The link tester (`/recognize`) sends one link through the backend's public API exactly as
-the app does, as the backend's dev test user (`GET /dev/token`, which needs `DEV_TEST_EMAIL`
-and `DEV_TEST_PASSWORD` in `backend/.env`), polls it until it settles and shows the places.
+the app does, as the backend's test user (`GET /internal/v1/ops/test-user-token` with the
+dashboard's token; the backend needs `DEV_TEST_EMAIL` and `DEV_TEST_PASSWORD`), polls it until
+it settles and shows the places.
 One recognition at a time; nothing is kept — a reload forgets the run. It replaced the test
 page the backend used to serve at `localhost:3000/`.
 
