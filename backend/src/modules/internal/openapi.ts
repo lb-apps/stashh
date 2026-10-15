@@ -2,6 +2,7 @@ import { z } from "zod";
 import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
 import { channelIdentityParamsSchema } from "../identities/types.js";
 import { recognitionEnqueuedSchema, recognitionStatusSchema } from "../recognitions/openapi.js";
+import { OPS_RANGES, opsQuerySchema } from "../ops/types.js";
 import { createInternalRecognitionRequestSchema } from "../recognitions/types.js";
 
 registry.registerComponent("securitySchemes", "ServiceToken", {
@@ -62,9 +63,10 @@ registry.registerPath({
   path: "/users/{userId}/recognitions",
   summary: "Enqueue recognition for a user",
   description: `Same contract as the public \`POST /recognitions\`, on behalf of \`userId\`, with one more source:
-\`shared_media\` — a post shared in an Instagram DM, which has no permalink. The channel sends the
-signed Instagram CDN link and the caption it received; the task is keyed \`instagram-media:<media_id>\`,
-so the same post is served from cache afterwards.
+\`shared_media\` — a post or story shared in an Instagram DM, which has no permalink. The channel sends the
+signed Instagram CDN link and, for a post, the caption it received; the task is keyed
+\`instagram-media:<media_id>\` (post) or \`instagram-story:<media_id>\` (story), so the same share is served
+from cache afterwards. A story's media is read but never stored.
 
 Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key for the same user returns the original task instead of enqueuing a second one.`,
   request: {
@@ -87,6 +89,59 @@ registry.registerPath({
   request: { params: userParams.extend({ id: z.string().uuid() }) },
   responses: {
     200: { description: "Recognition task", content: { "application/json": { schema: successEnvelope(recognitionStatusSchema, "InternalGetRecognition") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/recognitions",
+  summary: "Recognition ops stats",
+  description: `What the recognition system is doing, for the local ops dashboard.
+
+- \`stats\`: \`recognition_ops_stats()\` — the live queue, totals for tasks created in the window, run figures
+  (cache hits, p50/p95 processing, average per step, places matched, tokens and cost), p50/p95 queue wait,
+  a time series (hourly for \`24h\`, daily otherwise) and failures by step. Run figures start on 2026-10-14,
+  when runs began to be recorded.
+- \`queue\`: tasks queued or processing now, oldest first (max 50).
+- \`recognitions\`: the latest 60 recognitions with source type, channel, cover, places and cost.
+- \`process\`: this instance only — uptime, memory, worker concurrency, model, API traffic since start.`,
+  request: { query: opsQuerySchema },
+  responses: {
+    200: {
+      description: "Ops snapshot",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({
+              range: z.enum(OPS_RANGES),
+              since: z.string(),
+              bucket: z.enum(["hour", "day"]),
+              generated_at: z.string(),
+              stats: z.record(z.string(), z.unknown()),
+              queue: z.array(z.record(z.string(), z.unknown())),
+              recognitions: z.array(z.record(z.string(), z.unknown())),
+              process: z.record(z.string(), z.unknown()),
+            }),
+            "InternalOpsRecognitions",
+          ),
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/recognitions/{id}",
+  summary: "One recognition, in full",
+  description: "Source (type, channel, caption, cover), timestamps, every worker attempt with step timings, model usage and cost, and the result places. For the ops dashboard's detail view.",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "Recognition detail", content: { "application/json": { schema: successEnvelope(z.record(z.string(), z.unknown()), "InternalOpsRecognitionDetail") } } },
     ...commonErrorResponses,
   },
 });

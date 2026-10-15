@@ -88,7 +88,8 @@ describe("composeRecognitionReply", () => {
     expect(sourceKindOf({ kind: "url", url: "https://www.instagram.com/reel/X/" })).toBe("reel");
     expect(sourceKindOf({ kind: "url", url: "https://www.instagram.com/p/X/" })).toBe("post");
     expect(sourceKindOf({ kind: "url", url: "https://vm.tiktok.com/X/" })).toBe("video");
-    expect(sourceKindOf({ kind: "instagram_media", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("post");
+    expect(sourceKindOf({ kind: "instagram_media", format: "post", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("post");
+    expect(sourceKindOf({ kind: "instagram_media", format: "story", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("story");
     expect(composeRecognitionReply([place], "post")[0]).toEqual({ kind: "text", text: "Bu gönderide 1 mekân var." });
   });
 });

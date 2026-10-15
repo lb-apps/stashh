@@ -13,8 +13,11 @@ import { GooglePlacesClient } from "../../services/google/google-places-client.j
 import { GooglePhotoMediaClient } from "../../services/google/google-photo-media-client.js";
 import { uploadPlaceThumbnail } from "../../lib/thumbnailUploader.js";
 import { createRecognitionServiceWithServiceRole } from "./factory.js";
+import { buildRunRecord } from "./run-record.js";
 import type { RecognitionService } from "./service.js";
 import type { RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
+import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
+import { uploadSourceThumbnail } from "../../lib/sourceThumbnailUploader.js";
 
 let shouldKeepRunning = true;
 let wakeResolver: (() => void) | null = null;
@@ -79,6 +82,10 @@ async function processRecognition(
     retryCount: recognition.retry_count,
     bypassCache: Boolean(taskOptions.bypass_cache),
   });
+  const attempt = recognition.retry_count + 1;
+  // Kept outside the try so a run that fails after the model call still records its cost.
+  let analyzed: AIAnalysisResult | undefined;
+  let fetchMethod: SourceContent["fetch_method"] | undefined;
 
   try {
     const cachedResultId = taskOptions.bypass_cache
@@ -96,24 +103,37 @@ async function processRecognition(
         () => ({ resultId: cachedResultId }),
       );
       tl.done();
+      await recognitionService.recordRun(
+        buildRunRecord({ taskId: recognition.id, attempt, outcome: "cache_hit", timings: tl.timings() }),
+        tl.log,
+      );
       return;
     }
 
     const sourceContent = await tl.step(
       "content fetched",
       (stepLog) => fetchSourceContent(recognition, stepLog),
-      (content) => ({ supplied: recognition.source_media !== null, captionLength: content.caption?.length ?? 0 }),
+      (content) => ({ method: content.fetch_method, media: content.media.length, captionLength: content.caption?.length ?? 0 }),
     );
+    fetchMethod = sourceContent.fetch_method;
+
+    // The cover is copied while the model works; it never fails the recognition. A story's
+    // media is never kept: Meta allows reading it, not storing it.
+    const sourceThumbnail =
+      sourceContent.thumbnail_url && sourceContent.source_type !== "story"
+        ? uploadSourceThumbnail(sourceContent.thumbnail_url, recognition.source_url, createSupabaseServiceClient(), tl.log)
+        : Promise.resolve(null);
 
     const analysis = await tl.step(
       "media analyzed",
-      (stepLog) => analyzeContent(sourceContent.media_url, sourceContent.caption, stepLog, sourceContent.platform),
-      (result) => ({ kind: result.media_kind, placeCount: result.places.length }),
+      (stepLog) => analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform),
+      (result) => ({ kind: result.media_kind, media: result.media_count, placeCount: result.places.length, namesElsewhere: result.names_elsewhere }),
     );
+    analyzed = analysis;
 
     const placeMatches = await tl.step(
       "places found",
-      () => matchPlaces(analysis.places, googlePlacesClient),
+      (stepLog) => matchPlaces(analysis.places, googlePlacesClient, stepLog),
       (matches) => ({ total: analysis.places.length, matched: [...matches.values()].filter(Boolean).length }),
     );
 
@@ -166,7 +186,9 @@ async function processRecognition(
           { status: "completed", source_url: recognition.source_url, source_content: sourceContent, extracted_places: extractedPlaces },
           thumbnailUrls,
         );
-        return recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis.media_kind);
+        return sourceThumbnail.then((thumbnailUrl) =>
+          recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis, thumbnailUrl),
+        );
       },
       (id) => ({ resultId: id }),
     );
@@ -174,8 +196,32 @@ async function processRecognition(
     await recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId });
 
     tl.done();
+    await recognitionService.recordRun(
+      buildRunRecord({
+        taskId: recognition.id,
+        attempt,
+        outcome: "completed",
+        timings: tl.timings(),
+        fetchMethod,
+        analysis: { ...analysis, places_extracted: analysis.places.length },
+        placesMatched: matchedPlaces.length,
+      }),
+      tl.log,
+    );
   } catch (error) {
     tl.fail(error);
+    await recognitionService.recordRun(
+      buildRunRecord({
+        taskId: recognition.id,
+        attempt,
+        outcome: "failed",
+        timings: tl.timings(),
+        fetchMethod,
+        analysis: analyzed && { ...analyzed, places_extracted: analyzed.places.length },
+        errorMessage: (error instanceof Error ? error.message : String(error)).slice(0, 2000),
+      }),
+      tl.log,
+    );
     await recognitionService.processRecognitionFailure({ recognition, error }, tl.log);
   }
 }

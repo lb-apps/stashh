@@ -19,6 +19,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `backend/` | Express + Zod + OpenAPI API |
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
+| `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -69,6 +70,10 @@ reconcile anything back to it.
 - Interactives are pill-shaped and glossy: a short cobalt gradient plus the
   inner top highlight. Glossy 3D objects at empty and loading states. Spring
   motion with a slight overshoot.
+- **If removing it loses nothing, it is not on screen.** Ask of every element: "if we take
+  this off the screen, do we lose anything?" When the answer is no, it does not ship —
+  repetition, decoration, titles restated as descriptions, placeholder text and debug data
+  nobody acts on all fail. Run this check before calling any screen done.
 
 ## Web — Discovery is the base
 
@@ -105,6 +110,65 @@ kit splits the token system in half — if a component is missing, add it to
 **Light only.** Discovery is a single warm-bone light system. There is no dark
 theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
+## Ops dashboard — `ops/` (local only)
+
+`ops/` is an internal tool, never deployed: `cd ops && npm run dev` serves it on
+`127.0.0.1:3003` only. It reads each service's own ops endpoint with its own token
+(backend `GET /internal/v1/ops/recognitions`, instagram `GET /ops/stats`); it never reads a
+table. Tokens and URLs live in `ops/.env.local` and stay server-side.
+
+- **shadcn/ui is allowed here and only here.** `web/` stays Discovery-only. The exception holds
+  because `ops/` is a separate app with its own component kit, so web's token system is not split.
+- **Design language = Discovery's Recognition console kit** (`ui_kits/web_console/` in the
+  Discovery Design System project on Claude Design): utility mode only, bone page, white cards at
+  `rounded-card` (24px), no borders, heavy display page titles, uppercase `micro-label`s for
+  column heads and metadata, rounded black numerals (`numeric`), glossy cobalt pills
+  (`fill-primary`), segmented controls for every filter. One deviation, by the owner's call: the
+  run detail always opens as a dialog (side Sheet), never docked beside the table, even though
+  the kit docks it. Check the kit before adding a screen.
+- **Tokens come from web.** `ops/app/globals.css` imports `web/lib/discovery/tokens/*.css`
+  (never copies; `base.css` left out) and maps shadcn's variables onto them. Light only. The
+  shadcn primitives in `ops/components/ui/` are restyled to the kit, not replaced.
+- `ops/lib/utils.ts` configures `cn` with Discovery's type, radius and depth scales — without it
+  the merger drops `text-display` beside a text colour. Import `cn` from `@/lib/utils`, never `"cn"`.
+- Focus is an outline (`outline-solid outline-3 outline-cobalt-300`), never a ring: fills carry
+  their own box-shadow and would swallow it.
+- **Type floor.** Readable text is never under 15px (`text-caption`); row titles 17px
+  (`text-body`). 13px only for uppercase micro-labels and monospace ids, 11px only for inline
+  pill badges. shadcn's `text-sm`/`text-xs` defaults are raised in the primitives — do not
+  reintroduce them at call sites.
+- **Light only, for real.** `globals.css` ties Tailwind's `dark:` to a `.dark` class the app never
+  sets; without it the OS dark setting switches on shadcn's dark styles (30% field fills).
+- **Contrast is measured on the actual background**, greys on greys included: micro-label grey
+  (#6E6B66) passes on white and bone but not on a bone-300 field, so field placeholders use
+  `text-muted-foreground`. Text over images sits on an opaque fill.
+- **No statistics jargon in UI copy.** Say "Typical" (median) and "Slowest 5%", never p50 / p95
+  / percentile; code and API field names keep the precise terms.
+- Text greys, by the owner's call: secondary `grey-800`, micro-labels `--micro-foreground`
+  #6E6B66 (the kit's lighter greys miss 4.5:1). Status hues are marks and soft badge fills;
+  Discovery has no red fill — a failure is a grey pill with a red dot.
+- Metrics come from `recognition_runs` (one row per worker attempt: step timings, fetch method,
+  model usage and cost), `recognition_results.source_thumbnail_url` (covers in the public
+  `source-thumbnails` bucket) and `instagram_messages.intent` / `finished_at`. Add a metric there,
+  expose it in the service's ops SQL function (`recognition_ops_stats/_list/_detail`,
+  `instagram_ops_stats`), then show it. Source type and channel come from the shared SQL helpers
+  `recognition_source_type()` / `recognition_source_platform()` / `recognition_channel()` — never
+  re-derive them elsewhere. API health is in memory per backend process (`lib/api-metrics.ts`:
+  routes, 5-minute series, last server errors) and says so on screen; dependency health comes
+  from `recognition_ops_dependencies()`.
+- Charts follow shadcn's chart blocks (area, interactive bar, donut, radial, line, stacked and
+  horizontal bar) in `ops/components/ops/charts/`. They do not animate: data refreshes every 5 s
+  and a replayed entrance would hide value labels.
+- Only the detail sheet reads `?id=` (inside its own Suspense); pages must hydrate with the layout.
+- **Recognize a link** (`/recognize`) is the one page that writes: one recognition at a time through the
+  backend's public API as its dev test user (`GET /dev/token`), polled until it settles, nothing persisted.
+  It replaced the backend's old test page; the backend serves no HTML of its own.
+- **UI is English** (`en-US` formats in `ops/lib/format.ts`, every label in `ops/lib/labels.ts`).
+- **shadcn components first.** No raw `ul/li/dl/label/button/img` in `ops/components/ops/`: row
+  lists are `ItemGroup`/`Item`, number tiles are `StatGrid` (muted `Item`s), thumbnails are
+  `Avatar` (`Thumb`), covers are `AspectRatio`, cards are `Card`, toggles are `Collapsible`, form
+  labels are `Label`. Add a missing piece with `npx shadcn add`, never hand-roll it.
+
 ## Backend / API
 
 - **Canonical reference:** the running Scalar UI at `/docs` and the spec at `/openapi.json`.
@@ -118,6 +182,7 @@ theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
   `ios/Config/*.plist` holds real credentials and is **gitignored** — on a fresh clone, copy each `ios/Config/<Env>.plist.example` to `ios/Config/<Env>.plist` and fill in the values before building.
 - **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`).
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
+- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only).
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
 ## Conventions

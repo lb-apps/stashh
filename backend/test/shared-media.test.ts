@@ -40,6 +40,21 @@ describe("internal recognition request", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("takes a shared story, and treats a share without a format as a post", () => {
+    const story = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", format: "story", media_id: "18094747109404940", media_url: CDN, caption: null },
+    });
+    expect(story.success && "shared_media" in story.data && story.data.shared_media.format).toBe("story");
+    const post = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", media_id: "18008721881113680", media_url: CDN, caption: "jazz" },
+    });
+    expect(post.success && "shared_media" in post.data && post.data.shared_media.format).toBe("post");
+    const other = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", format: "live", media_id: "1", media_url: CDN, caption: null },
+    });
+    expect(other.success).toBe(false);
+  });
 });
 
 describe("fetchSourceContent", () => {
@@ -55,8 +70,28 @@ describe("fetchSourceContent", () => {
       log,
     );
 
-    expect(content).toEqual({ media_url: CDN, caption: "jazz", platform: "instagram", source_type: "post" });
+    expect(content).toEqual({
+      media: [{ url: CDN }],
+      caption: "jazz",
+      platform: "instagram",
+      source_type: "post",
+      // A shared post's media is its own thumbnail (stored only if it turns out to be an image).
+      thumbnail_url: CDN,
+      fetch_method: "supplied",
+    });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reads a shared story as supplied content of its own kind", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const content = await fetchSourceContent(
+      {
+        source_url: "instagram-story:18094747109404940",
+        source_media: { media_url: CDN, caption: null, platform: "instagram", source_type: "story" },
+      },
+      log,
+    );
+    expect(content).toMatchObject({ media: [{ url: CDN }], caption: null, source_type: "story", fetch_method: "supplied" });
   });
 
   it("rejects malformed supplied content", async () => {
@@ -67,22 +102,38 @@ describe("fetchSourceContent", () => {
 });
 
 describe("toMediaPart", () => {
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const webp = Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WEBP")]);
+
   it("sends a video as a video part", () => {
-    expect(toMediaPart("video/mp4", "AAAA")).toEqual({
+    expect(toMediaPart("video/mp4", mp4)).toEqual({
       kind: "video",
-      part: { type: "video_url", video_url: { url: "data:video/mp4;base64,AAAA" } },
+      part: { type: "video_url", video_url: { url: `data:video/mp4;base64,${mp4.toString("base64")}` } },
     });
   });
 
   it("sends an image as an image part, keeping its real type", () => {
-    expect(toMediaPart("image/jpeg; charset=binary", "AAAA")).toEqual({
-      kind: "image",
-      part: { type: "image_url", image_url: { url: "data:image/jpeg;base64,AAAA" } },
+    expect(toMediaPart("image/jpeg; charset=binary", jpeg).part).toEqual({
+      type: "image_url",
+      image_url: { url: `data:image/jpeg;base64,${jpeg.toString("base64")}` },
     });
   });
 
-  it("refuses anything else", () => {
-    expect(() => toMediaPart("text/html", "AAAA")).toThrow(/text\/html/);
-    expect(() => toMediaPart(null, "AAAA")).toThrow(/unknown/);
+  it.each([
+    ["an MP4 served as octet-stream (Instagram's video CDN)", "application/octet-stream", mp4, "video", "video/mp4"],
+    ["a JPEG without a content type", null, jpeg, "image", "image/jpeg"],
+    ["a PNG as binary/octet-stream", "binary/octet-stream", png, "image", "image/png"],
+    ["a WebP with an empty type", "", webp, "image", "image/webp"],
+  ] as const)("recognises %s from its bytes", (_, contentType, bytes, kind, mime) => {
+    const media = toMediaPart(contentType, bytes);
+    expect(media.kind).toBe(kind);
+    expect(JSON.stringify(media.part)).toContain(`data:${mime};base64,`);
+  });
+
+  it("refuses what is neither video nor image", () => {
+    expect(() => toMediaPart("text/html", Buffer.from("<html>"))).toThrow(/text\/html/);
+    expect(() => toMediaPart("application/octet-stream", Buffer.from("plain bytes"))).toThrow(/application\/octet-stream/);
   });
 });

@@ -1,3 +1,5 @@
+import type { ModelUsage } from "../lib/openrouter.js";
+
 // ── Source content result ──────────────────────────────────
 
 /** Platform a recognition source URL belongs to. */
@@ -7,9 +9,18 @@ export type SourcePlatform = "instagram" | "tiktok";
 export type SourceType = "reel" | "post" | "story" | "tiktok";
 
 /** Normalised scrape result, whichever platform it came from. */
+/** One video or image the model reads, by a directly fetchable URL. */
+export interface SourceMediaItem {
+  url: string;
+}
+
 export interface SourceContent {
-  /** Directly fetchable video or image URL, downloaded and handed to the model. */
-  media_url: string;
+  /** What the model reads, in post order: one item for a Reel, photo or story, one per slide for a carousel. */
+  media: SourceMediaItem[];
+  /** The post's cover image, if the source offers one (copied to storage by the worker). */
+  thumbnail_url: string | null;
+  /** How the media was obtained; recorded per run for scraper health. */
+  fetch_method: "scrape" | "downloader" | "tiktok" | "supplied";
   /** Post caption. Instagram: og:description. TikTok: the post title. */
   caption: string | null;
   source_type: SourceType;
@@ -34,9 +45,24 @@ export interface VenueRecommendation {
   kind: VenueRecommendationKind;
 }
 
+/** What kind of place the post features; steers the Maps search when the name alone misleads it. */
+export type VenueCategory =
+  | "restaurant"
+  | "cafe"
+  | "bar"
+  | "bakery"
+  | "dessert"
+  | "hotel"
+  | "attraction"
+  | "shop"
+  | "other";
+
 export interface ExtractedPlace {
   name: string;
+  category: VenueCategory;
   location_hint: string | null;
+  /** Street address as the post writes it, when it gives one; tells two listings on one street apart. */
+  address: string | null;
   /** Venue Instagram handle when visible in caption (@tag) or video; omit leading @ */
   instagram_username: string | null;
   /** Explicit must-try / ordering tips for this venue from the post */
@@ -47,8 +73,23 @@ export interface ExtractedPlace {
 
 export interface AIAnalysisResult {
   places: ExtractedPlace[];
-  /** What the media turned out to be, from its Content-Type. */
+  /**
+   * The post presents several venues whose names are not in what the model read: a list
+   * post seen by its cover only, which is all a DM share of a carousel carries.
+   */
+  names_elsewhere: boolean;
+  /** What the media turned out to be: "video" when any item the model read is one. */
   media_kind: "video" | "image";
+  /** Bytes the model read, over every item. */
+  media_bytes: number;
+  /** Items the model read; a carousel's slides, up to the configured cap. */
+  media_count: number;
+  /** The first video the model read, or null when the post is photos only. */
+  video_url: string | null;
+  /** Model and upstream provider that answered, and what the call cost. */
+  model: string;
+  provider: string | null;
+  usage: ModelUsage | null;
 }
 
 // ── Google Places enrichment ───────────────────────────────

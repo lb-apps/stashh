@@ -1,0 +1,226 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Discovery is the single source of colour, depth, radius, type and motion. These
+   files are imported from web/, never copied, so a token change reaches both apps.
+   base.css is left out on purpose: its element resets belong to web/. */
+@import "../../web/lib/discovery/tokens/colors.css";
+@import "../../web/lib/discovery/tokens/elevation.css";
+@import "../../web/lib/discovery/tokens/radius.css";
+@import "../../web/lib/discovery/tokens/fonts.css";
+@import "../../web/lib/discovery/tokens/motion.css";
+@import "../../web/lib/discovery/tokens/typography.css";
+@import "../../web/lib/discovery/tokens/spacing.css";
+
+/* Discovery is light only. Tailwind's `dark:` would otherwise follow the OS setting and
+   switch on every dark style the shadcn primitives ship (30% field fills, swapped text
+   colours). Tie it to a `.dark` class this app never sets, so it never applies. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Status hues for marks (dots, bars, badge fills) — never as text colour: on white
+     they sit under 4.5:1, so status text stays ink beside the mark. */
+  --color-success: var(--green-600);
+  --color-success-soft: var(--green-100);
+  --color-warning: var(--amber-500);
+  --color-warning-soft: var(--amber-100);
+  --color-danger: var(--red-500);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Discovery's own scales, for the console kit (ui_kits/web_console). */
+  --radius-tile: var(--r-sm);
+  --radius-button: var(--r-button);
+  --radius-field: var(--r-field);
+  --radius-card: var(--r-card);
+  --radius-sheet: var(--r-sheet);
+
+  --font-numeric: var(--font-rounded);
+
+  --text-display: var(--fs-display-2);
+  --text-display--line-height: var(--lh-display-2);
+  --text-display--letter-spacing: var(--tr-display);
+  --text-display--font-weight: var(--fw-black);
+  --text-title: var(--fs-title-2);
+  --text-title--line-height: var(--lh-title-2);
+  --text-title--letter-spacing: var(--tr-title);
+  --text-title--font-weight: var(--fw-black);
+  --text-headline: var(--fs-headline);
+  --text-headline--line-height: var(--lh-headline);
+  --text-headline--letter-spacing: var(--tr-tight);
+  --text-headline--font-weight: var(--fw-bold);
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-body);
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: var(--lh-caption);
+  --text-nano: var(--fs-nano);
+  --text-nano--line-height: var(--lh-nano);
+  --text-nano--letter-spacing: var(--tr-nano);
+  --text-nano--font-weight: var(--fw-heavy);
+
+  --color-cobalt-50: var(--cobalt-50);
+  --color-cobalt-100: var(--cobalt-100);
+  --color-cobalt-300: var(--cobalt-300);
+  --color-cobalt-500: var(--cobalt-500);
+  --color-cobalt-600: var(--cobalt-600);
+  --color-bone-200: var(--bone-200);
+  --color-bone-300: var(--bone-300);
+  --color-grey-100: var(--grey-100);
+  --color-grey-300: var(--grey-300);
+  --color-amber-100: var(--amber-100);
+  --color-amber-500: var(--amber-500);
+  --color-green-500: var(--green-500);
+  --color-micro: var(--micro-foreground);
+  --color-amber-ink: var(--amber-ink);
+
+  --ease-spring: var(--ease-spring);
+}
+
+/* Depth comes from the bone/white contrast plus Discovery's soft warm shadow, not
+   hairlines. Own name: Tailwind reads shadow-<colour> as a shadow colour, and its
+   shadow-* scale cannot take a var(). */
+@utility depth-card {
+  box-shadow: var(--sh-card);
+}
+@utility depth-float {
+  box-shadow: var(--sh-float);
+}
+/* Fills read as physical objects through a thin inner highlight. */
+@utility gloss {
+  box-shadow: var(--gloss-top);
+}
+/* The segmented-control thumb: lifted, with the strong highlight. */
+@utility depth-thumb {
+  box-shadow: var(--sh-thumb), var(--gloss-top-strong);
+}
+/* A field or segmented track sits slightly into the surface. */
+@utility depth-inset {
+  box-shadow: inset 0 1px 3px rgba(28, 25, 20, 0.06);
+}
+/* The one interactive fill: cobalt gradient, gloss, cobalt glow. */
+@utility fill-primary {
+  background: var(--fill-primary);
+  color: var(--text-on-brand);
+  box-shadow: var(--gloss-top), var(--sh-cobalt);
+}
+/* Column heads and metadata: written in normal case, set uppercase here. */
+@utility micro-label {
+  font-family: var(--font-display);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-micro);
+  text-transform: uppercase;
+  color: var(--micro-foreground);
+}
+/* Every number: the rounded face with tabular figures, so columns do not jitter. */
+@utility numeric {
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+}
+
+/* shadcn's semantic variables, mapped onto Discovery. Light only: Discovery has no
+   dark theme. */
+:root {
+  /* shadcn's scale hangs off Discovery's 16px button radius; cards, fields and sheets
+     use Discovery's own radii (rounded-card, rounded-field, rounded-sheet). */
+  --radius: var(--r-button);
+
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--cobalt-500);
+  --primary-foreground: var(--text-on-brand);
+  --secondary: var(--fill-secondary);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-sunken-on-white);
+  /* Discovery's secondary grey (#8E8B86) is ~3.3:1 on white — too faint for the many
+     small labels of a dense screen. grey-800 keeps the warm family at ~9:1. */
+  --muted-foreground: var(--grey-800);
+  /* The kit's micro-labels are #B5B2AC (~2.2:1 on white). The owner chose to keep the
+     hierarchy one step darker: this grey is ~5.3:1 on white, ~4.6:1 on bone. */
+  --micro-foreground: #6E6B66;
+  /* Ink for text on amber-100, as Discovery's Badge sets it. */
+  --amber-ink: #8A6100;
+  --accent: var(--cobalt-tint-08);
+  --accent-foreground: var(--cobalt-700);
+  --destructive: var(--red-500);
+  --border: var(--hairline);
+  --input: var(--fill-secondary);
+  --ring: var(--cobalt-300);
+
+  /* Charts: cobalt carries every series in three depths; amber and red only where the
+     value measures something going wrong (console kit rule). */
+  --chart-1: var(--cobalt-500);
+  --chart-2: var(--cobalt-300);
+  --chart-3: var(--cobalt-700);
+  --chart-4: var(--amber-500);
+  --chart-5: var(--red-500);
+
+  --sidebar: var(--surface-app);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--cobalt-500);
+  --sidebar-primary-foreground: var(--text-on-brand);
+  --sidebar-accent: var(--surface-card);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--cobalt-300);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}

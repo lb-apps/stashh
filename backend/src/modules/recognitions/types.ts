@@ -31,12 +31,14 @@ export const createRecognitionRequestSchema = z.object({
 
 /**
  * What a recognition reads. A URL is scraped; shared media arrives with its content
- * because the channel that received it holds the only copy (an Instagram post shared
- * in a DM has no permalink, just a signed CDN link and the caption).
+ * because the channel that received it holds the only copy (an Instagram post or story
+ * shared in a DM has no permalink, just a signed CDN link and, for a post, the caption).
  */
+export type SharedMediaFormat = "post" | "story";
+
 export type RecognitionSource =
   | { kind: "url"; url: string }
-  | { kind: "shared_media"; provider: "instagram"; mediaId: string; mediaUrl: string; caption: string | null };
+  | { kind: "shared_media"; provider: "instagram"; format: SharedMediaFormat; mediaId: string; mediaUrl: string; caption: string | null };
 
 /** Hosts Instagram's messaging CDN serves shared media from. */
 const SHARED_MEDIA_HOST = /(?:^|\.)(?:fbsbx\.com|cdninstagram\.com|fbcdn\.net)$/i;
@@ -52,6 +54,8 @@ function isSharedMediaUrl(value: string): boolean {
 
 const sharedMediaSchema = z.object({
   provider: z.literal("instagram"),
+  /** A feed post (default) or a story; a story's media is read but never stored. */
+  format: z.enum(["post", "story"]).default("post"),
   media_id: z.string().regex(/^\d{1,32}$/, "media_id must be numeric"),
   media_url: z.string().url().refine(isSharedMediaUrl, "media_url must be an https Instagram CDN link"),
   caption: z.string().max(10_000).nullable().optional(),
@@ -66,7 +70,7 @@ export const createInternalRecognitionRequestSchema = z.union([
 export function toRecognitionSource(body: z.infer<typeof createInternalRecognitionRequestSchema>): RecognitionSource {
   if ("source_url" in body) return { kind: "url", url: body.source_url };
   const media = body.shared_media;
-  return { kind: "shared_media", provider: media.provider, mediaId: media.media_id, mediaUrl: media.media_url, caption: media.caption ?? null };
+  return { kind: "shared_media", provider: media.provider, format: media.format, mediaId: media.media_id, mediaUrl: media.media_url, caption: media.caption ?? null };
 }
 
 export const recognitionIdentifierSchema = z.object({

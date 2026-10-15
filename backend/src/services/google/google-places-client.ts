@@ -27,10 +27,23 @@ const TEXT_SEARCH_FIELD_MASK = [
   "places.location",
   "places.rating",
   "places.photos",
+  "places.types",
+  "places.primaryType",
 ].join(",");
 
+export interface NearbySearchParams {
+  center: { latitude: number; longitude: number };
+  radiusMeters: number;
+  /** Place types (Table A) to include; a place matches when it carries any of them. */
+  includedTypes: string[];
+  maxResultCount?: number;
+}
+
 export interface IGooglePlacesClient {
-  searchText(query: string, maxResultCount?: number): Promise<TextSearchResult | null>;
+  /** Text Search candidates in Google's rank order; empty when nothing matched or the call failed. */
+  searchText(query: string, maxResultCount?: number): Promise<TextSearchResult[]>;
+  /** Places around a point, nearest first; empty when nothing matched or the call failed. */
+  searchNearby(params: NearbySearchParams): Promise<TextSearchResult[]>;
   getPlaceDetails(googlePlaceId: string): Promise<GooglePlaceV1 | null>;
   getPlacePhotos(googlePlaceId: string): Promise<string[]>;
 }
@@ -41,7 +54,7 @@ export class GooglePlacesClient implements IGooglePlacesClient {
     private readonly log?: Logger,
   ) {}
 
-  async searchText(query: string, maxResultCount = 1): Promise<TextSearchResult | null> {
+  async searchText(query: string, maxResultCount = 1): Promise<TextSearchResult[]> {
     const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
@@ -54,21 +67,36 @@ export class GooglePlacesClient implements IGooglePlacesClient {
 
     if (!response.ok) {
       this.log?.warn({ query, status: response.status }, "text search failed");
-      return null;
+      return [];
     }
 
-    const data = (await response.json()) as {
-      places?: Array<{
-        id: string;
-        displayName?: { text: string; languageCode?: string };
-        shortFormattedAddress?: string;
-        location?: { latitude?: number; longitude?: number };
-        rating?: number;
-        photos?: Array<{ name: string }>;
-      }>;
-    };
+    const data = (await response.json()) as { places?: TextSearchResult[] };
+    return data.places ?? [];
+  }
 
-    return data.places?.[0] ?? null;
+  async searchNearby(params: NearbySearchParams): Promise<TextSearchResult[]> {
+    const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": this.apiKey,
+        "X-Goog-FieldMask": TEXT_SEARCH_FIELD_MASK,
+      },
+      body: JSON.stringify({
+        locationRestriction: { circle: { center: params.center, radius: params.radiusMeters } },
+        includedTypes: params.includedTypes,
+        maxResultCount: params.maxResultCount ?? 10,
+        rankPreference: "DISTANCE",
+      }),
+    });
+
+    if (!response.ok) {
+      this.log?.warn({ center: params.center, status: response.status }, "nearby search failed");
+      return [];
+    }
+
+    const data = (await response.json()) as { places?: TextSearchResult[] };
+    return data.places ?? [];
   }
 
   async getPlaceDetails(googlePlaceId: string): Promise<GooglePlaceV1 | null> {

@@ -30,6 +30,8 @@ const recognitionSchema = z.object({
   recognition_id: z.string().uuid(),
   status: z.enum(["queued", "processing", "completed", "committed", "failed", "cancelled", "expired"]),
   places: z.array(placeSchema).nullable(),
+  /** The post announced venues whose names were not in what was read: a list seen by its cover only. */
+  names_elsewhere: z.boolean().optional().default(false),
   error_message: z.string().nullable(),
 });
 export type Recognition = z.infer<typeof recognitionSchema>;
@@ -42,10 +44,14 @@ export const TERMINAL_STATUSES: ReadonlySet<Recognition["status"]> = new Set([
   "expired",
 ]);
 
-/** What to recognize: a link the backend scrapes, or a post shared in a DM (no permalink exists). */
+/**
+ * What to recognize: a link the backend scrapes, or media shared in a DM that has no
+ * permalink — a feed post (with its caption) or a story (no caption; Meta forbids
+ * keeping its media, so only the CDN link travels).
+ */
 export type RecognitionSource =
   | { kind: "url"; url: string }
-  | { kind: "instagram_media"; mediaId: string; mediaUrl: string; caption: string | null };
+  | { kind: "instagram_media"; format: "post" | "story"; mediaId: string; mediaUrl: string; caption: string | null };
 
 export class StashhApiError extends Error {
   readonly status: number;
@@ -95,7 +101,7 @@ export class HttpStashhApi implements StashhApi {
     const body =
       source.kind === "url"
         ? { source_url: source.url }
-        : { shared_media: { provider: "instagram", media_id: source.mediaId, media_url: source.mediaUrl, caption: source.caption } };
+        : { shared_media: { provider: "instagram", format: source.format, media_id: source.mediaId, media_url: source.mediaUrl, caption: source.caption } };
     const data = await this.request("POST", `/internal/v1/users/${userId}/recognitions`, recognitionAcceptedSchema, {
       body,
       headers: { "idempotency-key": idempotencyKey },

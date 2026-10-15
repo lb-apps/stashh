@@ -14,5 +14,7 @@ export function errorHandler(
   }
   console.error(err);
   const { status, body } = respondToError(err, getRequestId(req));
+  // The real cause for the ops dashboard's recent-errors list; the client sees `body` only.
+  if (status >= 500) res.locals.errorMessage = err instanceof Error ? err.message : String(err);
   res.status(status).json(body);
 }

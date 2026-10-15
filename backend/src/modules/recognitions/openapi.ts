@@ -27,6 +27,9 @@ export const recognitionStatusSchema = z
     source_url: z.string().url(),
     result_id: z.string().uuid().nullable(),
     places: z.unknown().nullable(),
+    names_elsewhere: z
+      .boolean()
+      .describe("The post presents several venues whose names were not in the media and caption read — a list post seen by its cover only. With an empty `places`, ask for the post's link."),
     error_message: z.string().nullable(),
     retry_count: z.number().int(),
     started_at: z.string().nullable(),

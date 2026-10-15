@@ -27,15 +27,38 @@ export interface ChatCompletionRequest {
   reasoningEffort?: "minimal" | "low" | "medium" | "high";
 }
 
+/** Token usage and cost of one call, as OpenRouter reports it on every response. */
+export interface ModelUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
+  /** OpenRouter `usage.cost`, in USD credits. */
+  cost_usd: number | null;
+}
+
 export interface ChatCompletion {
   content: string;
   /** Normalised by OpenRouter: "stop", "length", "content_filter", … */
   finishReason: string | null;
   model: string;
+  /** Upstream provider OpenRouter routed to (e.g. "Google AI Studio"). */
+  provider: string | null;
+  usage: ModelUsage | null;
 }
+
+const usageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  prompt_tokens_details: z.object({ cached_tokens: z.number().optional() }).nullish(),
+  completion_tokens_details: z.object({ reasoning_tokens: z.number().optional() }).nullish(),
+  cost: z.number().nullish(),
+});
 
 const responseSchema = z.object({
   model: z.string(),
+  provider: z.string().nullish(),
+  usage: usageSchema.nullish(),
   choices: z
     .array(
       z.object({
@@ -115,7 +138,22 @@ export function createOpenRouterClient(options: { apiKey: string; timeoutMs?: nu
       if (choice.error) throw new OpenRouterError(response.status, choice.error.message);
       if (!choice.message.content) throw new OpenRouterError(response.status, "model returned an empty response");
 
-      return { content: choice.message.content, finishReason: choice.finish_reason ?? null, model: parsed.data.model };
+      const usage = parsed.data.usage;
+      return {
+        content: choice.message.content,
+        finishReason: choice.finish_reason ?? null,
+        model: parsed.data.model,
+        provider: parsed.data.provider ?? null,
+        usage: usage
+          ? {
+              prompt_tokens: usage.prompt_tokens,
+              completion_tokens: usage.completion_tokens,
+              reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
+              cached_tokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
+              cost_usd: usage.cost ?? null,
+            }
+          : null,
+      };
     },
   };
 }

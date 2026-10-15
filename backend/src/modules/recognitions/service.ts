@@ -1,13 +1,15 @@
 import { config } from "../../config.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
-import type { RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
-import type { RecognitionRepository } from "./repository.js";
+import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
+import type { RecognitionRepository, RecognitionWithResult } from "./repository.js";
+import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
   RecognitionSource,
   RecognitionTaskOptions,
   RecognitionTaskRow,
+  SharedMediaFormat,
 } from "./types.js";
 
 interface RecognitionBackoffResult {
@@ -32,9 +34,9 @@ function normalizeInstagramSourceUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
-/** Result-cache key of a post shared in an Instagram DM, which has no URL. */
-function instagramMediaKey(mediaId: string): string {
-  return `instagram-media:${mediaId}`;
+/** Result-cache key of a post or story shared in an Instagram DM, which has no URL. */
+function instagramMediaKey(format: SharedMediaFormat, mediaId: string): string {
+  return format === "story" ? `instagram-story:${mediaId}` : `instagram-media:${mediaId}`;
 }
 
 interface EnqueueRecognitionParams {
@@ -125,10 +127,10 @@ export class RecognitionService {
 
   async enqueueRecognition(params: EnqueueRecognitionParams): Promise<RecognitionTaskRow> {
     const { source } = params;
-    const sourceUrl = source.kind === "url" ? normalizeInstagramSourceUrl(source.url) : instagramMediaKey(source.mediaId);
+    const sourceUrl = source.kind === "url" ? normalizeInstagramSourceUrl(source.url) : instagramMediaKey(source.format, source.mediaId);
     const sourceMedia =
       source.kind === "shared_media"
-        ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: "post" }
+        ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: source.format }
         : null;
     const options = params.options ?? {};
     const { idempotencyKey } = params;
@@ -158,10 +160,7 @@ export class RecognitionService {
     }
   }
 
-  async getRecognition(
-    recognitionId: string,
-    ownerUserId: string,
-  ): Promise<{ task: RecognitionTaskRow; places: Json | null } | null> {
+  async getRecognition(recognitionId: string, ownerUserId: string): Promise<RecognitionWithResult | null> {
     return this.recognitionRepository.getRecognitionByIdForOwner(recognitionId, ownerUserId);
   }
 
@@ -193,9 +192,16 @@ export class RecognitionService {
     return this.recognitionRepository.recoverStaleRecognitions(params);
   }
 
+  /**
+   * An earlier result for the same source, when it found something. An empty result is
+   * not served again: the next share runs afresh, so a post the pipeline could not read
+   * yesterday gets another chance once it can.
+   */
   async getCachedResultId(sourceUrl: string): Promise<string | null> {
     const cachedResult = await this.recognitionRepository.getRecognitionResultBySourceUrl(sourceUrl);
-    return cachedResult?.id ?? null;
+    if (!cachedResult) return null;
+    if (Array.isArray(cachedResult.places) && cachedResult.places.length === 0) return null;
+    return cachedResult.id;
   }
 
   mapPipelineResultToStoredPlaces(
@@ -220,17 +226,32 @@ export class RecognitionService {
     sourceUrl: string,
     places: RecognitionResultPlace[],
     sourceContent: SourceContent,
-    mediaKind: "video" | "image",
+    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere">,
+    sourceThumbnailUrl: string | null,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
       sourceUrl,
       places: places as unknown as Json,
-      // The stored field means "video"; a photo post has none.
-      videoUrl: mediaKind === "video" ? sourceContent.media_url : null,
+      namesElsewhere: analysis.names_elsewhere,
+      // The first video the model read; null for a photo post or a carousel of photos.
+      videoUrl: analysis.video_url,
       caption: sourceContent.caption,
       sourceType: sourceContent.source_type,
+      sourceThumbnailUrl,
     });
     return result.id;
+  }
+
+  /**
+   * Records how one attempt went. Metrics are an observer: a failed write is logged
+   * and swallowed so it can never fail or retry the recognition itself.
+   */
+  async recordRun(run: RecognitionRunInsert, log: Logger): Promise<void> {
+    try {
+      await this.recognitionRepository.insertRun(run);
+    } catch (error) {
+      log.warn({ err: error, outcome: run.outcome }, "recognition run not recorded");
+    }
   }
 
   async processRecognitionSuccess(params: ProcessRecognitionSuccessParams): Promise<void> {

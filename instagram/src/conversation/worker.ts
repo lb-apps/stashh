@@ -39,6 +39,11 @@ export class MessageWorker {
     this.idleMs = options.idleMs ?? 1_000;
   }
 
+  /** Messages being processed by this instance right now. */
+  get inFlightCount(): number {
+    return this.inFlight.size;
+  }
+
   start(): void {
     this.loop ??= this.run();
   }

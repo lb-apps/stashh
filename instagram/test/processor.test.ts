@@ -24,6 +24,7 @@ const recognition = (status: Recognition["status"], places: Place[] | null = nul
   recognition_id: RECOGNITION_ID,
   status,
   places,
+  names_elsewhere: false,
   error_message: error,
 });
 
@@ -91,7 +92,7 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
     await next(mid);
 
-    expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2 });
+    expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2, intent: "recognize", finishedAt: time.now() });
     expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var."]);
     const carousel = messenger.sent[1]?.message;
     expect(carousel?.kind).toBe("carousel");
@@ -153,6 +154,7 @@ describe("recognizing a shared Reel", () => {
     await tick();
     expect(stashh.created[0]?.source).toEqual({
       kind: "instagram_media",
+      format: "post",
       mediaId: "7",
       mediaUrl: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=7",
       caption: "liste",
@@ -161,6 +163,29 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
     await next(mid);
     expect(messenger.texts()).toEqual(["Bu gönderide 2 mekân var."]);
+  });
+
+  it("asks for the post's link when a shared list post shows none of its names", async () => {
+    const mid = await deliver({
+      attachments: [
+        { type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=8", title: "15 mekan önerisi", ig_post_media_id: "8" } },
+      ],
+    });
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });
+    await next(mid);
+    expect(store.row(mid).status).toBe("replied");
+    expect(messenger.texts()).toEqual([
+      "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+    ]);
+  });
+
+  it("keeps the plain empty reply for a link whose post names nothing", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });
+    await next(mid);
+    expect(messenger.texts()).toEqual(["Bu Reel'de bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım."]);
   });
 
   it("splits more than ten places into several carousels", async () => {
@@ -181,7 +206,7 @@ describe("failures and retries", () => {
     await tick();
 
     const row = store.row(mid);
-    expect(row).toMatchObject({ status: "received", attempts: 1, lastError: "unavailable", lockedUntil: null });
+    expect(row).toMatchObject({ status: "received", attempts: 1, lastError: "unavailable", lockedUntil: null, finishedAt: null });
     expect(row.nextAttemptAt.getTime()).toBeGreaterThan(time.now().getTime());
 
     await next(mid);
@@ -242,7 +267,7 @@ describe("failures and retries", () => {
     time.advance(25 * 60 * 60 * 1000);
     await tick();
 
-    expect(store.row(mid).status).toBe("expired");
+    expect(store.row(mid)).toMatchObject({ status: "expired", intent: "recognize", finishedAt: time.now() });
     expect(messenger.sent).toHaveLength(0);
     expect(stashh.created).toHaveLength(0);
   });
@@ -264,15 +289,28 @@ describe("other intents", () => {
   it("explains what Stashh does for an ordinary message", async () => {
     const mid = await deliver({ text: "merhaba" });
     await tick();
-    expect(store.row(mid).status).toBe("replied");
-    expect(messenger.texts()).toEqual(['Bir Reel ya da gönderi paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
+    expect(store.row(mid).finishedAt).not.toBeNull();
+    expect(messenger.texts()).toEqual(['Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
   });
 
   it("says which shares it can read for an unsupported attachment", async () => {
     const mid = await deliver({ attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] });
     await tick();
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.texts()[0]).toMatch(/^Şimdilik Reel'leri, gönderileri/);
+    expect(messenger.texts()[0]).toMatch(/^Şimdilik Reel'leri, gönderileri, hikâyeleri/);
+  });
+
+  it("recognizes a shared story and names it as one in the reply", async () => {
+    const STORY_URL = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18094747109404940&signature=x";
+    const mid = await deliver({ attachments: [{ type: "ig_story", payload: { story_media_id: "18094747109404940", story_media_url: STORY_URL } }] });
+    await tick();
+    expect(stashh.created[0]?.source).toEqual({ kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null });
+
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "recognize" });
+    expect(messenger.texts()).toEqual(["Bu hikâyede 1 mekân var."]);
   });
 
   it("ignores a redelivered message id", async () => {

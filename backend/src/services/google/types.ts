@@ -26,4 +26,7 @@ export interface TextSearchResult {
   location?: { latitude?: number; longitude?: number };
   rating?: number;
   photos?: Array<{ name: string }>;
+  /** Place types (https://developers.google.com/maps/documentation/places/web-service/place-types); a street is `route`. */
+  types?: string[];
+  primaryType?: string;
 }

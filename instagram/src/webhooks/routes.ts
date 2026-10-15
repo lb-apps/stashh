@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { Logger } from "../lib/logger.ts";
+import { createWebhookCounters, type WebhookCounters } from "./counters.ts";
 import { isValidSignature } from "./signature.ts";
 
 /**
@@ -30,9 +31,10 @@ export interface WebhookRouterDeps {
   verifyToken: string;
   sink: WebhookSink;
   log: Logger;
+  counters?: WebhookCounters;
 }
 
-export function createWebhookRouter({ appSecret, verifyToken, sink, log }: WebhookRouterDeps): Router {
+export function createWebhookRouter({ appSecret, verifyToken, sink, log, counters = createWebhookCounters() }: WebhookRouterDeps): Router {
   const router = Router();
 
   // Subscription handshake: echo hub.challenge only for our verify token.
@@ -59,6 +61,7 @@ export function createWebhookRouter({ appSecret, verifyToken, sink, log }: Webho
     }
     if (!isValidSignature(rawBody, req.get("x-hub-signature-256"), appSecret)) {
       log.warn("webhook signature rejected");
+      counters.rejected_signature += 1;
       res.sendStatus(401);
       return;
     }
@@ -68,12 +71,14 @@ export function createWebhookRouter({ appSecret, verifyToken, sink, log }: Webho
       // Signed by Meta but not a shape we handle (e.g. another product's object).
       // Acknowledge so it is not redelivered for 36 hours.
       log.warn({ issues: parsed.error.issues }, "webhook body ignored: unexpected envelope");
+      counters.ignored_envelope += 1;
       res.sendStatus(200);
       return;
     }
 
     try {
       await sink.accept({ rawBody, body: parsed.data, receivedAt: new Date() });
+      counters.deliveries += 1;
       res.sendStatus(200);
     } catch (error) {
       log.error({ err: error }, "webhook delivery not persisted; Meta will retry");

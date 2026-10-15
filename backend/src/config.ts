@@ -26,6 +26,10 @@ const envSchema = z.object({
   RECOGNITIONS_POLL_MAX_MS: z.coerce.number().int().min(1000).default(5000),
   RECOGNITIONS_CLAIM_TIMEOUT_MS: z.coerce.number().int().min(60000).default(900000),
   RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS: z.coerce.number().int().min(5000).default(30000),
+  /** Most carousel slides the model reads for one post; the rest are dropped. */
+  RECOGNITIONS_MAX_MEDIA: z.coerce.number().int().min(1).default(12),
+  /** Most media bytes sent to the model for one post; slides past the budget are dropped. */
+  RECOGNITIONS_MAX_MEDIA_BYTES: z.coerce.number().int().min(1_000_000).default(40_000_000),
   PLACE_THUMBNAILS_BUCKET: z.string().default("place-thumbnails"),
   /**
    * Bearer tokens accepted on `/internal/v1` (service-to-service), comma-separated so a

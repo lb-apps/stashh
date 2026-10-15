@@ -7,16 +7,17 @@ import type { RecognitionSource } from "../stashh/client.ts";
  */
 
 /** What the person shared, so the reply names it the way they would. */
-export type SourceKind = "reel" | "video" | "post";
+export type SourceKind = "reel" | "video" | "post" | "story";
 
 const NOUN: Record<SourceKind, { locative: string; accusative: string }> = {
   reel: { locative: "Reel'de", accusative: "Reel'i" },
   video: { locative: "videoda", accusative: "videoyu" },
   post: { locative: "gönderide", accusative: "gönderiyi" },
+  story: { locative: "hikâyede", accusative: "hikâyeyi" },
 };
 
 export function sourceKindOf(source: RecognitionSource): SourceKind {
-  if (source.kind === "instagram_media") return "post";
+  if (source.kind === "instagram_media") return source.format;
   if (/tiktok\.com/i.test(source.url)) return "video";
   if (/instagram\.com\/(?:[A-Za-z0-9._]+\/)?reels?\//i.test(source.url)) return "reel";
   return "post";
@@ -29,9 +30,11 @@ export const copy = {
   empty: (kind: SourceKind) =>
     `Bu ${NOUN[kind].locative} bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım.`,
   failed: (kind: SourceKind) => `Bu ${NOUN[kind].accusative} şu an okuyamadık. Birazdan tekrar gönderir misin?`,
-  help: 'Bir Reel ya da gönderi paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.',
+  listNeedsLink:
+    "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+  help: 'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.',
   unsupported:
-    "Şimdilik Reel'leri, gönderileri ve Instagram ya da TikTok linklerini okuyabiliyoruz. Bir Reel ya da gönderi paylaş, içindeki mekânları listeleyelim.",
+    "Şimdilik Reel'leri, gönderileri, hikâyeleri ve Instagram ya da TikTok linklerini okuyabiliyoruz. Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları listeleyelim.",
   erased: "Stashh'teki verilerini sildik.",
   openInMaps: "Haritada aç",
   instagram: "Instagram",

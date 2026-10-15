@@ -3,6 +3,7 @@ import { z } from "zod";
 import { sendAccepted, sendError, sendNoContent, sendSuccess } from "../../http/response.js";
 import { createChannelIdentityService } from "../identities/factory.js";
 import { channelIdentityParamsSchema } from "../identities/types.js";
+import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
 import { createInternalRecognitionRequestSchema, toRecognitionSource } from "../recognitions/types.js";
@@ -15,6 +16,8 @@ import { createInternalRecognitionRequestSchema, toRecognitionSource } from "../
  * the same owner filter the public API derives from the JWT.
  */
 export const internalRouter = Router();
+
+internalRouter.use("/ops", opsRouter);
 
 const userParamsSchema = z.object({ userId: z.string().uuid("userId must be a UUID") });
 const userRecognitionParamsSchema = userParamsSchema.extend({
@@ -106,7 +109,7 @@ internalRouter.get("/users/:userId/recognitions/:id", async (req, res, next) => 
       sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
       return;
     }
-    sendSuccess(res, req, 200, presentRecognition(recognition.task, recognition.places));
+    sendSuccess(res, req, 200, presentRecognition(recognition));
   } catch (error) {
     next(error);
   }

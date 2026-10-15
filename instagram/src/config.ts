@@ -32,6 +32,16 @@ const envSchema = z.object({
   /** Server-only `sb_secret_...` key; the channel's tables are service-role only. */
   SUPABASE_SECRET_KEY: z.string().min(1),
 
+  /**
+   * Bearer tokens for `GET /ops/stats` (the local ops dashboard), comma-separated so one
+   * can rotate. Each ≥ 32 chars. Unset → the route does not exist.
+   */
+  OPS_API_TOKENS: z
+    .string()
+    .optional()
+    .transform((value) => (value ?? "").split(",").map((t) => t.trim()).filter(Boolean))
+    .refine((tokens) => tokens.every((t) => t.length >= 32), "Each OPS_API_TOKENS entry must be ≥ 32 chars"),
+
   /** Messages processed at once by this instance. */
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
 

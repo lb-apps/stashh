@@ -68,6 +68,8 @@ export type Database = {
           attachments: Json
           attempts: number
           created_at: string
+          finished_at: string | null
+          intent: string | null
           last_error: string | null
           locked_until: string | null
           mid: string
@@ -88,6 +90,8 @@ export type Database = {
           attachments?: Json
           attempts?: number
           created_at?: string
+          finished_at?: string | null
+          intent?: string | null
           last_error?: string | null
           locked_until?: string | null
           mid: string
@@ -108,6 +112,8 @@ export type Database = {
           attachments?: Json
           attempts?: number
           created_at?: string
+          finished_at?: string | null
+          intent?: string | null
           last_error?: string | null
           locked_until?: string | null
           mid?: string
@@ -270,7 +276,9 @@ export type Database = {
           caption: string | null
           created_at: string
           id: string
+          names_elsewhere: boolean
           places: Json
+          source_thumbnail_url: string | null
           source_type: string | null
           source_url: string
           updated_at: string
@@ -280,7 +288,9 @@ export type Database = {
           caption?: string | null
           created_at?: string
           id?: string
+          names_elsewhere?: boolean
           places?: Json
+          source_thumbnail_url?: string | null
           source_type?: string | null
           source_url: string
           updated_at?: string
@@ -290,13 +300,110 @@ export type Database = {
           caption?: string | null
           created_at?: string
           id?: string
+          names_elsewhere?: boolean
           places?: Json
+          source_thumbnail_url?: string | null
           source_type?: string | null
           source_url?: string
           updated_at?: string
           video_url?: string | null
         }
         Relationships: []
+      }
+      recognition_runs: {
+        Row: {
+          analysis_ms: number | null
+          attempt: number
+          cached_tokens: number | null
+          completion_tokens: number | null
+          cost_usd: number | null
+          error_message: string | null
+          failed_step: string | null
+          fetch_method: string | null
+          fetch_ms: number | null
+          finished_at: string
+          id: string
+          match_ms: number | null
+          media_bytes: number | null
+          media_kind: string | null
+          model: string | null
+          outcome: string
+          places_extracted: number | null
+          places_matched: number | null
+          prompt_tokens: number | null
+          provider: string | null
+          reasoning_tokens: number | null
+          save_ms: number | null
+          started_at: string
+          task_id: string
+          thumbnails_ms: number | null
+          total_ms: number
+        }
+        Insert: {
+          analysis_ms?: number | null
+          attempt: number
+          cached_tokens?: number | null
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          error_message?: string | null
+          failed_step?: string | null
+          fetch_method?: string | null
+          fetch_ms?: number | null
+          finished_at?: string
+          id?: string
+          match_ms?: number | null
+          media_bytes?: number | null
+          media_kind?: string | null
+          model?: string | null
+          outcome: string
+          places_extracted?: number | null
+          places_matched?: number | null
+          prompt_tokens?: number | null
+          provider?: string | null
+          reasoning_tokens?: number | null
+          save_ms?: number | null
+          started_at: string
+          task_id: string
+          thumbnails_ms?: number | null
+          total_ms: number
+        }
+        Update: {
+          analysis_ms?: number | null
+          attempt?: number
+          cached_tokens?: number | null
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          error_message?: string | null
+          failed_step?: string | null
+          fetch_method?: string | null
+          fetch_ms?: number | null
+          finished_at?: string
+          id?: string
+          match_ms?: number | null
+          media_bytes?: number | null
+          media_kind?: string | null
+          model?: string | null
+          outcome?: string
+          places_extracted?: number | null
+          places_matched?: number | null
+          prompt_tokens?: number | null
+          provider?: string | null
+          reasoning_tokens?: number | null
+          save_ms?: number | null
+          started_at?: string
+          task_id?: string
+          thumbnails_ms?: number | null
+          total_ms?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recognition_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recognition_tasks: {
         Row: {
@@ -697,6 +804,8 @@ export type Database = {
           attachments: Json
           attempts: number
           created_at: string
+          finished_at: string | null
+          intent: string | null
           last_error: string | null
           locked_until: string | null
           mid: string
@@ -940,6 +1049,10 @@ export type Database = {
         }[]
       }
       gettransactionid: { Args: never; Returns: unknown }
+      instagram_ops_stats: {
+        Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
@@ -981,6 +1094,25 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      recognition_channel: {
+        Args: { p_owner_user_id: string }
+        Returns: string
+      }
+      recognition_ops_dependencies: { Args: { p_since: string }; Returns: Json }
+      recognition_ops_detail: { Args: { p_task_id: string }; Returns: Json }
+      recognition_ops_list: { Args: { p_limit: number }; Returns: Json }
+      recognition_ops_stats: {
+        Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
+      recognition_source_platform: {
+        Args: { p_source_url: string }
+        Returns: string
+      }
+      recognition_source_type: {
+        Args: { p_source_url: string }
+        Returns: string
+      }
       recover_stale_recognitions: {
         Args: { p_claim_limit?: number; p_stale_after_milliseconds: number }
         Returns: {
