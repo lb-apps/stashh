@@ -1,7 +1,7 @@
 # Stashh Recognition v2 — carousels, stories, honest matching
 
-Plan written 2026-10-15 from the diagnosis of the DM shares that found nothing. Not started;
-awaiting the owner's go. Branch `feature/recognition-quality` from `origin/develop`, in a
+Plan written 2026-10-15 from the diagnosis of the DM shares that found nothing. Packages A–D
+shipped the same day on https://github.com/lb-apps/stashh/pull/2 (E and F not started). Branch `feature/recognition-quality` from `origin/develop`, in a
 worktree at `.claude/worktrees/feature-recognition-quality` (the main checkout holds another
 session's uncommitted `feature/ops-dashboard` work). `node_modules` symlinked from the main
 checkout for `backend/` and `instagram/`.
