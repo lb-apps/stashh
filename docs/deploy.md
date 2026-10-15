@@ -7,7 +7,7 @@ Production is two services and a tunnel, run as containers from the root [`compo
 | `backend` | built from [`backend/Dockerfile`](../backend/Dockerfile) | 3000 | API and recognition worker in one process (`node dist/start.js`) |
 | `instagram` | built from [`instagram/Dockerfile`](../instagram/Dockerfile) | 3002 | Instagram DM channel (Node 24 runs the TypeScript as it is) |
 | `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector: `https://ig-dev.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
-| `dozzle` | `amir20/dozzle` | 3004 | Logs, status and live CPU/memory of every container, in the browser (no login: LAN only) |
+| `dozzle` | `amir20/dozzle` | 3004 | Logs, status and live CPU/memory of every container, in the browser. Login is set up in its UI on first visit; users live in the `dozzle_data` volume |
 
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
 time. `web/` (Vercel) and `ops/` (local only) are not part of the stack. Images are built from

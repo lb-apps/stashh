@@ -81,12 +81,14 @@ services:
     logging: *logging
 
   # Container logs, status and live CPU/memory in the browser: http://<host>:3004 (Dozzle).
-  # Reads the Docker socket read-only and has no login, so the port stays on the LAN.
+  # Reads the Docker socket read-only. Its users and settings (login is set up in its UI on
+  # first visit) live in the dozzle_data volume, so they survive a recreate.
   dozzle:
     image: amir20/dozzle:v11.3.2
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - dozzle_data:/data
     ports:
       - "3004:8080"
     environment:
@@ -102,3 +104,6 @@ services:
         limits:
           memory: 128m
     logging: *logging
+
+volumes:
+  dozzle_data:
