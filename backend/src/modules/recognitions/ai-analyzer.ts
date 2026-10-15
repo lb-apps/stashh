@@ -88,6 +88,7 @@ Rules:
 - recommendations summary must be English, concise, imperative, and neutral.
 - For consumables (dish/drink/cocktail/dessert), use "Try ..." phrasing.
 - If no valid featured venue exists, return places: [].
+- names_elsewhere: true only when the post presents several venues (a list, a route, "10 places", "15 mekan", "les 5 meilleures adresses") whose names are not readable in the media and caption given here, so they must sit on slides you were not given. False when the venues are named, or when the post is about one venue.
 
 Output must strictly follow the provided JSON schema.`;
 
@@ -158,8 +159,13 @@ const responseSchema = {
         additionalProperties: false,
       },
     },
+    names_elsewhere: {
+      type: "boolean",
+      description:
+        "True only when the post presents several venues whose names are not in the media and caption given (a list post seen by its cover); false when venues are named or the post is about one venue",
+    },
   },
-  required: ["places"],
+  required: ["places", "names_elsewhere"],
   additionalProperties: false,
 };
 
@@ -311,6 +317,7 @@ export async function analyzeContent(
   log.debug({ responseLength: text.length, model: completion.model }, "raw response");
 
   let parsed: {
+    names_elsewhere?: boolean;
     places: Array<{
       name: string;
       category?: string | null;
@@ -333,6 +340,7 @@ export async function analyzeContent(
   log.info({ duration: Date.now() - t, model: completion.model, kind: mediaKind, media: items.length }, "media analyzed");
 
   return {
+    names_elsewhere: parsed.names_elsewhere === true,
     media_kind: mediaKind,
     media_bytes: mediaBytes,
     media_count: items.length,

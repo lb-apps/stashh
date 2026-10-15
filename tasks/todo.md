@@ -88,19 +88,21 @@ changes beyond additive fields, the ops dashboard (reads new columns only if pre
 
 ## D. DM-shared list posts ask for the link — backend + instagram, ~½ day
 
-- [ ] Model schema gains `names_elsewhere: boolean` — true when the post announces several
+- [x] Model schema gains `names_elsewhere: boolean` — true when the post announces several
       venues (a list, a route, "10 places", "15 mekan", "les 5 meilleures adresses") whose
       names are not in the media or caption given; judged by the model, in any language
-- [ ] `recognition_results.names_elsewhere boolean not null default false` (migration);
+- [x] `recognition_results.names_elsewhere boolean not null default false` (migration);
       `presentRecognition` exposes it; `instagram/src/stashh/client.ts` schema reads it
-- [ ] Processor: completed + 0 places + `names_elsewhere` + source is a DM post →
+- [x] Processor: completed + 0 places + `names_elsewhere` + source is a DM post →
       `copy.listNeedsLink` (draft: "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz.
       Gönderinin linkini paylaşırsan hepsini çıkaralım: Paylaş → Bağlantıyı kopyala."), in the
       reply language once F decides it; the link then runs through B
-- [ ] Cache: `getCachedResultId` ignores results with 0 places, so a re-share re-runs
+- [x] Cache: `getCachedResultId` ignores results with 0 places, so a re-share re-runs
       (the three empty rows heal on their next share)
-- [ ] Tests: processor branch; cache lookup skips empties
+- [x] Tests: processor branch; cache lookup skips empties
 - [ ] Live: re-share one of the three list posts → link request; send its link → full list
+      (needs the deployed backend and the owner's re-share; the logged-out profile grid shows only
+      12 posts, so the three posts' permalinks could not be found from here)
 
 ## E. Scrape hygiene (optional, from the blocking-risk review) — backend, ~½ day
 

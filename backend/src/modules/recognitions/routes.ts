@@ -105,7 +105,7 @@ recognitionsRouter.get("/:id", async (req, res, next) => {
       sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
       return;
     }
-    sendSuccess(res, req, 200, presentRecognition(recognitionData.task, recognitionData.places));
+    sendSuccess(res, req, 200, presentRecognition(recognitionData));
   } catch (error) {
     next(error);
   }

@@ -30,6 +30,8 @@ const recognitionSchema = z.object({
   recognition_id: z.string().uuid(),
   status: z.enum(["queued", "processing", "completed", "committed", "failed", "cancelled", "expired"]),
   places: z.array(placeSchema).nullable(),
+  /** The post announced venues whose names were not in what was read: a list seen by its cover only. */
+  names_elsewhere: z.boolean().optional().default(false),
   error_message: z.string().nullable(),
 });
 export type Recognition = z.infer<typeof recognitionSchema>;

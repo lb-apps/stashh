@@ -73,6 +73,11 @@ export interface ExtractedPlace {
 
 export interface AIAnalysisResult {
   places: ExtractedPlace[];
+  /**
+   * The post presents several venues whose names are not in what the model read: a list
+   * post seen by its cover only, which is all a DM share of a carousel carries.
+   */
+  names_elsewhere: boolean;
   /** What the media turned out to be: "video" when any item the model read is one. */
   media_kind: "video" | "image";
   /** Bytes the model read, over every item. */

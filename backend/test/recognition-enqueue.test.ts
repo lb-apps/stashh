@@ -5,11 +5,16 @@ import type { RecognitionTaskInsert, RecognitionTaskRow } from "../src/modules/r
 
 class FakeRepository {
   tasks: RecognitionTaskRow[] = [];
+  results: Array<{ id: string; source_url: string; places: unknown }> = [];
   /** Simulates another request inserting the same key between our read and our write. */
   raceOnNextInsert: RecognitionTaskRow | null = null;
 
   async getRecognitionByIdempotencyKey(owner: string, key: string) {
     return this.tasks.find((t) => t.owner_user_id === owner && t.idempotency_key === key) ?? null;
+  }
+
+  async getRecognitionResultBySourceUrl(sourceUrl: string) {
+    return this.results.find((r) => r.source_url === sourceUrl) ?? null;
   }
 
   async createQueuedRecognition(insert: RecognitionTaskInsert): Promise<RecognitionTaskRow> {
@@ -49,6 +54,19 @@ function setup() {
   const repo = new FakeRepository();
   return { repo, service: new RecognitionService(repo as unknown as RecognitionRepository) };
 }
+
+describe("RecognitionService.getCachedResultId", () => {
+  it("serves an earlier result only when it found something", async () => {
+    const { repo, service } = setup();
+    repo.results.push(
+      { id: "empty", source_url: "instagram-media:1", places: [] },
+      { id: "full", source_url: "instagram-media:2", places: [{ name: "Sofyalı Meyhane" }] },
+    );
+    expect(await service.getCachedResultId("instagram-media:1")).toBeNull();
+    expect(await service.getCachedResultId("instagram-media:2")).toBe("full");
+    expect(await service.getCachedResultId("instagram-media:3")).toBeNull();
+  });
+});
 
 describe("RecognitionService.enqueueRecognition", () => {
   const CDN = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=abc";

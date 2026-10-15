@@ -276,6 +276,7 @@ export type Database = {
           caption: string | null
           created_at: string
           id: string
+          names_elsewhere: boolean
           places: Json
           source_thumbnail_url: string | null
           source_type: string | null
@@ -287,6 +288,7 @@ export type Database = {
           caption?: string | null
           created_at?: string
           id?: string
+          names_elsewhere?: boolean
           places?: Json
           source_thumbnail_url?: string | null
           source_type?: string | null
@@ -298,6 +300,7 @@ export type Database = {
           caption?: string | null
           created_at?: string
           id?: string
+          names_elsewhere?: boolean
           places?: Json
           source_thumbnail_url?: string | null
           source_type?: string | null

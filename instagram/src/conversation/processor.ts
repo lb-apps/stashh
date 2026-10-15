@@ -114,7 +114,13 @@ export class MessageProcessor {
     const recognition = await this.stashh.getRecognition({ userId: message.userId, recognitionId: message.recognitionId });
 
     if (recognition.status === "completed" || recognition.status === "committed") {
-      return this.reply(message, composeRecognitionReply(recognition.places ?? [], kind));
+      const places = recognition.places ?? [];
+      // A list post shared from the feed reaches us as its cover only (Meta sends no other
+      // slide and no permalink); the link, once pasted, is read in full.
+      if (places.length === 0 && recognition.names_elsewhere && this.isSharedPost(message)) {
+        return this.reply(message, [text(copy.listNeedsLink)]);
+      }
+      return this.reply(message, composeRecognitionReply(places, kind));
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
       return this.reply(message, [text(copy.failed(kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
@@ -171,6 +177,12 @@ export class MessageProcessor {
   private sourceKind(message: StoredMessage): SourceKind {
     const intent = interpret(message);
     return intent.kind === "recognize" ? sourceKindOf(intent.source) : "reel";
+  }
+
+  /** A feed post shared from the Instagram app, as opposed to a pasted link, a Reel or a story. */
+  private isSharedPost(message: StoredMessage): boolean {
+    const intent = interpret(message);
+    return intent.kind === "recognize" && intent.source.kind === "instagram_media" && intent.source.format === "post";
   }
 }
 

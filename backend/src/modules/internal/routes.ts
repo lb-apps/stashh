@@ -109,7 +109,7 @@ internalRouter.get("/users/:userId/recognitions/:id", async (req, res, next) => 
       sendError(res, req, 404, "NOT_FOUND", "Recognition not found");
       return;
     }
-    sendSuccess(res, req, 200, presentRecognition(recognition.task, recognition.places));
+    sendSuccess(res, req, 200, presentRecognition(recognition));
   } catch (error) {
     next(error);
   }

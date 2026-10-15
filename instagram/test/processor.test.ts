@@ -24,6 +24,7 @@ const recognition = (status: Recognition["status"], places: Place[] | null = nul
   recognition_id: RECOGNITION_ID,
   status,
   places,
+  names_elsewhere: false,
   error_message: error,
 });
 
@@ -162,6 +163,29 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
     await next(mid);
     expect(messenger.texts()).toEqual(["Bu gönderide 2 mekân var."]);
+  });
+
+  it("asks for the post's link when a shared list post shows none of its names", async () => {
+    const mid = await deliver({
+      attachments: [
+        { type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=8", title: "15 mekan önerisi", ig_post_media_id: "8" } },
+      ],
+    });
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });
+    await next(mid);
+    expect(store.row(mid).status).toBe("replied");
+    expect(messenger.texts()).toEqual([
+      "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+    ]);
+  });
+
+  it("keeps the plain empty reply for a link whose post names nothing", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });
+    await next(mid);
+    expect(messenger.texts()).toEqual(["Bu Reel'de bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım."]);
   });
 
   it("splits more than ten places into several carousels", async () => {

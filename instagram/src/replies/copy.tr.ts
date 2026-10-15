@@ -30,6 +30,8 @@ export const copy = {
   empty: (kind: SourceKind) =>
     `Bu ${NOUN[kind].locative} bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım.`,
   failed: (kind: SourceKind) => `Bu ${NOUN[kind].accusative} şu an okuyamadık. Birazdan tekrar gönderir misin?`,
+  listNeedsLink:
+    "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
   help: 'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.',
   unsupported:
     "Şimdilik Reel'leri, gönderileri, hikâyeleri ve Instagram ya da TikTok linklerini okuyabiliyoruz. Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları listeleyelim.",

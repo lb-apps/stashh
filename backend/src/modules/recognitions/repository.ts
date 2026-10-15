@@ -37,11 +37,20 @@ interface FailRecognitionParams {
 interface UpsertRecognitionResultParams {
   sourceUrl: string;
   places: Json;
+  /** The post announced venues whose names were not in what the model read. */
+  namesElsewhere: boolean;
   videoUrl: string | null;
   caption: string | null;
   sourceType: SourceType;
   /** Written only when present, so a failed copy never erases an earlier cover. */
   sourceThumbnailUrl: string | null;
+}
+
+/** A finished recognition as the API presents it: the task and what its result says. */
+export interface RecognitionWithResult {
+  task: RecognitionTaskRow;
+  places: Json | null;
+  names_elsewhere: boolean;
 }
 
 export class RecognitionRepository {
@@ -76,7 +85,7 @@ export class RecognitionRepository {
   async getRecognitionByIdForOwner(
     recognitionId: string,
     ownerUserId: string,
-  ): Promise<{ task: RecognitionTaskRow; places: Json | null } | null> {
+  ): Promise<RecognitionWithResult | null> {
     const { data: task, error } = await this.supabaseClient
       .from("recognition_tasks")
       .select("*")
@@ -88,17 +97,17 @@ export class RecognitionRepository {
     if (!task) return null;
 
     if (!task.result_id) {
-      return { task, places: null };
+      return { task, places: null, names_elsewhere: false };
     }
 
     const { data: result, error: resultError } = await this.supabaseClient
       .from("recognition_results")
-      .select("places")
+      .select("places, names_elsewhere")
       .eq("id", task.result_id)
       .maybeSingle();
     if (resultError) throw resultError;
 
-    return { task, places: result?.places ?? null };
+    return { task, places: result?.places ?? null, names_elsewhere: result?.names_elsewhere ?? false };
   }
 
   /**
@@ -169,6 +178,7 @@ export class RecognitionRepository {
         {
           source_url: params.sourceUrl,
           places: params.places,
+          names_elsewhere: params.namesElsewhere,
           video_url: params.videoUrl,
           caption: params.caption,
           source_type: params.sourceType,
