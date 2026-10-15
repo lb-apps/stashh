@@ -72,16 +72,17 @@ changes beyond additive fields, the ops dashboard (reads new columns only if pre
 
 ## C. Story shares — instagram + backend, ~½ day
 
-- [ ] `intent.ts`: `ig_story` (`story_media_url`, `story_media_id`) and `story_mention`
+- [x] `intent.ts`: `ig_story` (`story_media_url`, `story_media_id`) and `story_mention`
       (`payload.url`) → `instagram_media` with `format: "story"`; `ig_post` keeps `"post"`
-- [ ] `client.ts` → `shared_media.format`; backend `sharedMediaSchema.format` (`post | story`,
+- [x] `client.ts` → `shared_media.format`; backend `sharedMediaSchema.format` (`post | story`,
       default `post`); `service.ts` key `instagram-story:<id>`, `source_type: "story"` (the
       results check already allows it)
-- [ ] Worker: no cover copy for stories (Meta: story media is never stored on our server)
-- [ ] `copy.tr.ts`: `SourceKind` gains `story` ("hikâyede" / "hikâyeyi"); `help` and
+- [x] Worker: no cover copy for stories (Meta: story media is never stored on our server)
+- [x] `copy.tr.ts`: `SourceKind` gains `story` ("hikâyede" / "hikâyeyi"); `help` and
       `unsupported` name stories
-- [ ] Tests: intent for both attachment types, processor reply noun, backend schema and key
-- [ ] Live: share a story to @stashh → places or an honest empty
+- [x] Tests: intent for both attachment types, processor reply noun, backend schema and key
+- [x] Live: the story shared on 14 Oct (a Paris pâtisserie) re-run in-process → "Pâtisserie Tomo" →
+      Tomo, 11 Rue Chabanais; a fresh share to @stashh is the remaining end-to-end check
 
 ## D. DM-shared list posts ask for the link — backend + instagram, ~½ day
 

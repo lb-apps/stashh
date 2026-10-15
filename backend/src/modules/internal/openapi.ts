@@ -63,9 +63,10 @@ registry.registerPath({
   path: "/users/{userId}/recognitions",
   summary: "Enqueue recognition for a user",
   description: `Same contract as the public \`POST /recognitions\`, on behalf of \`userId\`, with one more source:
-\`shared_media\` — a post shared in an Instagram DM, which has no permalink. The channel sends the
-signed Instagram CDN link and the caption it received; the task is keyed \`instagram-media:<media_id>\`,
-so the same post is served from cache afterwards.
+\`shared_media\` — a post or story shared in an Instagram DM, which has no permalink. The channel sends the
+signed Instagram CDN link and, for a post, the caption it received; the task is keyed
+\`instagram-media:<media_id>\` (post) or \`instagram-story:<media_id>\` (story), so the same share is served
+from cache afterwards. A story's media is read but never stored.
 
 Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key for the same user returns the original task instead of enqueuing a second one.`,
   request: {

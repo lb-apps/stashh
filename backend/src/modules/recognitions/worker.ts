@@ -117,10 +117,12 @@ async function processRecognition(
     );
     fetchMethod = sourceContent.fetch_method;
 
-    // The cover is copied while the model works; it never fails the recognition.
-    const sourceThumbnail = sourceContent.thumbnail_url
-      ? uploadSourceThumbnail(sourceContent.thumbnail_url, recognition.source_url, createSupabaseServiceClient(), tl.log)
-      : Promise.resolve(null);
+    // The cover is copied while the model works; it never fails the recognition. A story's
+    // media is never kept: Meta allows reading it, not storing it.
+    const sourceThumbnail =
+      sourceContent.thumbnail_url && sourceContent.source_type !== "story"
+        ? uploadSourceThumbnail(sourceContent.thumbnail_url, recognition.source_url, createSupabaseServiceClient(), tl.log)
+        : Promise.resolve(null);
 
     const analysis = await tl.step(
       "media analyzed",

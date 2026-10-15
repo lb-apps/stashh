@@ -96,6 +96,7 @@ describe("interpret", () => {
       kind: "recognize",
       source: {
         kind: "instagram_media",
+        format: "post",
         mediaId: "18000000000000002",
         mediaUrl: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18000000000000002&signature=FixtureSignature",
         caption: "İstanbul’da jazz kulüpleri listemiz\n\n@fixturejazz 📍 Pera 🍷\n@fixtureclub 📍 Galata 🍸",
@@ -107,6 +108,30 @@ describe("interpret", () => {
     expect(interpret({ text: null, attachments: [{ type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/x" } }] })).toEqual({
       kind: "unsupported",
       attachmentType: "ig_post",
+    });
+  });
+
+  const STORY_URL = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18094747109404940&signature=FixtureSignature";
+
+  it("recognizes a shared story from the media link and id it carries", () => {
+    const attachments = [{ type: "ig_story", payload: { story_media_id: "18094747109404940", story_media_url: STORY_URL } }];
+    expect(interpret({ text: null, attachments })).toEqual({
+      kind: "recognize",
+      source: { kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null },
+    });
+  });
+
+  it("recognizes a story mention, taking the id from the media link", () => {
+    expect(interpret({ text: null, attachments: [{ type: "story_mention", payload: { url: STORY_URL } }] })).toEqual({
+      kind: "recognize",
+      source: { kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null },
+    });
+  });
+
+  it("treats a story mention whose link carries no id as unsupported", () => {
+    expect(interpret({ text: null, attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] })).toEqual({
+      kind: "unsupported",
+      attachmentType: "story_mention",
     });
   });
 

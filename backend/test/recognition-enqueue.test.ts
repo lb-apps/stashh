@@ -51,6 +51,24 @@ function setup() {
 }
 
 describe("RecognitionService.enqueueRecognition", () => {
+  const CDN = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=abc";
+
+  it("keys a shared post and a shared story apart and records what each is", async () => {
+    const { service } = setup();
+    const post = await service.enqueueRecognition({
+      ownerUserId: OWNER,
+      source: { kind: "shared_media", provider: "instagram", format: "post", mediaId: "18000000000000002", mediaUrl: CDN, caption: "jazz" },
+    });
+    const story = await service.enqueueRecognition({
+      ownerUserId: OWNER,
+      source: { kind: "shared_media", provider: "instagram", format: "story", mediaId: "18094747109404940", mediaUrl: CDN, caption: null },
+    });
+    expect(post.source_url).toBe("instagram-media:18000000000000002");
+    expect(post.source_media).toMatchObject({ media_url: CDN, caption: "jazz", platform: "instagram", source_type: "post" });
+    expect(story.source_url).toBe("instagram-story:18094747109404940");
+    expect(story.source_media).toMatchObject({ media_url: CDN, caption: null, platform: "instagram", source_type: "story" });
+  });
+
   it("normalises the source URL and stores the idempotency key", async () => {
     const { service } = setup();
     const created = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-1" });
@@ -85,6 +103,7 @@ describe("RecognitionService.enqueueRecognition", () => {
     const source = {
       kind: "shared_media" as const,
       provider: "instagram" as const,
+      format: "post" as const,
       mediaId: "18008721881113680",
       mediaUrl: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=x",
       caption: "jazz clubs",

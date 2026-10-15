@@ -153,6 +153,7 @@ describe("recognizing a shared Reel", () => {
     await tick();
     expect(stashh.created[0]?.source).toEqual({
       kind: "instagram_media",
+      format: "post",
       mediaId: "7",
       mediaUrl: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=7",
       caption: "liste",
@@ -266,14 +267,26 @@ describe("other intents", () => {
     await tick();
     expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
     expect(store.row(mid).finishedAt).not.toBeNull();
-    expect(messenger.texts()).toEqual(['Bir Reel ya da gönderi paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
+    expect(messenger.texts()).toEqual(['Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
   });
 
   it("says which shares it can read for an unsupported attachment", async () => {
     const mid = await deliver({ attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] });
     await tick();
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.texts()[0]).toMatch(/^Şimdilik Reel'leri, gönderileri/);
+    expect(messenger.texts()[0]).toMatch(/^Şimdilik Reel'leri, gönderileri, hikâyeleri/);
+  });
+
+  it("recognizes a shared story and names it as one in the reply", async () => {
+    const STORY_URL = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18094747109404940&signature=x";
+    const mid = await deliver({ attachments: [{ type: "ig_story", payload: { story_media_id: "18094747109404940", story_media_url: STORY_URL } }] });
+    await tick();
+    expect(stashh.created[0]?.source).toEqual({ kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null });
+
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "recognize" });
+    expect(messenger.texts()).toEqual(["Bu hikâyede 1 mekân var."]);
   });
 
   it("ignores a redelivered message id", async () => {

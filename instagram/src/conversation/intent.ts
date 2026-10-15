@@ -3,11 +3,11 @@ import type { InboundAttachment } from "./events.ts";
 
 /** What a person wants from a message, decided before any side effect. */
 export type Intent =
-  /** Find the places in a Reel, a shared post or a pasted link. */
+  /** Find the places in a Reel, a shared post or story, or a pasted link. */
   | { kind: "recognize"; source: RecognitionSource }
   /** Erase everything Stashh holds about the sender ("sil"). */
   | { kind: "erase" }
-  /** A share type we cannot read yet (stories). */
+  /** A share that carries nothing we can read (no media link, no id). */
   | { kind: "unsupported"; attachmentType: string }
   /** Anything else: explain what Stashh does. */
   | { kind: "help" };
@@ -42,17 +42,36 @@ export function interpret(message: { text: string | null; attachments: InboundAt
 /**
  * What a shared attachment lets us read. A Reel carries its public permalink. A feed
  * post carries no permalink, only a signed CDN link to its media, the caption and a
- * media id that Instagram Login cannot resolve, so the media itself is the source.
+ * media id that Instagram Login cannot resolve, so the media itself is the source. A
+ * story share (`ig_story`) carries the story's media link and id; a story mention
+ * carries only the link, whose `asset_id` is the same id.
  */
 function sharedSource(attachment: InboundAttachment): RecognitionSource | null {
-  const url = attachment.payload?.url;
-  if (!url) return null;
+  const payload = attachment.payload ?? {};
   if (PERMALINK_ATTACHMENTS.has(attachment.type)) {
-    return LINK_PATTERN.test(url) ? { kind: "url", url } : null;
+    return payload.url && LINK_PATTERN.test(payload.url) ? { kind: "url", url: payload.url } : null;
   }
-  const mediaId = attachment.payload?.["ig_post_media_id"];
-  if (attachment.type === "ig_post" && typeof mediaId === "string" && mediaId) {
-    return { kind: "instagram_media", mediaId, mediaUrl: url, caption: attachment.payload?.title ?? null };
+  if (attachment.type === "ig_post") {
+    const mediaId = payload["ig_post_media_id"];
+    if (!payload.url || typeof mediaId !== "string" || !mediaId) return null;
+    return { kind: "instagram_media", format: "post", mediaId, mediaUrl: payload.url, caption: payload.title ?? null };
+  }
+  if (attachment.type === "ig_story" || attachment.type === "story_mention") {
+    const mediaUrl = attachment.type === "ig_story" ? payload["story_media_url"] : payload.url;
+    if (typeof mediaUrl !== "string" || !mediaUrl) return null;
+    const declared = payload["story_media_id"];
+    const mediaId = typeof declared === "string" && declared ? declared : assetIdOf(mediaUrl);
+    return mediaId ? { kind: "instagram_media", format: "story", mediaId, mediaUrl, caption: null } : null;
   }
   return null;
+}
+
+/** The numeric `asset_id` Instagram's messaging CDN puts in every media link. */
+function assetIdOf(mediaUrl: string): string | null {
+  try {
+    const id = new URL(mediaUrl).searchParams.get("asset_id");
+    return id && /^\d{1,32}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
 }

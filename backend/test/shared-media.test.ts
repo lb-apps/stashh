@@ -40,6 +40,21 @@ describe("internal recognition request", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("takes a shared story, and treats a share without a format as a post", () => {
+    const story = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", format: "story", media_id: "18094747109404940", media_url: CDN, caption: null },
+    });
+    expect(story.success && "shared_media" in story.data && story.data.shared_media.format).toBe("story");
+    const post = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", media_id: "18008721881113680", media_url: CDN, caption: "jazz" },
+    });
+    expect(post.success && "shared_media" in post.data && post.data.shared_media.format).toBe("post");
+    const other = createInternalRecognitionRequestSchema.safeParse({
+      shared_media: { provider: "instagram", format: "live", media_id: "1", media_url: CDN, caption: null },
+    });
+    expect(other.success).toBe(false);
+  });
 });
 
 describe("fetchSourceContent", () => {
@@ -65,6 +80,18 @@ describe("fetchSourceContent", () => {
       fetch_method: "supplied",
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reads a shared story as supplied content of its own kind", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const content = await fetchSourceContent(
+      {
+        source_url: "instagram-story:18094747109404940",
+        source_media: { media_url: CDN, caption: null, platform: "instagram", source_type: "story" },
+      },
+      log,
+    );
+    expect(content).toMatchObject({ media_url: CDN, caption: null, source_type: "story", fetch_method: "supplied" });
   });
 
   it("rejects malformed supplied content", async () => {

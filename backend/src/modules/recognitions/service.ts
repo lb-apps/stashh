@@ -9,6 +9,7 @@ import type {
   RecognitionSource,
   RecognitionTaskOptions,
   RecognitionTaskRow,
+  SharedMediaFormat,
 } from "./types.js";
 
 interface RecognitionBackoffResult {
@@ -33,9 +34,9 @@ function normalizeInstagramSourceUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
-/** Result-cache key of a post shared in an Instagram DM, which has no URL. */
-function instagramMediaKey(mediaId: string): string {
-  return `instagram-media:${mediaId}`;
+/** Result-cache key of a post or story shared in an Instagram DM, which has no URL. */
+function instagramMediaKey(format: SharedMediaFormat, mediaId: string): string {
+  return format === "story" ? `instagram-story:${mediaId}` : `instagram-media:${mediaId}`;
 }
 
 interface EnqueueRecognitionParams {
@@ -126,10 +127,10 @@ export class RecognitionService {
 
   async enqueueRecognition(params: EnqueueRecognitionParams): Promise<RecognitionTaskRow> {
     const { source } = params;
-    const sourceUrl = source.kind === "url" ? normalizeInstagramSourceUrl(source.url) : instagramMediaKey(source.mediaId);
+    const sourceUrl = source.kind === "url" ? normalizeInstagramSourceUrl(source.url) : instagramMediaKey(source.format, source.mediaId);
     const sourceMedia =
       source.kind === "shared_media"
-        ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: "post" }
+        ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: source.format }
         : null;
     const options = params.options ?? {};
     const { idempotencyKey } = params;
