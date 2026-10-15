@@ -47,7 +47,7 @@ if (( ${#missing[@]} )); then
 fi
 
 sudo systemctl enable --now stashh-update.timer
+# A fresh clone is already at the branch head, so the timer would see nothing to do: deploy now.
 echo "first deploy (builds the images; a few minutes on a Pi)…"
-sudo systemctl start stashh-update.service || true
-sudo systemctl --no-pager status stashh-update.service | tail -n 20
+(set -a && . "$env_dir/deploy.env" && set +a && "$repo/deploy/update.sh" --force)
 docker compose -f "$repo/compose.yaml" ps
