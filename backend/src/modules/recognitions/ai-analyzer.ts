@@ -5,6 +5,7 @@ import type { Logger } from "../../lib/logger.js";
 import type {
   AIAnalysisResult,
   SourcePlatform,
+  VenueCategory,
   VenueRecommendation,
   VenueRecommendationKind,
 } from "../../types/schemas.js";
@@ -19,6 +20,22 @@ const venueRecommendationKindValues: VenueRecommendationKind[] = [
   "timing",
   "general",
 ];
+
+const venueCategoryValues: VenueCategory[] = [
+  "restaurant",
+  "cafe",
+  "bar",
+  "bakery",
+  "dessert",
+  "hotel",
+  "attraction",
+  "shop",
+  "other",
+];
+
+function normalizeCategory(raw: string | null | undefined): VenueCategory {
+  return raw && (venueCategoryValues as string[]).includes(raw) ? (raw as VenueCategory) : "other";
+}
 
 /** Instagram mention in caption: @handle must appear as a real token (not @foo matching @foobar). */
 function captionContainsInstagramMention(caption: string, handle: string): boolean {
@@ -61,8 +78,9 @@ const SYSTEM_PROMPT = `You extract featured venues from one social post (caption
 
 Rules:
 - Return only specific businesses likely to have a Google Maps listing.
-- Never return cities, neighborhoods, streets, or generic place types.
+- A venue is a named business or attraction. A city, neighborhood, street, square or address is never a venue, even when the post names only that.
 - Exclude venues mentioned only as landmarks (e.g. "across from X").
+- The post may be in any language; keep each venue's name as the post writes it.
 - Prefer precision over recall; if unsure, omit.
 - instagram_username: only include a handle if the caption contains that exact @mention for the venue, or the video or image clearly shows an @username for that business. Otherwise null. Never infer from business name, speech, signage without @, or URL paths.
 - recommendations must include only explicit creator tips tied to that venue.
@@ -83,6 +101,12 @@ const responseSchema = {
         type: "object",
         properties: {
           name: { type: "string", description: "The venue's proper name" },
+          category: {
+            type: "string",
+            enum: venueCategoryValues,
+            description:
+              "What kind of place it is: restaurant (incl. meyhane, taverna, bistro, street food), cafe (coffee, tea, brunch), bar (pub, cocktail, club, wine), bakery, dessert (patisserie, ice cream), hotel, attraction (museum, park, landmark, viewpoint), shop, other",
+          },
           instagram_username: {
             type: ["string", "null"],
             description:
@@ -90,7 +114,13 @@ const responseSchema = {
           },
           location_hint: {
             type: ["string", "null"],
-            description: "City or neighborhood as a Google Maps search hint only",
+            description:
+              "Where the venue is, for the Google Maps search only: neighborhood (if given), city, country, in the post's own language, e.g. \"Kadıköy, İstanbul, Türkiye\" or \"Kypseli, Athens, Greece\"; null if the post gives no clue",
+          },
+          address: {
+            type: ["string", "null"],
+            description:
+              "The venue's street address exactly as the post writes it (street, number, district), only if the post states one in the caption or on screen; else null",
           },
           recommendations: {
             type: "array",
@@ -123,7 +153,7 @@ const responseSchema = {
             enum: ["video"],
           },
         },
-        required: ["name", "instagram_username", "location_hint", "recommendations", "confidence_score", "source"],
+        required: ["name", "category", "instagram_username", "location_hint", "address", "recommendations", "confidence_score", "source"],
         additionalProperties: false,
       },
     },
@@ -228,8 +258,10 @@ export async function analyzeContent(
   let parsed: {
     places: Array<{
       name: string;
+      category?: string | null;
       instagram_username?: string | null;
       location_hint?: string | null;
+      address?: string | null;
       recommendations?: Array<{ summary?: string; kind?: string }>;
       confidence_score: number;
       source: "video";
@@ -267,7 +299,9 @@ export async function analyzeContent(
       }
       return {
         name: p.name,
+        category: normalizeCategory(p.category),
         location_hint: p.location_hint ?? null,
+        address: p.address?.trim() || null,
         instagram_username,
         recommendations: normalizeRecommendations(p.recommendations),
         confidence_score: p.confidence_score,

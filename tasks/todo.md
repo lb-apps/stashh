@@ -1,3 +1,141 @@
+# Stashh Recognition v2 — carousels, stories, honest matching
+
+Plan written 2026-10-15 from the diagnosis of the DM shares that found nothing. Not started;
+awaiting the owner's go. Branch `feature/recognition-quality` from `origin/develop`, in a
+worktree at `.claude/worktrees/feature-recognition-quality` (the main checkout holds another
+session's uncommitted `feature/ops-dashboard` work). `node_modules` symlinked from the main
+checkout for `backend/` and `instagram/`.
+
+**Goal.** Every Reel, post, story or link shared with Stashh finds the venues it names: every
+carousel slide is read, stories are read, a match is a business and never a street, and a
+DM-shared list post we cannot read asks for its link instead of answering "nothing found".
+
+**Language.** Content is global: captions, on-screen text, venue names, cities and scripts
+in any language. Nothing in the pipeline may assume Turkish or Turkey — no `regionCode`, no
+`locationBias`, no Turkish word lists; the model judges meaning, string code handles any
+script. The DM reply copy is Turkish-only today (`copy.tr.ts`); whether replies follow the
+sender's language is question 5 below (package F).
+
+**Evidence.** 3 of 7 DM-shared photo posts returned 0 places; all three covers are list
+titles ("15 mekan", "favori kahvaltı mekanları") with the names on later slides. Meta's
+webhook delivers only a carousel's first image and no permalink, so the DM path cannot read
+the rest. The downloader (`igdl`) returns every slide of a permalink, each 4×. Places text
+search returned "Sofyalı Sk. No:9" (a street) for Sofyalı 9 and "Tarihi Yeldeğirmeni Sokak"
+for a venue. One story share was answered "unsupported" although its CDN URL was in the payload.
+
+**Out of scope.** Logged-in scraping, new third parties, iOS (paused), public API shape
+changes beyond additive fields, the ops dashboard (reads new columns only if present).
+
+## A. Honest place matching — backend, ~½ day
+
+- [x] `GooglePlacesClient.searchText(query, { maxResultCount: 3 })` returns the candidate list;
+      field mask adds `places.types`, `places.primaryType`, `places.formattedAddress`
+- [x] `place-text-search.ts`: query = `name, location_hint`; drop candidates whose `types` hit
+      `route`, `street_address`, `locality`, `sublocality*`, `neighborhood`,
+      `administrative_area_level_*`, `postal_code`, `premise`, `plus_code`, `country`; among the
+      rest pick the best name similarity, script-agnostic: NFKD, strip combining marks, casefold
+      with the Turkish İ/ı special case, Dice over character bigrams so Greek, Cyrillic, Arabic
+      and CJK names work without tokenisation; below the floor → `null` (a miss beats a wrong pin)
+- [x] Prompt: `location_hint` = "city, country" in the post's own language when the post says
+      or shows it; the query carries the region, never a hard `regionCode` or `locationBias`
+- [x] Tests: fake client returning a street then the venue; Touché vs "Zorlu Performing Arts
+      Center" rejected; normalisation cases in Turkish, Greek (ΡΑΝΤΙΚΑΛ kitchen, Athens),
+      German umlauts, Arabic and Japanese; the Manchester "Cafe Istanbul" result still matches
+- [x] Found while building: Text Search reads "Sofyalı 9" as an address in every form, so the
+      model now also gives the venue's category and street address; an address is geocoded and
+      the businesses within 75 m are checked by name first (Nearby Search), and the text search
+      retries with the category word. Sofyalı → Sofyalı Meyhane (No:7), Forno di Roma by address
+- [x] Live: re-run the Sofyalı DM share with `bypass_cache` → "Sofyalı 9"
+
+## B. Carousels on the permalink path — backend, ~1 day
+
+- [ ] `SourceContent.media: Array<{ url, thumbnail_url }>` (first item keeps feeding
+      `recognition_results.video_url`); `fetch_method` unchanged
+- [ ] `instagram-scraper.ts`: dedupe the downloader list by the decoded CDN path (fallback:
+      thumbnail), keep order, cap at `RECOGNITIONS_MAX_MEDIA` (default 12); a single playable
+      video from the HTML keeps today's path
+- [ ] `ai-analyzer.ts`: download every item (bounded parallelism), one model call with
+      `"Slide i of N"` text parts between media parts; prompt says the post is a carousel of N
+      slides, names often sit as on-image text in any language, the caption may only introduce
+      the list, return every featured venue; byte budget (default 40 MB) drops video slides
+      beyond the first two
+- [ ] Keep `Accept-Language: en-US` on the HTML fetch: the og:description wrapper
+      (`<likes> - <user> on <date>: "…"`) is localised by that header and `extractCaption`
+      parses the English form; the caption inside stays in its own language
+- [ ] Response schema `source` enum → `caption | video | both` (matches `ExtractedPlace`)
+- [ ] `recognition_runs.media_count` (migration `add column if not exists`, coordinated with
+      `20261014190000_platform_content_types.sql` on `feature/ops-dashboard`, which adds the
+      same column); `buildRunRecord` writes it
+- [ ] Tests: dedupe; part assembly and cap with a stubbed OpenRouter (pattern of
+      `openrouter.test.ts`); existing `shared-media` tests still green
+- [ ] Live: a 4-slide carousel permalink → `media_count = 4`, venues from slides 2–4
+
+## C. Story shares — instagram + backend, ~½ day
+
+- [ ] `intent.ts`: `ig_story` (`story_media_url`, `story_media_id`) and `story_mention`
+      (`payload.url`) → `instagram_media` with `format: "story"`; `ig_post` keeps `"post"`
+- [ ] `client.ts` → `shared_media.format`; backend `sharedMediaSchema.format` (`post | story`,
+      default `post`); `service.ts` key `instagram-story:<id>`, `source_type: "story"` (the
+      results check already allows it)
+- [ ] Worker: no cover copy for stories (Meta: story media is never stored on our server)
+- [ ] `copy.tr.ts`: `SourceKind` gains `story` ("hikâyede" / "hikâyeyi"); `help` and
+      `unsupported` name stories
+- [ ] Tests: intent for both attachment types, processor reply noun, backend schema and key
+- [ ] Live: share a story to @stashh → places or an honest empty
+
+## D. DM-shared list posts ask for the link — backend + instagram, ~½ day
+
+- [ ] Model schema gains `names_elsewhere: boolean` — true when the post announces several
+      venues (a list, a route, "10 places", "15 mekan", "les 5 meilleures adresses") whose
+      names are not in the media or caption given; judged by the model, in any language
+- [ ] `recognition_results.names_elsewhere boolean not null default false` (migration);
+      `presentRecognition` exposes it; `instagram/src/stashh/client.ts` schema reads it
+- [ ] Processor: completed + 0 places + `names_elsewhere` + source is a DM post →
+      `copy.listNeedsLink` (draft: "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz.
+      Gönderinin linkini paylaşırsan hepsini çıkaralım: Paylaş → Bağlantıyı kopyala."), in the
+      reply language once F decides it; the link then runs through B
+- [ ] Cache: `getCachedResultId` ignores results with 0 places, so a re-share re-runs
+      (the three empty rows heal on their next share)
+- [ ] Tests: processor branch; cache lookup skips empties
+- [ ] Live: re-share one of the three list posts → link request; send its link → full list
+
+## E. Scrape hygiene (optional, from the blocking-risk review) — backend, ~½ day
+
+- [ ] Deterministic fetch failures (404, no og tags, unsupported URL) fail without retries;
+      network errors keep the 3 retries
+- [ ] Login-wall signal = redirect to `/accounts/login/` or no `og:title`, not the substring
+- [ ] In-process breaker: 3 login walls in 10 min → skip HTML fetch for 30 min, downloader only
+- [ ] DM Reels pass the DM `title` with the URL as a fallback caption, so the breaker costs
+      no caption
+- [ ] Question for the owner: keep DM-shared covers in the public `source-thumbnails` bucket?
+
+## F. Reply language (only if the owner wants it) — instagram, ~½ day
+
+- [ ] Pick the reply language per message: the sender's own text if any, else the shared
+      caption's language (model-reported `language` field added to the analysis schema), else
+      English; Turkish only on a Turkish signal
+- [ ] `copy.en.ts` as the file's doc comment intends (a second language is a copy of the
+      file); `copy(lang)` selects; erase command accepts "sil" and "delete" in both
+- [ ] Tests: language pick per source; both copies cover every key
+- [ ] Live: an English caption shared from a non-Turkish account → English reply
+
+## Order and checks
+
+A → C → B → D → E. Each package: `npm test` in `backend/` and `instagram/`, `npm run build`,
+then the live check against the local backend (`cd backend && npm run dev`, Instagram
+channel on :3002) with the real cases listed above; the ops dashboard shows `media_count`
+and the run outcome. Commit per package, PR to `develop`.
+
+## Questions before starting
+
+1. Slide cap 12 and "first two videos" — fine, or lower for cost?
+2. Empty results no longer served from cache — fine?
+3. The link-request copy above — wording OK?
+4. E.5 (DM covers in a public bucket) — keep, make private, or drop?
+5. Replies: stay Turkish for everyone, or follow the sender's language (package F)?
+
+---
+
 # Stashh Ops v3 — English UI, native shadcn, Discovery console kit
 
 - [x] English everywhere (en-US formats, labels, route `/recognitions`, `lang="en"`)

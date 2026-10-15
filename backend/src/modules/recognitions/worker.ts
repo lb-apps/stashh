@@ -131,7 +131,7 @@ async function processRecognition(
 
     const placeMatches = await tl.step(
       "places found",
-      () => matchPlaces(analysis.places, googlePlacesClient),
+      (stepLog) => matchPlaces(analysis.places, googlePlacesClient, stepLog),
       (matches) => ({ total: analysis.places.length, matched: [...matches.values()].filter(Boolean).length }),
     );
 

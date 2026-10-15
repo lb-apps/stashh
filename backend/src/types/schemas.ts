@@ -40,9 +40,24 @@ export interface VenueRecommendation {
   kind: VenueRecommendationKind;
 }
 
+/** What kind of place the post features; steers the Maps search when the name alone misleads it. */
+export type VenueCategory =
+  | "restaurant"
+  | "cafe"
+  | "bar"
+  | "bakery"
+  | "dessert"
+  | "hotel"
+  | "attraction"
+  | "shop"
+  | "other";
+
 export interface ExtractedPlace {
   name: string;
+  category: VenueCategory;
   location_hint: string | null;
+  /** Street address as the post writes it, when it gives one; tells two listings on one street apart. */
+  address: string | null;
   /** Venue Instagram handle when visible in caption (@tag) or video; omit leading @ */
   instagram_username: string | null;
   /** Explicit must-try / ordering tips for this venue from the post */
