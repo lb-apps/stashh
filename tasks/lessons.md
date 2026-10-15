@@ -92,3 +92,21 @@ exists after switching branches before reporting the switch as done.
   browser profile hid it.
 - **Rule:** in a light-only app, pin `@custom-variant dark` to an unused class on day one; audit
   contrast with the computed background behind each text node, and test with the OS in dark mode.
+
+## 2026-10-15 — Don't design around the owner's language
+
+**Correction:** "bu sistem her dilde doğru çalışmalı. Sadece Türkçede değil."
+
+**What happened:** The recognition plan proposed "Turkish-aware" name normalisation (İ→i, ı→i,
+token Dice) and used only Turkish examples, because every recent DM share was Turkish.
+
+**Why it was wrong:** The sample was local; the product is not. The stored results already held
+a Greek post from Athens and an English one from Manchester. Code that normalises for one
+language silently degrades every other script, and a plan with one-language examples invites
+one-language tests.
+
+**How to apply:** For anything that touches content (matching, parsing, prompts, tests), start
+from "any language, any script, any country": Unicode-level normalisation, model-judged
+meaning instead of word lists, no region bias, test cases from at least three scripts. Treat
+the UI/reply language as a separate, explicit product decision and ask about it rather than
+inheriting the owner's language.
