@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  instagram:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: instagram
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: instagram/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  # A Dockerfile or compose.yaml that does not build fails here, not on the host that follows the repo.
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate compose.yaml
+        run: |
+          mkdir -p /tmp/stashh-env && touch /tmp/stashh-env/{backend,instagram,tunnel}.env
+          STASHH_ENV_DIR=/tmp/stashh-env docker compose config --quiet
+      - run: docker build backend
+      - run: docker build instagram

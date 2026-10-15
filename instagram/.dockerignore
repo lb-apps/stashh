@@ -1,0 +1,8 @@
+node_modules
+test
+.captures
+.env
+.env.*
+*.log
+.DS_Store
+vitest.config.ts

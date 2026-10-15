@@ -75,6 +75,9 @@ supabase/.branches/
 # --- Deploy CLIs (project links, tokens) ---
 .vercel/
 
+# --- Compose env files (deploy/*.env.example are the templates) ---
+deploy/*.env
+
 # --- Keys and certificates (Apple signing, APNs, TLS) ---
 *.pem
 *.key
