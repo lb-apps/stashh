@@ -19,7 +19,7 @@ import { requestIdMiddleware } from "./http/requestId.js";
 import { apiMetrics, apiMetricsMiddleware } from "./lib/api-metrics.js";
 import { sendSuccess, sendError } from "./http/response.js";
 import { mountDocs } from "./docs.js";
-import { signInDevTestUser } from "./lib/devSupabasePasswordSignIn.js";
+import { sendTestUserToken } from "./modules/ops/test-user-token.js";
 
 const app = express();
 
@@ -60,42 +60,15 @@ app.use(requestIdMiddleware);
 // API health for the ops dashboard; its own polling, health checks and docs are not traffic.
 app.use(apiMetricsMiddleware(apiMetrics, (path) => /^\/(internal\/v1\/ops|health|docs|openapi)/.test(path)));
 
-// Dev-only: a fresh Supabase access token for the test user, which the ops dashboard's
-// link tester (ops/, "Recognize a link") uses to act as the app would. 404 in production.
+// Development only: the test-user token without a service token, for the web console
+// (web/lib/backend.ts) and local tooling. 404 in production, where operator tools use
+// GET /internal/v1/ops/test-user-token behind the service token.
 app.get("/dev/token", async (req, res) => {
-  const result = await signInDevTestUser();
-  if (!result.ok) {
-    if (result.error === "production") {
-      sendError(res, req, 404, "NOT_FOUND", "Not found");
-      return;
-    }
-    if (result.error === "missing_env") {
-      sendError(
-        res,
-        req,
-        503,
-        "SERVICE_UNAVAILABLE",
-        "DEV_TEST_EMAIL, DEV_TEST_PASSWORD, and SUPABASE_PUBLISHABLE_KEY (or legacy SUPABASE_ANON_KEY) must be set in .env",
-      );
-      return;
-    }
-    sendError(
-      res,
-      req,
-      result.httpStatus ?? 401,
-      "UNAUTHORIZED",
-      result.message ?? "Supabase auth failed",
-    );
+  if (process.env.NODE_ENV === "production") {
+    sendError(res, req, 404, "NOT_FOUND", "Not found");
     return;
   }
-
-  sendSuccess(res, req, 200, {
-    access_token: result.access_token,
-    supabase_url: config.SUPABASE_URL,
-    supabase_publishable_key: config.supabasePublishableKey,
-    /** Same identity as password grant — UI can label saved places. */
-    dev_user_email: config.DEV_TEST_EMAIL ?? null,
-  });
+  await sendTestUserToken(req, res);
 });
 
 // Health check — intentionally unprotected (for uptime probes)

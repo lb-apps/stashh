@@ -4,20 +4,18 @@ type DevPasswordSignInResult =
   | { ok: true; access_token: string }
   | {
       ok: false;
-      error: "production" | "missing_env" | "auth_failed";
+      error: "missing_env" | "auth_failed";
       message?: string;
       httpStatus?: number;
     };
 
 /**
- * Local dev only: Supabase password grant for `DEV_TEST_EMAIL` / `DEV_TEST_PASSWORD`.
- * Used by `/dev/token` and Scalar docs prefill — never call in production.
+ * Supabase password grant for the test user (`DEV_TEST_EMAIL` / `DEV_TEST_PASSWORD`): the
+ * identity operator tools use to call the public API as the app would. Served by
+ * `/internal/v1/ops/test-user-token` (service token), `/dev/token` (development only) and
+ * the Scalar docs prefill (development only).
  */
 export async function signInDevTestUser(): Promise<DevPasswordSignInResult> {
-  if (process.env.NODE_ENV === "production") {
-    return { ok: false, error: "production" };
-  }
-
   const { SUPABASE_URL, supabasePublishableKey, DEV_TEST_EMAIL, DEV_TEST_PASSWORD } = config;
   if (!supabasePublishableKey || !DEV_TEST_EMAIL || !DEV_TEST_PASSWORD) {
     return { ok: false, error: "missing_env" };
