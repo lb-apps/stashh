@@ -62,8 +62,9 @@ services:
           memory: 256m
     logging: *logging
 
-  # Meta's webhook → https://ig-dev.stashh.me → this connector → the instagram service.
-  # The tunnel (stashh-ig-dev) is run from its token; no certificate or credentials file is needed.
+  # Meta's webhook → https://instagram.stashh.me → this connector → the instagram service.
+  # The tunnel is named for the environment that runs the connector (stashh-prod); hostnames name
+  # the service. It runs from its token; no certificate or credentials file is needed.
   tunnel:
     image: cloudflare/cloudflared:2026.10.0
     container_name: tunnel

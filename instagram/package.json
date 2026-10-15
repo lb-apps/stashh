@@ -9,7 +9,6 @@
   },
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch src/start.ts",
-    "tunnel": "cloudflared tunnel run --url http://localhost:3002 stashh-ig-dev",
     "start": "node src/start.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

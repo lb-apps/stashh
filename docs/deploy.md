@@ -6,7 +6,7 @@ Production is two services and a tunnel, run as containers from the root [`compo
 |---|---|---|---|
 | `backend` | built from [`backend/Dockerfile`](../backend/Dockerfile) | 3000 | API and recognition worker in one process (`node dist/start.js`) |
 | `instagram` | built from [`instagram/Dockerfile`](../instagram/Dockerfile) | 3002 | Instagram DM channel (Node 24 runs the TypeScript as it is) |
-| `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector: `https://ig-dev.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
+| `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`): `https://instagram.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
 | `dozzle` | `amir20/dozzle` | 3004 | Logs, status and live CPU/memory of every container, in the browser. Login is set up in its UI on first visit; users live in the `dozzle_data` volume |
 
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
@@ -27,7 +27,7 @@ docker compose up -d --build --wait
   value in the env file for them is ignored. `WEBHOOK_CAPTURE_DIR` is refused in production.
 - `DEV_TEST_EMAIL` / `DEV_TEST_PASSWORD` in `backend.env` are optional; the ops dashboard's link
   tester needs them (`GET /internal/v1/ops/test-user-token`, behind the service token).
-- The tunnel token: `cloudflared tunnel token stashh-ig-dev` on a machine with the account
+- The tunnel token: `cloudflared tunnel token stashh-prod` on a machine with the account
   certificate (the owner's Mac), or Zero Trust → Networks → Tunnels. Run the connector on one
   host at a time; Cloudflare balances between connectors, so two hosts would split Meta's deliveries.
 - Env files outside the checkout: `STASHH_ENV_DIR=/path docker compose …`.
@@ -35,7 +35,12 @@ docker compose up -d --build --wait
   and runs unlimited (Raspberry Pi OS: see below).
 
 Verify: `docker compose ps` shows all four healthy; `http://<host>:3004` (Dozzle) shows their logs; `curl localhost:3000/health` and
-`curl localhost:3002/health` answer; `curl https://ig-dev.stashh.me/health` → 200 through the tunnel.
+`curl localhost:3002/health` answer; `curl https://instagram.stashh.me/health` → 200 through the tunnel.
+
+Naming: a tunnel is a connector identity, so it is named for the environment that runs it
+(`stashh-prod`; a staging host would get `stashh-staging`). Hostnames name the service behind them
+(`instagram.stashh.me`; `api.stashh.me` once the backend is exposed). The production connector runs
+only on the production host: a second connector anywhere else would receive half of Meta's deliveries.
 
 ## The home Pi follows the repo
 
