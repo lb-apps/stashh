@@ -9,6 +9,8 @@
 #
 # STASHH_ENV_DIR points at the env files when they live outside the checkout (the home Pi
 # keeps them in /srv/stashh/env, where a git reset cannot touch them).
+# Containers carry the plain service name (backend, instagram, tunnel, dozzle), not the
+# project-prefixed default: the project is the group already, in Dozzle and in `docker ps`.
 name: stashh
 
 x-logging: &logging
@@ -21,6 +23,7 @@ services:
   backend:
     build: ./backend
     image: stashh/backend
+    container_name: backend
     restart: unless-stopped
     init: true
     env_file: ${STASHH_ENV_DIR:-./deploy}/backend.env
@@ -40,6 +43,7 @@ services:
   instagram:
     build: ./instagram
     image: stashh/instagram
+    container_name: instagram
     restart: unless-stopped
     init: true
     depends_on:
@@ -62,6 +66,7 @@ services:
   # The tunnel (stashh-ig-dev) is run from its token; no certificate or credentials file is needed.
   tunnel:
     image: cloudflare/cloudflared:2026.10.0
+    container_name: tunnel
     restart: unless-stopped
     command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run --url http://instagram:3002
     env_file: ${STASHH_ENV_DIR:-./deploy}/tunnel.env
@@ -85,6 +90,7 @@ services:
   # first visit) live in the dozzle_data volume, so they survive a recreate.
   dozzle:
     image: amir20/dozzle:v11.3.2
+    container_name: dozzle
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
