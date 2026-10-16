@@ -23,7 +23,8 @@ export function createApp(deps: AppDeps): Express {
     res.json({ status: "ok" });
   });
 
-  app.use("/webhooks/instagram", createWebhookRouter(deps));
+  // Meta delivers to https://instagram.stashh.me/webhooks: the hostname names the service, the path the job.
+  app.use("/webhooks", createWebhookRouter(deps));
   if (deps.ops && deps.ops.tokens.length > 0) app.use("/ops", createOpsRouter(deps.ops));
 
   app.use((_req, res) => {

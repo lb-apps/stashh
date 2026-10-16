@@ -57,7 +57,7 @@ describe("webhook routes", () => {
     const app = createApp({ appSecret: APP_SECRET, verifyToken: VERIFY_TOKEN, sink, counters, log: pino({ level: "silent" }) });
     server = app.listen(0);
     await new Promise<void>((resolve) => server.once("listening", resolve));
-    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/webhooks/instagram`;
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/webhooks`;
   });
 
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
