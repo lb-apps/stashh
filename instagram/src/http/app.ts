@@ -24,7 +24,10 @@ export function createApp(deps: AppDeps): Express {
   });
 
   // Meta delivers to https://instagram.stashh.me/webhooks: the hostname names the service, the path the job.
-  app.use("/webhooks", createWebhookRouter(deps));
+  const webhooks = createWebhookRouter(deps);
+  app.use("/webhooks", webhooks);
+  // Transition only: Meta's callback still points at the old path. Remove once it is moved.
+  app.use("/webhooks/instagram", webhooks);
   if (deps.ops && deps.ops.tokens.length > 0) app.use("/ops", createOpsRouter(deps.ops));
 
   app.use((_req, res) => {
