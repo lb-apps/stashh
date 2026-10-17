@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s · Stashh",
   },
   description:
-    "Bir Reel'i Instagram'da @stashh'e gönder, içindeki mekânları sana listeleyelim.",
+    "Bir Reel'i Instagram'da @stashh.me'ye gönder, içindeki mekânları sana listeleyelim.",
   openGraph: {
     siteName: "Stashh",
     locale: "tr_TR",

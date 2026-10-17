@@ -3,7 +3,7 @@ import Link from "next/link";
 // whose name lookup pulls every Lucide glyph (~650 KB) into this page.
 import { BrandMoment } from "@/lib/discovery/components/BrandMoment";
 
-const INSTAGRAM_DM = "https://ig.me/m/stashh";
+const INSTAGRAM_DM = "https://ig.me/m/stashh.me";
 
 // Brand mode, start to finish: one full-bleed cobalt screen, one line, one
 // action. Intentionally not a marketing page.
@@ -24,7 +24,7 @@ export default function HomePage() {
           }
           headline="Stashh"
           style={{ flex: 1 }}
-          sub="Bir Reel’i @stashh’e gönder, içindeki mekânları sana listeleyelim."
+          sub="Bir Reel’i @stashh.me’ye gönder, içindeki mekânları sana listeleyelim."
         />
       </main>
 
