@@ -4,7 +4,7 @@ import type { InboundMessage } from "../src/conversation/events.ts";
 import { MessageProcessor } from "../src/conversation/processor.ts";
 import { GraphApiError } from "../src/meta/graph-client.ts";
 import { StashhApiError, type Place, type Recognition } from "../src/stashh/client.ts";
-import { clock, FakeMessenger, FakeStashh, MemoryStore } from "./support/fakes.ts";
+import { clock, FakeMessenger, FakeProfiles, FakeStashh, MemoryStore } from "./support/fakes.ts";
 
 const SENDER = "igsid-1";
 const REEL_URL = "https://www.instagram.com/reel/Dd31ojZOgKL/";
@@ -32,6 +32,7 @@ let time: ReturnType<typeof clock>;
 let store: MemoryStore;
 let stashh: FakeStashh;
 let messenger: FakeMessenger;
+let profiles: FakeProfiles;
 let processor: MessageProcessor;
 let seq = 0;
 
@@ -40,7 +41,8 @@ beforeEach(() => {
   store = new MemoryStore(time.now);
   stashh = new FakeStashh();
   messenger = new FakeMessenger();
-  processor = new MessageProcessor({ store, stashh, messenger, log: pino({ level: "silent" }), now: time.now });
+  profiles = new FakeProfiles();
+  processor = new MessageProcessor({ store, stashh, messenger, profiles, log: pino({ level: "silent" }), now: time.now });
 });
 
 async function deliver(message: Partial<Pick<InboundMessage, "text" | "attachments" | "sentAt">>): Promise<string> {
@@ -72,6 +74,25 @@ async function next(mid: string): Promise<void> {
   if (due > 0) time.advance(due);
   await tick();
 }
+
+describe("naming the sender", () => {
+  it("hands the sender's Instagram profile to the backend with the user", async () => {
+    profiles.answers.set(SENDER, { username: "ayse.k", name: "Ayşe" });
+    await reel();
+    await tick();
+
+    expect(stashh.resolvedProfiles).toEqual([{ username: "ayse.k", name: "Ayşe" }]);
+  });
+
+  it("still recognizes when the profile cannot be read", async () => {
+    profiles.answers.set(SENDER, new GraphApiError(400, 100, "Unsupported get request"));
+    const mid = await reel();
+    await tick();
+
+    expect(stashh.resolvedProfiles).toEqual([null]);
+    expect(store.row(mid).status).toBe("submitted");
+  });
+});
 
 describe("recognizing a shared Reel", () => {
   it("submits once, polls until done, and replies with a summary and a carousel", async () => {

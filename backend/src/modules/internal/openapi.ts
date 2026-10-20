@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
-import { channelIdentityParamsSchema } from "../identities/types.js";
+import {
+  channelIdentityParamsSchema,
+  channelProfileSchema,
+  channelProviderSchema,
+  resolveChannelIdentityBodySchema,
+  staleChannelIdentitiesQuerySchema,
+} from "../identities/types.js";
 import { recognitionEnqueuedSchema, recognitionStatusSchema } from "../recognitions/openapi.js";
 import { OPS_RANGES, opsQuerySchema } from "../ops/types.js";
 import { createInternalRecognitionRequestSchema } from "../recognitions/types.js";
@@ -38,13 +44,47 @@ registry.registerPath({
   summary: "Resolve channel identity",
   description: `Returns the Stashh user behind an identity on a messaging channel, creating it on first contact.
 
-Idempotent and safe under concurrency: the user id is derived from \`provider\` + \`externalId\`, so repeated or simultaneous calls converge on one user. \`201\` when this call created the user, \`200\` otherwise.`,
-  request: { params: channelIdentityParamsSchema.openapi("ChannelIdentityParams") },
+Idempotent and safe under concurrency: the user id is derived from \`provider\` + \`externalId\`, so repeated or simultaneous calls converge on one user. \`201\` when this call created the user, \`200\` otherwise.
+
+Send \`profile\` when the channel has just fetched the person's public profile: it overwrites the stored username and name. Omit it to resolve only; the stored profile is left as is.`,
+  request: {
+    params: channelIdentityParamsSchema.openapi("ChannelIdentityParams"),
+    body: { required: false, content: { "application/json": { schema: resolveChannelIdentityBodySchema.openapi("ResolveChannelIdentityBody") } } },
+  },
   responses: {
     200: { description: "Existing identity", content: { "application/json": { schema: successEnvelope(channelIdentitySchema, "ResolveChannelIdentity") } } },
     201: { description: "Identity and user created", content: { "application/json": { schema: successEnvelope(channelIdentitySchema, "CreateChannelIdentity") } } },
     ...commonErrorResponses,
   },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/channel-identities/{provider}",
+  summary: "List identities with a stale profile",
+  description: `External ids whose profile was never fetched or was last fetched before \`synced_before\`, ordered by \`external_id\`. Page with \`after\` set to the last id returned; a short page is the last. The channel refreshes each one through \`PUT /channel-identities/{provider}/{externalId}/profile\`.`,
+  request: { params: z.object({ provider: channelProviderSchema }), query: staleChannelIdentitiesQuerySchema },
+  responses: {
+    200: {
+      description: "One page of stale identities",
+      content: { "application/json": { schema: successEnvelope(z.object({ external_ids: z.array(z.string()) }), "StaleChannelIdentities") } },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "put",
+  path: "/channel-identities/{provider}/{externalId}/profile",
+  summary: "Refresh channel identity profile",
+  description: "Overwrites the stored username and name of an existing identity with the profile the channel just fetched. Never creates an identity, so a refresh that races an erase cannot bring the person back: `404` when the identity does not exist.",
+  request: {
+    params: channelIdentityParamsSchema,
+    body: { content: { "application/json": { schema: channelProfileSchema.openapi("ChannelProfile") } } },
+  },
+  responses: { 204: { description: "Profile stored" }, ...commonErrorResponses },
 });
 
 registry.registerPath({

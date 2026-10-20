@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { InstagramProfile } from "../meta/graph-client.ts";
 
 /**
  * Typed client for the Stashh backend's internal API (`/internal/v1`).
@@ -12,6 +13,8 @@ const envelopeSchema = z.object({
 });
 
 const channelIdentitySchema = z.object({ user_id: z.string().uuid(), created: z.boolean() });
+
+const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
 
@@ -71,7 +74,12 @@ export class StashhApiError extends Error {
 }
 
 export interface StashhApi {
-  resolveInstagramUser(igsid: string): Promise<{ userId: string }>;
+  /** Resolves (or creates) the user; a `profile` overwrites the stored username and name. */
+  resolveInstagramUser(igsid: string, profile?: InstagramProfile | null): Promise<{ userId: string }>;
+  /** Refreshes an existing user's profile; false when the user no longer exists (never creates one). */
+  updateInstagramProfile(igsid: string, profile: InstagramProfile): Promise<boolean>;
+  /** One page of senders whose profile is missing or was last fetched before `syncedBefore`. */
+  listProfileStaleInstagramUsers(params: { syncedBefore: Date; after?: string; limit: number }): Promise<string[]>;
   eraseInstagramUser(igsid: string): Promise<void>;
   createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }): Promise<{ recognitionId: string }>;
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
@@ -88,9 +96,28 @@ export class HttpStashhApi implements StashhApi {
     this.timeoutMs = options.timeoutMs ?? 10_000;
   }
 
-  async resolveInstagramUser(igsid: string) {
-    const data = await this.request("PUT", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}`, channelIdentitySchema);
+  async resolveInstagramUser(igsid: string, profile?: InstagramProfile | null) {
+    const data = await this.request("PUT", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}`, channelIdentitySchema, {
+      body: profile ? { profile } : {},
+    });
     return { userId: data.user_id };
+  }
+
+  async updateInstagramProfile(igsid: string, profile: InstagramProfile) {
+    try {
+      await this.request("PUT", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}/profile`, null, { body: profile });
+      return true;
+    } catch (error) {
+      if (error instanceof StashhApiError && error.status === 404) return false;
+      throw error;
+    }
+  }
+
+  async listProfileStaleInstagramUsers({ syncedBefore, after, limit }: { syncedBefore: Date; after?: string; limit: number }) {
+    const query = new URLSearchParams({ synced_before: syncedBefore.toISOString(), limit: String(limit) });
+    if (after !== undefined) query.set("after", after);
+    const data = await this.request("GET", `/internal/v1/channel-identities/instagram?${query}`, staleIdentitiesSchema);
+    return data.external_ids;
   }
 
   async eraseInstagramUser(igsid: string) {

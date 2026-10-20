@@ -2,7 +2,13 @@ import { Router } from "express";
 import { z } from "zod";
 import { sendAccepted, sendError, sendNoContent, sendSuccess } from "../../http/response.js";
 import { createChannelIdentityService } from "../identities/factory.js";
-import { channelIdentityParamsSchema } from "../identities/types.js";
+import {
+  channelIdentityParamsSchema,
+  channelProfileSchema,
+  channelProviderSchema,
+  resolveChannelIdentityBodySchema,
+  staleChannelIdentitiesQuerySchema,
+} from "../identities/types.js";
 import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
@@ -27,22 +33,74 @@ const idempotencyKeySchema = z.string().trim().min(1).max(255);
 
 // ── Channel identities ──────────────────────────────────────────────────────
 
-/** Resolve-or-create the Stashh user behind a channel identity. Idempotent. */
-internalRouter.put("/channel-identities/:provider/:externalId", async (req, res, next) => {
-  const params = channelIdentityParamsSchema.safeParse(req.params);
-  if (!params.success) {
-    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid channel identity", params.error.flatten().fieldErrors);
+/** Identities whose profile is missing or stale, for the channel to refresh. */
+internalRouter.get("/channel-identities/:provider", async (req, res, next) => {
+  const provider = channelProviderSchema.safeParse(req.params.provider);
+  const query = staleChannelIdentitiesQuerySchema.safeParse(req.query);
+  if (!provider.success || !query.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid request", {
+      ...(provider.success ? {} : { provider: ["Unknown provider"] }),
+      ...(query.success ? {} : query.error.flatten().fieldErrors),
+    });
     return;
   }
 
   try {
-    const identity = await createChannelIdentityService().resolve(params.data.provider, params.data.externalId);
+    const externalIds = await createChannelIdentityService().listProfileStale(provider.data, {
+      syncedBefore: query.data.synced_before,
+      after: query.data.after,
+      limit: query.data.limit,
+    });
+    sendSuccess(res, req, 200, { external_ids: externalIds });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Resolve-or-create the Stashh user behind a channel identity, recording its profile if sent. Idempotent. */
+internalRouter.put("/channel-identities/:provider/:externalId", async (req, res, next) => {
+  const params = channelIdentityParamsSchema.safeParse(req.params);
+  const body = resolveChannelIdentityBodySchema.safeParse(req.body ?? {});
+  if (!params.success || !body.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid channel identity", {
+      ...(params.success ? {} : params.error.flatten().fieldErrors),
+      ...(body.success ? {} : body.error.flatten().fieldErrors),
+    });
+    return;
+  }
+
+  try {
+    const identity = await createChannelIdentityService().resolve(params.data.provider, params.data.externalId, body.data.profile);
     sendSuccess(res, req, identity.created ? 201 : 200, {
       provider: identity.provider,
       external_id: identity.externalId,
       user_id: identity.userId,
       created: identity.created,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Refresh the profile of an existing channel identity. Never creates one: `404` when unknown. */
+internalRouter.put("/channel-identities/:provider/:externalId/profile", async (req, res, next) => {
+  const params = channelIdentityParamsSchema.safeParse(req.params);
+  const body = channelProfileSchema.safeParse(req.body);
+  if (!params.success || !body.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid profile", {
+      ...(params.success ? {} : params.error.flatten().fieldErrors),
+      ...(body.success ? {} : body.error.flatten().fieldErrors),
+    });
+    return;
+  }
+
+  try {
+    const updated = await createChannelIdentityService().updateProfile(params.data.provider, params.data.externalId, body.data);
+    if (!updated) {
+      sendError(res, req, 404, "NOT_FOUND", "Channel identity not found");
+      return;
+    }
+    sendNoContent(res);
   } catch (error) {
     next(error);
   }

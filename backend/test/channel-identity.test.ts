@@ -2,16 +2,23 @@ import { describe, expect, it } from "vitest";
 import type { AuthUserAdmin } from "../src/modules/identities/auth-user-admin.js";
 import type { ChannelIdentityRepository } from "../src/modules/identities/repository.js";
 import { ChannelIdentityService, channelUserId } from "../src/modules/identities/service.js";
-import type { ChannelIdentity, ChannelProvider } from "../src/modules/identities/types.js";
+import { channelProfileSchema, type ChannelIdentity, type ChannelProfile, type ChannelProvider } from "../src/modules/identities/types.js";
 
 class InMemoryIdentities {
   rows = new Map<string, ChannelIdentity>();
+  profiles = new Map<string, ChannelProfile>();
   async find(provider: ChannelProvider, externalId: string) {
     return this.rows.get(`${provider}:${externalId}`) ?? null;
   }
   async insert(identity: ChannelIdentity) {
     const key = `${identity.provider}:${identity.externalId}`;
     if (!this.rows.has(key)) this.rows.set(key, identity);
+  }
+  async saveProfile(provider: ChannelProvider, externalId: string, profile: ChannelProfile) {
+    const key = `${provider}:${externalId}`;
+    if (!this.rows.has(key)) return false;
+    this.profiles.set(key, profile);
+    return true;
   }
 }
 
@@ -85,6 +92,47 @@ describe("ChannelIdentityService.resolve", () => {
     const [a, b] = await Promise.all([service.resolve("instagram", "9"), service.resolve("instagram", "9")]);
     expect(a.userId).toBe(b.userId);
     expect(auth.users.size).toBe(1);
+  });
+});
+
+describe("ChannelIdentityService.resolve with a profile", () => {
+  it("records the profile on first contact", async () => {
+    const { identities, service } = setup();
+    await service.resolve("instagram", "11", { username: "ayse.k", name: "Ayşe" });
+    expect(identities.profiles.get("instagram:11")).toEqual({ username: "ayse.k", name: "Ayşe" });
+  });
+
+  it("overwrites the profile when the person renamed, and keeps it when none is sent", async () => {
+    const { identities, service } = setup();
+    await service.resolve("instagram", "12", { username: "old.name", name: null });
+    await service.resolve("instagram", "12", { username: "new.name", name: "Deniz" });
+    await service.resolve("instagram", "12");
+    expect(identities.profiles.get("instagram:12")).toEqual({ username: "new.name", name: "Deniz" });
+  });
+});
+
+describe("ChannelIdentityService.updateProfile", () => {
+  it("refreshes an existing identity", async () => {
+    const { identities, service } = setup();
+    await service.resolve("instagram", "13");
+    expect(await service.updateProfile("instagram", "13", { username: "cem", name: null })).toBe(true);
+    expect(identities.profiles.get("instagram:13")).toEqual({ username: "cem", name: null });
+  });
+
+  it("never brings back an erased person", async () => {
+    const { auth, identities, service } = setup();
+    expect(await service.updateProfile("instagram", "14", { username: "gone", name: null })).toBe(false);
+    expect(auth.users.size).toBe(0);
+    expect(identities.rows.size).toBe(0);
+  });
+});
+
+describe("channelProfileSchema", () => {
+  it("accepts Instagram usernames and rejects anything else", () => {
+    expect(channelProfileSchema.safeParse({ username: "a.b_c9", name: "Ayşe" }).success).toBe(true);
+    expect(channelProfileSchema.safeParse({ username: "has space", name: null }).success).toBe(false);
+    expect(channelProfileSchema.safeParse({ username: "x".repeat(31), name: null }).success).toBe(false);
+    expect(channelProfileSchema.safeParse({ username: "ok", name: "" }).success).toBe(false);
   });
 });
 

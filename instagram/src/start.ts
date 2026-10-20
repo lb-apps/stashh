@@ -6,8 +6,9 @@ import { SupabaseMessageStore } from "./db/message-store.ts";
 import { createApp } from "./http/app.ts";
 import { createOpsSnapshot } from "./ops/snapshot.ts";
 import { createLogger } from "./lib/logger.ts";
-import { InstagramMessenger } from "./meta/graph-client.ts";
+import { InstagramMessenger, InstagramProfiles } from "./meta/graph-client.ts";
 import { InstagramTokenStore } from "./meta/token-store.ts";
+import { sweepProfiles } from "./profiles/sweep.ts";
 import { HttpStashhApi } from "./stashh/client.ts";
 import { CaptureSink } from "./webhooks/capture-sink.ts";
 import type { WebhookSink } from "./webhooks/routes.ts";
@@ -29,10 +30,13 @@ const tokens = new InstagramTokenStore({
   bootstrapToken: config.INSTAGRAM_ACCESS_TOKEN,
   log: log.child({ component: "tokens" }),
 });
+const stashh = new HttpStashhApi({ baseUrl: config.STASHH_API_URL, token: config.STASHH_API_TOKEN });
+const profiles = new InstagramProfiles({ apiVersion: config.GRAPH_API_VERSION, tokens });
 const processor = new MessageProcessor({
   store,
-  stashh: new HttpStashhApi({ baseUrl: config.STASHH_API_URL, token: config.STASHH_API_TOKEN }),
+  stashh,
   messenger: new InstagramMessenger({ apiVersion: config.GRAPH_API_VERSION, tokens }),
+  profiles,
   log: log.child({ component: "processor" }),
 });
 const worker = new MessageWorker({
@@ -76,9 +80,18 @@ const maintenance = async () => {
 void maintenance();
 const maintenanceTimer = setInterval(() => void maintenance(), HOUR_MS);
 
+const profileLog = log.child({ component: "profiles" });
+const profileSweep = () =>
+  sweepProfiles({ stashh, profiles, log: profileLog })
+    .then((stored) => stored > 0 && profileLog.info({ stored }, "profiles refreshed"))
+    .catch((error: unknown) => profileLog.error({ err: error }, "profile sweep failed"));
+void profileSweep();
+const profileTimer = setInterval(() => void profileSweep(), 24 * HOUR_MS);
+
 const shutdown = async (signal: NodeJS.Signals) => {
   log.info({ signal }, "shutting down");
   clearInterval(maintenanceTimer);
+  clearInterval(profileTimer);
   server.close();
   await worker.stop();
   process.exit(0);

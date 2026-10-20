@@ -1,6 +1,6 @@
 import type { InboundMessage } from "../../src/conversation/events.ts";
 import type { MessageStore, Settlement, StoredMessage } from "../../src/conversation/store.ts";
-import type { Messenger, OutboundMessage } from "../../src/meta/graph-client.ts";
+import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader } from "../../src/meta/graph-client.ts";
 import type { Recognition, RecognitionSource, StashhApi } from "../../src/stashh/client.ts";
 
 interface Row extends StoredMessage {
@@ -103,15 +103,35 @@ type Step<T> = T | Error;
 /** StashhApi whose responses are queued per method; an Error in the queue is thrown. */
 export class FakeStashh implements StashhApi {
   resolved: string[] = [];
+  resolvedProfiles: Array<InstagramProfile | null | undefined> = [];
+  /** Users the backend knows, by IGSID, with their stored profile (null until one is stored). */
+  users = new Map<string, InstagramProfile | null>();
+  listCalls: Array<{ syncedBefore: Date; after?: string; limit: number }> = [];
   erased: string[] = [];
   created: Array<{ userId: string; source: RecognitionSource; idempotencyKey: string }> = [];
   createSteps: Array<Step<{ recognitionId: string }>> = [];
   getSteps: Array<Step<Recognition>> = [];
   eraseSteps: Array<Step<void>> = [];
 
-  async resolveInstagramUser(igsid: string) {
+  async resolveInstagramUser(igsid: string, profile?: InstagramProfile | null) {
     this.resolved.push(igsid);
+    this.resolvedProfiles.push(profile);
     return { userId: "00000000-0000-4000-8000-000000000001" };
+  }
+
+  async updateInstagramProfile(igsid: string, profile: InstagramProfile) {
+    if (!this.users.has(igsid)) return false;
+    this.users.set(igsid, profile);
+    return true;
+  }
+
+  /** Every known user counts as stale; pages in id order like the backend. */
+  async listProfileStaleInstagramUsers(params: { syncedBefore: Date; after?: string; limit: number }) {
+    this.listCalls.push(params);
+    return [...this.users.keys()]
+      .sort()
+      .filter((id) => params.after === undefined || id > params.after)
+      .slice(0, params.limit);
   }
 
   async eraseInstagramUser(igsid: string) {
@@ -153,6 +173,19 @@ export class FakeMessenger implements Messenger {
 
   texts(): string[] {
     return this.sent.flatMap(({ message }) => (message.kind === "text" ? [message.text] : []));
+  }
+}
+
+/** ProfileReader answering from a map; an Error value is thrown for that IGSID. */
+export class FakeProfiles implements ProfileReader {
+  answers = new Map<string, InstagramProfile | null | Error>();
+  reads: string[] = [];
+
+  async profile(igsid: string): Promise<InstagramProfile | null> {
+    this.reads.push(igsid);
+    const answer = this.answers.get(igsid) ?? null;
+    if (answer instanceof Error) throw answer;
+    return answer;
   }
 }
 

@@ -17,21 +17,30 @@ export type Database = {
       channel_identities: {
         Row: {
           created_at: string
+          display_name: string | null
           external_id: string
+          profile_synced_at: string | null
           provider: string
           user_id: string
+          username: string | null
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           external_id: string
+          profile_synced_at?: string | null
           provider: string
           user_id: string
+          username?: string | null
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           external_id?: string
+          profile_synced_at?: string | null
           provider?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: []
       }

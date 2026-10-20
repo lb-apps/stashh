@@ -1,7 +1,7 @@
 import { v5 as uuidv5 } from "uuid";
 import type { AuthUserAdmin } from "./auth-user-admin.js";
 import type { ChannelIdentityRepository } from "./repository.js";
-import type { ChannelProvider, ResolvedChannelIdentity } from "./types.js";
+import type { ChannelProfile, ChannelProvider, ResolvedChannelIdentity } from "./types.js";
 
 /**
  * Fixed namespace for channel-identity user ids. Changing it would orphan every
@@ -31,7 +31,27 @@ export class ChannelIdentityService {
     private readonly reservedEmailDomain: string,
   ) {}
 
-  async resolve(provider: ChannelProvider, externalId: string): Promise<ResolvedChannelIdentity> {
+  /** Resolves (or creates) the user, then records `profile` when the channel sent one. */
+  async resolve(provider: ChannelProvider, externalId: string, profile?: ChannelProfile): Promise<ResolvedChannelIdentity> {
+    const resolved = await this.resolveUser(provider, externalId);
+    if (profile) await this.identities.saveProfile(provider, externalId, profile);
+    return resolved;
+  }
+
+  /**
+   * Refreshes the profile of an existing identity only — never creates one, so a refresh
+   * racing an erase cannot bring the person back. False when there is no such identity.
+   */
+  updateProfile(provider: ChannelProvider, externalId: string, profile: ChannelProfile): Promise<boolean> {
+    return this.identities.saveProfile(provider, externalId, profile);
+  }
+
+  /** External ids whose profile is missing or older than `syncedBefore`, for the channel to refresh. */
+  listProfileStale(provider: ChannelProvider, page: { syncedBefore: Date; after?: string; limit: number }): Promise<string[]> {
+    return this.identities.listProfileStale(provider, page);
+  }
+
+  private async resolveUser(provider: ChannelProvider, externalId: string): Promise<ResolvedChannelIdentity> {
     const existing = await this.identities.find(provider, externalId);
     if (existing) return { ...existing, created: false };
 
