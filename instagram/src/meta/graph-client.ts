@@ -1,4 +1,4 @@
-import { truncateGraphemes, truncateUtf8 } from "./text.ts";
+import { truncateGraphemes, truncateUtf16, truncateUtf8 } from "./text.ts";
 
 /** Instagram Send API limits (Instagram API with Instagram Login). */
 export const LIMITS = {
@@ -72,22 +72,72 @@ export class InstagramMessenger implements Messenger {
   }
 
   private async post(body: unknown): Promise<void> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/me/messages`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${await this.tokens.accessToken()}`, "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch (error) {
-      throw new GraphApiError(0, null, `Graph API unreachable: ${(error as Error).message}`);
-    }
-    if (response.ok) return;
-
-    const payload = (await response.json().catch(() => null)) as { error?: { code?: number; message?: string } } | null;
-    throw new GraphApiError(response.status, payload?.error?.code ?? null, payload?.error?.message ?? `HTTP ${response.status}`);
+    const response = await graphFetch(`${this.baseUrl}/me/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${await this.tokens.accessToken()}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw await graphError(response);
   }
+}
+
+/** The public profile of someone who messaged us, in the shape the Stashh backend stores. */
+export interface InstagramProfile {
+  username: string;
+  name: string | null;
+}
+
+export interface ProfileReader {
+  /** Null when Meta answers without a usable username. Throws `GraphApiError` on failure. */
+  profile(igsid: string): Promise<InstagramProfile | null>;
+}
+
+/** Reads profiles of people who messaged us (User Profile API, Instagram Login). */
+export class InstagramProfiles implements ProfileReader {
+  private readonly baseUrl: string;
+  private readonly tokens: AccessTokenSource;
+
+  constructor(options: { apiVersion: string; tokens: AccessTokenSource; baseUrl?: string }) {
+    this.baseUrl = `${options.baseUrl ?? "https://graph.instagram.com"}/${options.apiVersion}`;
+    this.tokens = options.tokens;
+  }
+
+  async profile(igsid: string): Promise<InstagramProfile | null> {
+    const response = await graphFetch(`${this.baseUrl}/${encodeURIComponent(igsid)}?fields=username,name`, {
+      headers: { authorization: `Bearer ${await this.tokens.accessToken()}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw await graphError(response);
+    return toProfile(await response.json().catch(() => null));
+  }
+}
+
+/**
+ * Normalizes a User Profile API body to the backend's contract (username per Instagram's
+ * rules, name trimmed and capped), so a profile can never make the backend reject a request.
+ */
+export function toProfile(body: unknown): InstagramProfile | null {
+  const { username, name } = (body ?? {}) as { username?: unknown; name?: unknown };
+  if (typeof username !== "string" || !/^[A-Za-z0-9._]{1,30}$/.test(username)) return null;
+  const trimmed = typeof name === "string" ? truncateUtf16(name.trim(), PROFILE_NAME_UNITS) : "";
+  return { username, name: trimmed || null };
+}
+
+/** The backend caps stored profile names at this length. */
+const PROFILE_NAME_UNITS = 200;
+
+async function graphFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new GraphApiError(0, null, `Graph API unreachable: ${(error as Error).message}`);
+  }
+}
+
+async function graphError(response: Response): Promise<GraphApiError> {
+  const payload = (await response.json().catch(() => null)) as { error?: { code?: number; message?: string } } | null;
+  return new GraphApiError(response.status, payload?.error?.code ?? null, payload?.error?.message ?? `HTTP ${response.status}`);
 }
 
 /** Maps an outbound message to the Send API body, enforcing every documented limit. */

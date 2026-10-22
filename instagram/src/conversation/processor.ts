@@ -1,5 +1,5 @@
 import type { Logger } from "../lib/logger.ts";
-import { GraphApiError, type Messenger, type OutboundMessage } from "../meta/graph-client.ts";
+import { GraphApiError, type Messenger, type OutboundMessage, type ProfileReader } from "../meta/graph-client.ts";
 import { composeRecognitionReply } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
 import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
@@ -17,6 +17,7 @@ export interface ProcessorDeps {
   store: MessageStore;
   stashh: StashhApi;
   messenger: Messenger;
+  profiles: ProfileReader;
   log: Logger;
   now?: () => Date;
 }
@@ -39,6 +40,7 @@ export class MessageProcessor {
   private readonly store: MessageStore;
   private readonly stashh: StashhApi;
   private readonly messenger: Messenger;
+  private readonly profiles: ProfileReader;
   private readonly log: Logger;
   private readonly now: () => Date;
 
@@ -46,6 +48,7 @@ export class MessageProcessor {
     this.store = deps.store;
     this.stashh = deps.stashh;
     this.messenger = deps.messenger;
+    this.profiles = deps.profiles;
     this.log = deps.log;
     this.now = deps.now ?? (() => new Date());
   }
@@ -81,11 +84,18 @@ export class MessageProcessor {
         await this.store.deleteBySender(message.senderId);
         return;
       case "recognize": {
-        // Cosmetic; never worth failing the message over.
-        await this.messenger.typing(message.senderId).catch((error: unknown) => {
-          this.log.debug({ err: error, mid: message.mid }, "typing indicator not sent");
-        });
-        const { userId } = await this.stashh.resolveInstagramUser(message.senderId);
+        const [, profile] = await Promise.all([
+          // Cosmetic; never worth failing the message over.
+          this.messenger.typing(message.senderId).catch((error: unknown) => {
+            this.log.debug({ err: error, mid: message.mid }, "typing indicator not sent");
+          }),
+          // Names the user; the daily profile sweep fills in whatever this misses.
+          this.profiles.profile(message.senderId).catch((error: unknown) => {
+            this.log.warn({ err: error, mid: message.mid }, "sender profile not read");
+            return null;
+          }),
+        ]);
+        const { userId } = await this.stashh.resolveInstagramUser(message.senderId, profile);
         const { recognitionId } = await this.stashh.createRecognition({
           userId,
           source: intent.source,
