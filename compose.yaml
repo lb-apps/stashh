@@ -1,6 +1,5 @@
 # Stashh in production: the API + recognition worker, the Instagram DM channel, the Cloudflare
-# tunnel that brings Meta's webhook to it, and Dozzle to watch the containers. Runs on any Docker
-# host from a clone:
+# tunnel that brings Meta's webhook to it. Runs on any Docker host from a clone:
 #
 #   cp backend/.env.example deploy/backend.env       # fill in (see docs/deploy.md)
 #   cp instagram/.env.example deploy/instagram.env   # fill in; leave WEBHOOK_CAPTURE_DIR out
@@ -9,8 +8,9 @@
 #
 # STASHH_ENV_DIR points at the env files when they live outside the checkout (home-server
 # keeps them in ~/HomeServer/stashh/env, where a git reset cannot touch them).
-# Containers carry the plain service name (backend, instagram, tunnel, dozzle), not the
-# project-prefixed default: the project is the group already, in Dozzle and in `docker ps`.
+# Containers carry the plain service name (backend, instagram, tunnel), not the
+# project-prefixed default: the project is the group already, in `docker ps` and in the host's
+# monitoring.
 name: stashh
 
 x-logging: &logging
@@ -85,32 +85,3 @@ services:
         limits:
           memory: 128m
     logging: *logging
-
-  # Container logs, status and live CPU/memory in the browser: http://<host>:3004 (Dozzle).
-  # Reads the Docker socket read-only. Its users and settings (login is set up in its UI on
-  # first visit) live in the dozzle_data volume, so they survive a recreate.
-  dozzle:
-    image: amir20/dozzle:v11.3.2
-    container_name: dozzle
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - dozzle_data:/data
-    ports:
-      - "3004:8080"
-    environment:
-      DOZZLE_NO_ANALYTICS: "true"
-    healthcheck:
-      test: ["CMD", "/dozzle", "healthcheck"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 128m
-    logging: *logging
-
-volumes:
-  dozzle_data:
