@@ -7,7 +7,6 @@ Production is two services and a tunnel, run as containers from the root [`compo
 | `backend` | built from [`backend/Dockerfile`](../backend/Dockerfile) | 3000 | API and recognition worker in one process (`node dist/start.js`) |
 | `instagram` | built from [`instagram/Dockerfile`](../instagram/Dockerfile) | 3002 | Instagram DM channel (Node 24 runs the TypeScript as it is) |
 | `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`): `https://instagram.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
-| `dozzle` | `amir20/dozzle` | 3004 | Logs, status and live CPU/memory of every container, in the browser. Login is set up in its UI on first visit; users live in the `dozzle_data` volume |
 
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
 time. `web/` (Vercel) and `ops/` (local only) are not part of the stack. Images are built from
@@ -34,7 +33,7 @@ docker compose up -d --build --wait
 - Memory limits (1 GB, 256 MB, 128 MB) need the kernel's memory cgroup; without it Docker warns
   and runs unlimited (see [A Linux host instead](#a-linux-host-instead)).
 
-Verify: `docker compose ps` shows all four healthy; `http://<host>:3004` (Dozzle) shows their logs; `curl localhost:3000/health` and
+Verify: `docker compose ps` shows all three healthy; `curl localhost:3000/health` and
 `curl localhost:3002/health` answer; `curl https://instagram.stashh.me/health` → 200 through the tunnel.
 
 Naming: a tunnel is a connector identity, so it is named for the environment that runs it
@@ -63,8 +62,8 @@ context (`DOCKER_HOST=unix:///Users/emirerdo/.lima/docker/sock/docker.sock`). Th
 limits are enforced inside the VM.
 
 Lima forwards a published port to the Mac's `127.0.0.1` unless told otherwise, so
-`~/.lima/docker/lima.yaml` forwards 3000, 3002 and 3004 to `0.0.0.0`: the API, the channel and
-Dozzle answer on the LAN and on Tailscale (`http://home-server:3000`). A change there takes effect
+`~/.lima/docker/lima.yaml` forwards 3000 and 3002 to `0.0.0.0`: the API and the channel answer
+on the LAN and on Tailscale (`http://home-server:3000`). A change there takes effect
 when the VM restarts.
 
 Layout on `home-server` (user `emirerdo`, `ssh home-server`):
@@ -87,13 +86,14 @@ the home automation that shares the machine; they are not in this repo.
 ```bash
 ssh home-server
 tail -n 50 ~/HomeServer/logs/com.homeserver.stashh-update.log     # what the last deploys did
-docker compose -f ~/HomeServer/stashh/repo/compose.yaml ps       # health of the four containers
+docker compose -f ~/HomeServer/stashh/repo/compose.yaml ps       # health of the three containers
 docker compose -f ~/HomeServer/stashh/repo/compose.yaml logs -f backend
 ~/HomeServer/bin/stashh-update.sh                                # deploy now instead of in a minute
 limactl list                                                     # is the VM running
 ```
 
-Dozzle: `http://home-server:3004` from any machine on the LAN or the tailnet.
+Each container's CPU, memory, health and recent logs: the owner's Beszel hub on the same machine,
+`http://home-server:8090`, on the tailnet.
 
 - **Changed an env file:** the commit did not move, so force it: `~/HomeServer/bin/stashh-update.sh --force`.
 - **Roll back:** revert on the branch and push; the next run deploys the revert. Old images are

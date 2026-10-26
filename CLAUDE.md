@@ -20,7 +20,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
 | `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
-| `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel + Dozzle; `home-server` (Mac mini) auto-deploys `develop` ([docs/deploy.md](docs/deploy.md)) |
+| `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel; `home-server` (Mac mini) auto-deploys `develop` ([docs/deploy.md](docs/deploy.md)) |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -187,7 +187,7 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
 - **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`). `npm start` runs the compiled `dist/` (`npm run build` first), which is what the image does.
 - **Production:** containers from the root `compose.yaml` — `docker compose up -d --build --wait` on any Docker host with `deploy/*.env` filled in. `home-server`, the Mac mini on the home LAN (`ssh home-server`), follows `develop`: a push is live within about a minute (`deploy/update.sh` every minute from a LaunchDaemon; Docker runs in a Lima VM). Runbook: [docs/deploy.md](docs/deploy.md). Nothing runs in production on the development Mac.
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
-- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only), Dozzle `3004` (production host only).
+- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only).
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
 ## Conventions
