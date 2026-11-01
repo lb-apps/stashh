@@ -74,6 +74,9 @@ supabase/.branches/
 
 # --- Deploy CLIs (project links, tokens) ---
 .vercel/
+# Wrangler's local state and the hooks Worker's local secrets (workers/hooks/.dev.vars.example is the template)
+.wrangler/
+.dev.vars
 
 # --- Compose env files (deploy/*.env.example are the templates) ---
 deploy/*.env

@@ -1,0 +1,4 @@
+# Local secrets of the hooks Worker (npm run hooks:dev). Copy to .dev.vars (gitignored).
+# The same HOOKS_RELAY_SECRET goes into instagram/.env, so the local instance opens the envelope.
+INSTAGRAM_APP_SECRET=
+HOOKS_RELAY_SECRET=

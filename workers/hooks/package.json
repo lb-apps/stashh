@@ -1,0 +1,24 @@
+{
+  "name": "stashh-hooks",
+  "version": "0.1.0",
+  "description": "Stashh hooks relay — hooks.stashh.me, the Cloudflare Worker that routes each Instagram sender's webhooks to prod or dev",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "hooks:dev": "wrangler dev",
+    "hooks:deploy:prod": "wrangler deploy --env production",
+    "hooks:tail:prod": "wrangler tail --env production --format pretty",
+    "hooks:types": "wrangler types --include-runtime=false worker-configuration.d.ts",
+    "hooks:typecheck": "tsc -p tsconfig.json",
+    "hooks:test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260928.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4",
+    "wrangler": "^4.143.0"
+  }
+}

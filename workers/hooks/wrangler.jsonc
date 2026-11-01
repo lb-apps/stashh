@@ -1,0 +1,56 @@
+// hooks.stashh.me — the relay in front of Meta's one Instagram webhook callback. It routes each
+// sender's events to prod or dev (prod unless they sent /env dev). Guide: docs/webhook-relay.md.
+//
+// The top level is a routeless dev Worker for `npm run hooks:dev` (local KV and queue, default
+// dev → localhost:3002). `--env production` is the one real relay.
+// KV namespace and queues are created once per account (docs/webhook-relay.md, "Rollout"):
+//   npx wrangler kv namespace create stashh-hooks-routes
+//   npx wrangler queues create stashh-hooks-deliveries
+//   npx wrangler queues create stashh-hooks-deliveries-dlq
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "stashh-hooks-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
+  "vars": {
+    "DEFAULT_ENV": "dev",
+    "PROD_URL": "https://instagram.stashh.me",
+    "DEV_URL": "http://localhost:3002"
+  },
+  "kv_namespaces": [{ "binding": "ROUTES", "id": "local-hooks-routes" }],
+  "queues": {
+    "producers": [{ "binding": "DELIVERIES", "queue": "stashh-hooks-deliveries-local" }],
+    "consumers": [
+      { "queue": "stashh-hooks-deliveries-local", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 5 }
+    ]
+  },
+  "env": {
+    "production": {
+      "name": "stashh-hooks",
+      "routes": [{ "pattern": "hooks.stashh.me", "custom_domain": true }],
+      "vars": {
+        // Every sender reaches production unless they sent /env dev.
+        "DEFAULT_ENV": "prod",
+        "PROD_URL": "https://instagram.stashh.me",
+        "DEV_URL": "https://ig-dev.stashh.me"
+      },
+      // stashh-hooks-routes: replace with the id `wrangler kv namespace create` prints (rollout step 1).
+      "kv_namespaces": [{ "binding": "ROUTES", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+      "queues": {
+        "producers": [{ "binding": "DELIVERIES", "queue": "stashh-hooks-deliveries" }],
+        "consumers": [
+          {
+            "queue": "stashh-hooks-deliveries",
+            "max_batch_size": 10,
+            "max_batch_timeout": 1,
+            "max_retries": 5,
+            "dead_letter_queue": "stashh-hooks-deliveries-dlq"
+          }
+        ]
+      }
+    }
+  }
+}
