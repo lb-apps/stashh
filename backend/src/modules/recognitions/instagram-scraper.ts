@@ -171,7 +171,7 @@ function firstLink(item: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+async function askDownloader(postUrl: string): Promise<DownloaderItem[]> {
   const result = await igdl(postUrl);
   const raw: unknown[] = Array.isArray(result) ? result : (result?.result ?? []);
   const items: DownloaderItem[] = [];
@@ -187,8 +187,11 @@ async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderIt
   }
   const slides = dedupeDownloaderItems(items);
   if (slides.length === 0) {
+    // The library returns its failures (`status: false`) instead of throwing them. Throttled, the
+    // service answers in under a second with `status: true` and a page of blank `{ url: "" }` items.
+    if (raw.length > 0) throw new Error(`throttled: ${raw.length} blank items`);
     const status = Array.isArray(result) ? null : (result as { status?: unknown; message?: unknown } | undefined);
-    log.warn({ status: status?.status ?? null, message: status?.message ?? null, items: raw.length }, "downloader returned no media");
+    throw new Error(`no media (status ${String(status?.status ?? null)}): ${String(status?.message ?? "no message")}`);
   }
   return slides;
 }
@@ -197,24 +200,22 @@ async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderIt
  * Every media item of a post, through the downloader service: the only route that lists
  * a carousel's slides, and the fallback when Instagram's HTML carries no usable video.
  * The service answers unevenly from one call to the next, so an empty answer is asked once more.
+ * With no slides, `failure` is the service's last answer, kept so the task's error says why.
  */
-async function resolveMediaViaDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+async function resolveMediaViaDownloader(postUrl: string, log: Logger): Promise<{ slides: DownloaderItem[]; failure: string | null }> {
+  let failure: string | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const slides = await askDownloader(postUrl, log);
-      if (slides.length > 0) {
-        log.info({ host: new URL(slides[0]!.url).host, slides: slides.length, attempt }, "media resolved via downloader");
-        return slides;
-      }
+      const slides = await askDownloader(postUrl);
+      log.info({ host: new URL(slides[0]!.url).host, slides: slides.length, attempt }, "media resolved via downloader");
+      return { slides, failure: null };
     } catch (downloaderError) {
-      log.warn(
-        { err: downloaderError instanceof Error ? downloaderError.message : String(downloaderError), attempt },
-        "downloader failed",
-      );
+      failure = downloaderError instanceof Error ? downloaderError.message : String(downloaderError);
+      log.warn({ err: failure, attempt }, "downloader failed");
     }
     if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, 1_500));
   }
-  return [];
+  return { slides: [], failure };
 }
 
 /** The post's cover image (`og:image`), entity-decoded; null when the page has none. */
@@ -228,7 +229,8 @@ export function extractCaption(html: string): string | null {
   const match = html.match(/<meta property="og:description" content="([^"]*)"/);
   if (!match) return null;
 
-  const raw = decodeHtmlEntities(match[1]!);
+  // Trimmed first: the attribute often ends in whitespace, which kept `".` on every caption.
+  const raw = decodeHtmlEntities(match[1]!).trim();
   const colonIdx = raw.indexOf(": ");
   const caption =
     colonIdx !== -1
@@ -287,20 +289,35 @@ async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<strin
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
+/**
+ * A post's media and caption. `channelCaption` is the caption a DM channel received with
+ * the post; it wins over the page's. With no media but a caption, the content comes back
+ * with no media (`fetch_method: "caption"`) so the caption can be read alone.
+ */
 export async function fetchInstagramContent(
   url: string,
   log: Logger,
+  channelCaption: string | null = null,
 ): Promise<SourceContent> {
   const shortcode = extractShortcode(url);
   const sourceType = detectSourceType(url);
 
-  const html = await fetchInstagramHtml(shortcode, log);
+  // Instagram often answers a server with an empty app shell (200, no og tags). The page only
+  // adds the caption and a signed video URL; the downloader does not need it, so it still runs.
+  let html: string | null = null;
+  let pageError: unknown = null;
+  try {
+    html = await fetchInstagramHtml(shortcode, log);
+  } catch (error) {
+    pageError = error;
+    log.warn({ err: error instanceof Error ? error.message : String(error) }, "page unreadable; asking the downloader");
+  }
 
-  const caption = extractCaption(html);
-  const scrapedVideoUrl = extractVideoUrl(html);
+  const caption = channelCaption ?? (html ? extractCaption(html) : null);
+  const scrapedVideoUrl = html ? extractVideoUrl(html) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
-  let thumbnailUrl = extractThumbnail(html);
+  let thumbnailUrl = html ? extractThumbnail(html) : null;
   let media: SourceMediaItem[] = [];
   let fetchMethod: "scrape" | "downloader" = "scrape";
 
@@ -308,8 +325,10 @@ export async function fetchInstagramContent(
   // may be a carousel, whose slides only the downloader lists, so it goes there first.
   const pageVideo = async (): Promise<SourceMediaItem[]> =>
     scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log)) ? [{ url: scrapedVideoUrl }] : [];
+  let downloaderFailure: string | null = null;
   const downloaded = async (): Promise<SourceMediaItem[]> => {
-    const slides = await resolveMediaViaDownloader(canonicalUrl, log);
+    const { slides, failure } = await resolveMediaViaDownloader(canonicalUrl, log);
+    downloaderFailure = failure;
     if (slides.length === 0) return [];
     if (slides.length > config.RECOGNITIONS_MAX_MEDIA) {
       log.warn({ slides: slides.length, kept: config.RECOGNITIONS_MAX_MEDIA }, "carousel longer than the slide cap; trailing slides dropped");
@@ -328,9 +347,13 @@ export async function fetchInstagramContent(
   }
 
   if (media.length === 0) {
-    throw new Error(
-      `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.`,
-    );
+    const downloader = downloaderFailure ? ` Downloader: ${downloaderFailure}` : "";
+    const mediaError = pageError
+      ? `${pageError instanceof Error ? pageError.message : String(pageError)}${downloader}`
+      : `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.${downloader}`;
+    if (!caption) throw new Error(mediaError);
+    log.warn({ err: mediaError }, "no media; reading the caption alone");
+    return { media: [], media_error: mediaError, thumbnail_url: thumbnailUrl, fetch_method: "caption", caption, source_type: sourceType, platform: "instagram" };
   }
 
   return {

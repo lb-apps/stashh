@@ -1,3 +1,25 @@
+# Instagram DMs: read the reel from its caption, retry past the throttle, say why it failed
+
+Plan written 2026-11-01. Continues PR #12 (`fix/instagram-shell-page-downloader`).
+
+**Why reels fail.** Instagram does not hand the server a playable video for many reels (empty
+app shell, or an unsigned video URL that answers 403). The only other route is the free
+downloader service, which throttles: in under a second it answers with 28 blank items. The
+worker's four attempts land 1, 2 and 4 seconds apart, all inside that window, so the user
+gets "okuyamadık". The DM itself carries the post's full caption (`payload.title`), which
+often names the venue (DfAfig_IlO9: "📍Ali Ustanın Yeri : Mithatpaşa CD No:1153 Üçkuyular İzmir").
+
+- [x] 1. The DM's caption travels with the reel: the instagram service sends `caption` beside
+      `source_url`; the backend keeps it on the task and uses it when the page gives none.
+- [x] 2. No media but a caption: the backend analyses the caption alone instead of failing
+      (run marked `media_kind` none). Fails only with neither media nor caption.
+- [x] 3. Retries outlast the throttle: 5 s, 15 s, 45 s, waited in the queue (`available_at`,
+      claimed only once due) instead of a sleep in one of the two worker slots.
+- [x] 4. The reason reaches the user: the backend returns an `error_code`
+      (`private`, `temporarily_unavailable`, `unreadable`) on a failed recognition; the
+      instagram service picks the Turkish copy for it in `copy.tr.ts`.
+- [ ] 5. Tests for each, typecheck, live run against DfAfig_IlO9; merge, deploy, check the next DMs.
+
 # Stashh in Docker — deploy anywhere, auto-deploy on the home Pi
 
 Plan written 2026-10-15. Branch `feature/docker-deploy` from `origin/develop` in the main checkout.

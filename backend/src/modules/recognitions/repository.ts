@@ -219,6 +219,7 @@ export class RecognitionRepository {
         error_message: params.errorMessage,
         retry_count: params.backoff.retryCount,
         started_at: null,
+        available_at: new Date(Date.now() + params.backoff.delayMilliseconds).toISOString(),
       })
       .eq("id", params.recognitionId);
 

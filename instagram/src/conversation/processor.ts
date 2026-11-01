@@ -133,7 +133,7 @@ export class MessageProcessor {
       return this.reply(message, composeRecognitionReply(places, kind));
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
-      return this.reply(message, [text(copy.failed(kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
+      return this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
     }
 
     const now = this.now();

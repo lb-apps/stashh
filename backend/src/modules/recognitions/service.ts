@@ -66,7 +66,10 @@ interface ProcessRecognitionFailureParams {
   error: unknown;
 }
 
-const MINIMUM_BACKOFF_MILLISECONDS = 1_000;
+// 5 s, 15 s, 45 s: the media downloader throttles for 20–30 s at a time, so the retries
+// have to outlast it, and the last one still lands well inside the DM's five-minute wait.
+const MINIMUM_BACKOFF_MILLISECONDS = 5_000;
+const BACKOFF_FACTOR = 3;
 const MAXIMUM_BACKOFF_MILLISECONDS = 60_000;
 
 export interface RecognitionResultPlace {
@@ -110,16 +113,12 @@ export function calculateRetryBackoff(
   currentRetryCount: number,
 ): RecognitionBackoffResult {
   const retryCount = currentRetryCount + 1;
-  const exponentialDelay = MINIMUM_BACKOFF_MILLISECONDS * (2 ** (retryCount - 1));
+  const exponentialDelay = MINIMUM_BACKOFF_MILLISECONDS * (BACKOFF_FACTOR ** (retryCount - 1));
   const delayMilliseconds = Math.min(exponentialDelay, MAXIMUM_BACKOFF_MILLISECONDS);
   return {
     retryCount,
     delayMilliseconds,
   };
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 export class RecognitionService {
@@ -131,7 +130,9 @@ export class RecognitionService {
     const sourceMedia =
       source.kind === "shared_media"
         ? { media_url: source.mediaUrl, caption: source.caption, platform: source.provider, source_type: source.format }
-        : null;
+        : source.caption
+          ? { caption: source.caption }
+          : null;
     const options = params.options ?? {};
     const { idempotencyKey } = params;
 
@@ -271,7 +272,7 @@ export class RecognitionService {
         { retryCount: nextRetryCount, maxRetries: config.RECOGNITIONS_MAX_RETRIES, delayMs: backoff.delayMilliseconds, reason: normalizedErrorMessage },
         "retrying",
       );
-      await delay(backoff.delayMilliseconds);
+      // The task waits in the queue (`available_at`), not in this worker slot.
       await this.recognitionRepository.requeueRecognition({
         recognitionId: params.recognition.id,
         errorMessage: normalizedErrorMessage,

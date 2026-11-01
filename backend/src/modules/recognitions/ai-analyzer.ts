@@ -227,11 +227,20 @@ function withinBudget(items: DownloadedMedia[], budgetBytes: number, log: Logger
 /**
  * The instruction that goes with the media. A carousel is named as one so the model
  * reads every slide: the names of a "15 places" post sit as text on slides 2–15 while
- * the caption only introduces the list.
+ * the caption only introduces the list. With no media (`mediaKind` null) the caption is
+ * all the model gets, and it is told so.
  */
 export function buildUserText(input: { platform: SourcePlatform; mediaKind: MediaKind; slideCount: number; caption: string | null }): string {
   const { platform, mediaKind, slideCount, caption } = input;
   const carousel = slideCount > 1;
+
+  if (mediaKind === null) {
+    const handleRule =
+      platform === "instagram"
+        ? "For instagram_username: only if that @handle appears in this caption."
+        : "For instagram_username: always return null. This post is from TikTok, so any @handle here is a TikTok handle, not an Instagram one.";
+    return `Extract featured venues and any concrete per-venue recommendations from this ${platform === "tiktok" ? "TikTok video" : "Instagram post"}. Its media could not be read, so its caption below is all you have: return only venues the caption itself names.\n\nPost caption:\n${caption ?? ""}\n\n${handleRule}`;
+  }
 
   // An @handle in a TikTok caption is a TikTok handle, not an Instagram one.
   // Writing it into `instagram_username` would store wrong data, so on TikTok we
@@ -269,7 +278,7 @@ export async function analyzeContent(
   log: Logger,
   platform: SourcePlatform = "instagram",
 ): Promise<AIAnalysisResult> {
-  if (media.length === 0) throw new Error("No media to analyze");
+  if (media.length === 0 && !caption?.trim()) throw new Error("No media or caption to analyze");
   log.debug({
     hasCaption: Boolean(caption?.trim()),
     captionHasAt: Boolean(caption?.includes("@")),
@@ -279,7 +288,7 @@ export async function analyzeContent(
 
   const downloaded = await Promise.all(media.map((item) => fetchMedia(item.url, log)));
   const items = withinBudget(downloaded, config.RECOGNITIONS_MAX_MEDIA_BYTES, log);
-  const mediaKind: MediaKind = items.some((item) => item.kind === "video") ? "video" : "image";
+  const mediaKind: MediaKind = items.length === 0 ? null : items.some((item) => item.kind === "video") ? "video" : "image";
   const mediaBytes = items.reduce((sum, item) => sum + item.bytes, 0);
 
   const t = Date.now();

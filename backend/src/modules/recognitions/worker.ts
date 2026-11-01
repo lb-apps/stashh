@@ -126,10 +126,17 @@ async function processRecognition(
 
     const analysis = await tl.step(
       "media analyzed",
-      (stepLog) => analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform),
+      async (stepLog) => {
+        analyzed = await analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform);
+        // Read from the caption alone and nothing found: the video may still name a venue, so
+        // this is the fetch failing, retried like one, not "no venue in this post".
+        if (sourceContent.media.length === 0 && analyzed.places.length === 0) {
+          throw new Error(sourceContent.media_error ?? "Post media could not be fetched");
+        }
+        return analyzed;
+      },
       (result) => ({ kind: result.media_kind, media: result.media_count, placeCount: result.places.length, namesElsewhere: result.names_elsewhere }),
     );
-    analyzed = analysis;
 
     const placeMatches = await tl.step(
       "places found",

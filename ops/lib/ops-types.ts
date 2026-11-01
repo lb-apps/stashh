@@ -19,7 +19,7 @@ export type SourceType = "reel" | "post" | "igtv" | "tiktok" | "shared_post";
 export type Channel = "app" | "instagram";
 export type TaskStatus = "queued" | "processing" | "completed" | "committed" | "failed" | "cancelled" | "expired";
 export type RunOutcome = "completed" | "cache_hit" | "failed";
-export type FetchMethod = "scrape" | "downloader" | "tiktok" | "supplied";
+export type FetchMethod = "scrape" | "downloader" | "tiktok" | "supplied" | "caption";
 
 export interface RecognitionSeriesPoint {
   bucket: string;
