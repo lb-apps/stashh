@@ -19,6 +19,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `backend/` | Express + Zod + OpenAPI API |
 | `web/` | Next.js 16 + React 19 + Tailwind v4 + the Discovery design system |
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
+| `workers/hooks/` | `hooks.stashh.me`, the Cloudflare Worker in front of Meta's one Instagram callback: routes each sender to prod or dev (`/env`) |
 | `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
 | `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel; `home-server` (Mac mini) auto-deploys `develop` ([docs/deploy.md](docs/deploy.md)) |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
@@ -173,6 +174,29 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   `Avatar` (`Thumb`), covers are `AspectRatio`, cards are `Card`, toggles are `Collapsible`, form
   labels are `Label`. Add a missing piece with `npx shadcn add`, never hand-roll it.
 
+## Webhook relay — `hooks.stashh.me`, `/env`
+
+One Meta app, one Instagram account, no test app: Meta's Instagram callback is
+`https://hooks.stashh.me/meta/instagram` (Cloudflare Worker, `workers/hooks/`), and it routes
+**each sender** to one environment — `prod` for everyone, `dev` (the Mac, `ig-dev.stashh.me` →
+`:3002`) for an account that sent `/env dev`, until `/env prod`. Guide and rollout:
+[docs/webhook-relay.md](docs/webhook-relay.md).
+
+- **Routing, never mirroring.** An event reaches exactly one environment; do not add a copy path.
+- **One shared core:** `instagram/src/webhooks/core/` (environments, commands, WebCrypto HMAC, the
+  envelope, the Instagram source). Web APIs and relative `.ts` imports only; the Worker imports it
+  by path. Commands and their replies live in `core/commands.ts` only, in English.
+- **The envelope** (`x-hooks-relay-*`, sealed with `HOOKS_RELAY_SECRET`) is trusted like Meta's
+  signature. No envelope = straight from Meta, still valid (that is the rollback); a broken one = 403.
+  Prod is delivered while Meta waits; dev in the background, then the queue, then the DLQ.
+- **Prod and dev share the database.** Every `instagram_messages` row carries its `environment` and
+  each worker claims only its own. Outside production only `relay_routed` messages are answered
+  (`conversation/outbound.ts`, `META_OUTBOUND`); every outbound path stays inside
+  `MessageProcessor.process`, behind `mayMessage`.
+- **Never log a body, a sender id or an IP** in the Worker.
+- The dev tunnel is a LaunchAgent (`npm run tunnel:install` in `instagram/`), never a terminal or
+  agent-session process.
+
 ## Backend / API
 
 - **Canonical reference:** the running Scalar UI at `/docs` and the spec at `/openapi.json`.
@@ -187,7 +211,8 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
 - **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`). `npm start` runs the compiled `dist/` (`npm run build` first), which is what the image does.
 - **Production:** containers from the root `compose.yaml` — `docker compose up -d --build --wait` on any Docker host with `deploy/*.env` filled in. `home-server`, the Mac mini on the home LAN (`ssh home-server`), follows `develop`: a push is live within about a minute (`deploy/update.sh` every minute from a LaunchDaemon; Docker runs in a Lima VM). Runbook: [docs/deploy.md](docs/deploy.md). Nothing runs in production on the development Mac.
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
-- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only).
+- **Hooks relay:** `cd workers/hooks && npm run hooks:typecheck && npm run hooks:test`; `npm run hooks:dev` runs it locally on `:8787`. Deploys only with `npm run hooks:deploy:prod` (docs/webhook-relay.md).
+- **Ports:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only), hooks relay `8787` (local only).
 - **Integration tests:** `ios/StashhAPITests/` (Swift Testing, `.serialized`). They hit the **real backend** — never mock the API in these. Run a local backend first.
 
 ## Conventions

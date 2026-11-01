@@ -8,6 +8,10 @@ Production is two services and a tunnel, run as containers from the root [`compo
 | `instagram` | built from [`instagram/Dockerfile`](../instagram/Dockerfile) | 3002 | Instagram DM channel (Node 24 runs the TypeScript as it is) |
 | `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`): `https://instagram.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
 
+Meta's Instagram callback goes through the hooks relay (`hooks.stashh.me`, a Cloudflare Worker in
+`workers/hooks/`, deployed separately), which forwards each sender to `instagram.stashh.me` or to
+the dev Mac: [webhook-relay.md](webhook-relay.md). `instagram.env` needs `HOOKS_RELAY_SECRET` for it.
+
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
 time. `web/` (Vercel) and `ops/` (local only) are not part of the stack. Images are built from
 source on the host that runs them, so no registry and no secrets in images.
