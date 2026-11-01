@@ -171,7 +171,7 @@ function firstLink(item: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+async function askDownloader(postUrl: string): Promise<DownloaderItem[]> {
   const result = await igdl(postUrl);
   const raw: unknown[] = Array.isArray(result) ? result : (result?.result ?? []);
   const items: DownloaderItem[] = [];
@@ -187,8 +187,11 @@ async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderIt
   }
   const slides = dedupeDownloaderItems(items);
   if (slides.length === 0) {
+    // The library returns its failures (`status: false`) instead of throwing them. Throttled, the
+    // service answers in under a second with `status: true` and a page of blank `{ url: "" }` items.
+    if (raw.length > 0) throw new Error(`throttled: ${raw.length} blank items`);
     const status = Array.isArray(result) ? null : (result as { status?: unknown; message?: unknown } | undefined);
-    log.warn({ status: status?.status ?? null, message: status?.message ?? null, items: raw.length }, "downloader returned no media");
+    throw new Error(`no media (status ${String(status?.status ?? null)}): ${String(status?.message ?? "no message")}`);
   }
   return slides;
 }
@@ -197,24 +200,22 @@ async function askDownloader(postUrl: string, log: Logger): Promise<DownloaderIt
  * Every media item of a post, through the downloader service: the only route that lists
  * a carousel's slides, and the fallback when Instagram's HTML carries no usable video.
  * The service answers unevenly from one call to the next, so an empty answer is asked once more.
+ * With no slides, `failure` is the service's last answer, kept so the task's error says why.
  */
-async function resolveMediaViaDownloader(postUrl: string, log: Logger): Promise<DownloaderItem[]> {
+async function resolveMediaViaDownloader(postUrl: string, log: Logger): Promise<{ slides: DownloaderItem[]; failure: string | null }> {
+  let failure: string | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const slides = await askDownloader(postUrl, log);
-      if (slides.length > 0) {
-        log.info({ host: new URL(slides[0]!.url).host, slides: slides.length, attempt }, "media resolved via downloader");
-        return slides;
-      }
+      const slides = await askDownloader(postUrl);
+      log.info({ host: new URL(slides[0]!.url).host, slides: slides.length, attempt }, "media resolved via downloader");
+      return { slides, failure: null };
     } catch (downloaderError) {
-      log.warn(
-        { err: downloaderError instanceof Error ? downloaderError.message : String(downloaderError), attempt },
-        "downloader failed",
-      );
+      failure = downloaderError instanceof Error ? downloaderError.message : String(downloaderError);
+      log.warn({ err: failure, attempt }, "downloader failed");
     }
     if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, 1_500));
   }
-  return [];
+  return { slides: [], failure };
 }
 
 /** The post's cover image (`og:image`), entity-decoded; null when the page has none. */
@@ -318,8 +319,10 @@ export async function fetchInstagramContent(
   // may be a carousel, whose slides only the downloader lists, so it goes there first.
   const pageVideo = async (): Promise<SourceMediaItem[]> =>
     scrapedVideoUrl && (await isVideoUrlPlayable(scrapedVideoUrl, log)) ? [{ url: scrapedVideoUrl }] : [];
+  let downloaderFailure: string | null = null;
   const downloaded = async (): Promise<SourceMediaItem[]> => {
-    const slides = await resolveMediaViaDownloader(canonicalUrl, log);
+    const { slides, failure } = await resolveMediaViaDownloader(canonicalUrl, log);
+    downloaderFailure = failure;
     if (slides.length === 0) return [];
     if (slides.length > config.RECOGNITIONS_MAX_MEDIA) {
       log.warn({ slides: slides.length, kept: config.RECOGNITIONS_MAX_MEDIA }, "carousel longer than the slide cap; trailing slides dropped");
@@ -338,9 +341,10 @@ export async function fetchInstagramContent(
   }
 
   if (media.length === 0) {
-    if (pageError) throw pageError;
+    const downloader = downloaderFailure ? ` Downloader: ${downloaderFailure}` : "";
+    if (pageError) throw new Error(`${pageError instanceof Error ? pageError.message : String(pageError)}${downloader}`);
     throw new Error(
-      `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.`,
+      `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.${downloader}`,
     );
   }
 

@@ -31,12 +31,31 @@ describe("fetchInstagramContent with an unreadable page", () => {
     });
   });
 
-  it("reports the page error when the downloader has nothing either", async () => {
+  it("reports the page error and the downloader's reason when it has nothing either", async () => {
     vi.useFakeTimers();
-    igdl.mockResolvedValue({ status: false, result: [] });
+    igdl.mockResolvedValue({ status: false, message: "rate limited" });
     const pending = expect(fetchInstagramContent("https://instagram.com/reel/DfIJE6KI0Gd", log)).rejects.toThrow(
-      /Could not fetch Instagram page for shortcode "DfIJE6KI0Gd"/,
+      /Could not fetch Instagram page for shortcode "DfIJE6KI0Gd".* Downloader: no media \(status false\): rate limited/,
     );
+    await vi.runAllTimersAsync();
+    await pending;
+    vi.useRealTimers();
+  });
+});
+
+describe("fetchInstagramContent when the downloader is throttled", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(shell, { status: 200 })));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    igdl.mockReset();
+  });
+
+  it("names the throttle instead of counting blank items as media", async () => {
+    vi.useFakeTimers();
+    igdl.mockResolvedValue({ status: true, result: Array.from({ length: 28 }, () => ({ thumbnail: "", url: "" })) });
+    const pending = expect(fetchInstagramContent("https://instagram.com/reel/DfAfig_IlO9", log)).rejects.toThrow(/Downloader: throttled: 28 blank items/);
     await vi.runAllTimersAsync();
     await pending;
     vi.useRealTimers();
