@@ -5,6 +5,8 @@ import type { GlassRegistry, GlassTier } from '../glass';
 import { LiquidGlass } from './liquid-glass';
 
 const REDUCE_TRANSPARENCY_KEY = 'discovery.reduce-transparency';
+/** Fired on `window` when the in-app setting changes, so a live map re-tiers at once. */
+const REDUCE_TRANSPARENCY_EVENT = 'discovery:reduce-transparency';
 
 /** iOS doesn't expose Reduce Transparency to the web, so it is also an in-app setting. */
 export function readReduceTransparency(): boolean {
@@ -21,6 +23,7 @@ export function writeReduceTransparency(on: boolean) {
   } catch {
     /* storage unavailable (private mode, in-app browser): the choice lasts this visit */
   }
+  window.dispatchEvent(new Event(REDUCE_TRANSPARENCY_EVENT));
 }
 
 function prefersOpaque(): boolean {
@@ -43,7 +46,6 @@ export function useLiquidGlass(): {
   /** The map calls these as its GL frame comes and goes. */
   onBackdropReady: () => void;
   onBackdropLost: () => void;
-  setReduceTransparency: (on: boolean) => void;
 } {
   const [degraded, setDegraded] = React.useState(false);
   const [backdrop, setBackdrop] = React.useState(false);
@@ -55,7 +57,11 @@ export function useLiquidGlass(): {
     const sync = () => setOpaque(prefersOpaque());
     sync();
     queries.forEach((q) => q.addEventListener('change', sync));
-    return () => queries.forEach((q) => q.removeEventListener('change', sync));
+    window.addEventListener(REDUCE_TRANSPARENCY_EVENT, sync);
+    return () => {
+      queries.forEach((q) => q.removeEventListener('change', sync));
+      window.removeEventListener(REDUCE_TRANSPARENCY_EVENT, sync);
+    };
   }, []);
 
   const tier: GlassTier = opaque ? 'solid' : backdrop && !degraded ? 'refractive' : 'frosted';
@@ -66,9 +72,5 @@ export function useLiquidGlass(): {
     registry,
     onBackdropReady: React.useCallback(() => setBackdrop(true), []),
     onBackdropLost: React.useCallback(() => setBackdrop(false), []),
-    setReduceTransparency: React.useCallback((on: boolean) => {
-      writeReduceTransparency(on);
-      setOpaque(prefersOpaque());
-    }, []),
   };
 }

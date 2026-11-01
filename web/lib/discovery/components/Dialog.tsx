@@ -1,6 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import { TEXT_DANGER_STRONG, TEXT_SECONDARY_STRONG } from '../pending-tokens';
+
+/** The dialog's width, padding, and its button row. */
+const DIALOG_W = 340;
+const DIALOG_PAD = 24;
+const BUTTON_H = 52;
+const BUTTON_GAP = 12;
+const BODY_GAP = 8;
+const ACTIONS_GAP = 22;
 
 type DialogProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style' | 'title'> & {
   title: React.ReactNode;
@@ -13,18 +22,30 @@ type DialogProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style' | 'title'
   style?: React.CSSProperties;
 };
 
+/**
+ * Discovery's alert: a title, one line of body, confirm and cancel. Cancel —
+ * the safe answer — has focus when it opens. The caller owns the modal layer
+ * (scrim, Escape, inert page).
+ */
 export function Dialog({ title, body, confirmLabel = 'Confirm', cancelLabel = 'Not now', destructive = false, onConfirm, onCancel, style, ...rest }: DialogProps) {
-  const btn = (label: React.ReactNode, kind: string, onPress?: () => void) => (
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  // Focus is a DOM side effect of opening, once.
+  React.useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  const btn = (label: React.ReactNode, kind: 'default' | 'destructive', onPress?: () => void, ref?: React.Ref<HTMLButtonElement>) => (
     <button
+      ref={ref}
       type="button"
       onClick={onPress}
       style={{
         flex: 1,
-        height: 52,
+        height: BUTTON_H,
         border: 'none',
         borderRadius: 'var(--r-pill)',
         background: 'var(--surface-field)',
-        color: kind === 'destructive' ? 'var(--text-danger)' : 'var(--text-primary)',
+        color: kind === 'destructive' ? TEXT_DANGER_STRONG : 'var(--text-primary)',
         fontFamily: 'var(--font-display)',
         fontSize: 'var(--fs-label)',
         fontWeight: 'var(--fw-bold)',
@@ -41,8 +62,8 @@ export function Dialog({ title, body, confirmLabel = 'Confirm', cancelLabel = 'N
     <div
       role="alertdialog"
       style={{
-        width: 340,
-        padding: 24,
+        width: DIALOG_W,
+        padding: DIALOG_PAD,
         borderRadius: 'var(--r-card-lg)',
         background: 'var(--bone-50)',
         boxShadow: 'var(--sh-card-lg)',
@@ -54,11 +75,11 @@ export function Dialog({ title, body, confirmLabel = 'Confirm', cancelLabel = 'N
         {title}
       </div>
       {body ? (
-        <div style={{ marginTop: 8, fontFamily: 'var(--font-text)', fontSize: 'var(--fs-body-lg)', lineHeight: 'var(--lh-body-lg)', color: 'var(--text-secondary)' }}>{body}</div>
+        <div style={{ marginTop: BODY_GAP, fontFamily: 'var(--font-text)', fontSize: 'var(--fs-body-lg)', lineHeight: 'var(--lh-body-lg)', color: TEXT_SECONDARY_STRONG }}>{body}</div>
       ) : null}
-      <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
+      <div style={{ display: 'flex', gap: BUTTON_GAP, marginTop: ACTIONS_GAP }}>
         {btn(confirmLabel, destructive ? 'destructive' : 'default', onConfirm)}
-        {btn(cancelLabel, 'default', onCancel)}
+        {btn(cancelLabel, 'default', onCancel, cancelRef)}
       </div>
     </div>
   );

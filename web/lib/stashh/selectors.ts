@@ -6,33 +6,52 @@ import type { CategoryGroup, LatLng, OpeningPeriod, SavedPlace } from "./types";
  * no request per keystroke or chip tap.
  */
 
-const MINUTES_PER_WEEK = 7 * 24 * 60;
+export const MINUTES_PER_DAY = 24 * 60;
+export const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
 
-/** Minutes since Sunday 00:00 in the place's local time (Google's day 0 is Sunday). */
-function localWeekMinute(now: Date, utcOffsetMinutes: number): number {
-  const local = new Date(now.getTime() + utcOffsetMinutes * 60_000);
-  return local.getUTCDay() * 24 * 60 + local.getUTCHours() * 60 + local.getUTCMinutes();
-}
-
-function weekMinute(point: { day: number; hour: number; minute: number }): number {
-  return point.day * 24 * 60 + point.hour * 60 + point.minute;
+/** A point in Google's week (day 0 = Sunday) as minutes since Sunday 00:00. */
+export function weekMinute(point: { day: number; hour: number; minute: number }): number {
+  return point.day * MINUTES_PER_DAY + point.hour * 60 + point.minute;
 }
 
 /**
- * Open right now? `null` when unknown (no hours, or no UTC offset to place
- * "now" in the venue's day). A period without `close` means open 24 hours.
+ * The venue's UTC offset. Places saved before the backend stored it fall back
+ * to the reader's own offset — saved places are nearly always in the reader's
+ * own city, and a wrong guess there costs one chip.
  */
+export function venueOffset(utcOffsetMinutes: number | null, now: Date): number {
+  return utcOffsetMinutes ?? -now.getTimezoneOffset();
+}
+
+/** "Now" as minutes since Sunday 00:00 in the venue's local time. */
+export function localWeekMinute(now: Date, utcOffsetMinutes: number): number {
+  const local = new Date(now.getTime() + utcOffsetMinutes * 60_000);
+  return weekMinute({ day: local.getUTCDay(), hour: local.getUTCHours(), minute: local.getUTCMinutes() });
+}
+
+/**
+ * Whether a period covers the week minute `t`, including one that wraps past
+ * Saturday night. A period with no close is Google's "open around the clock".
+ */
+export function periodCovers(period: OpeningPeriod, t: number): boolean {
+  if (!period.close) return true;
+  const open = weekMinute(period.open);
+  let close = weekMinute(period.close);
+  if (close <= open) close += MINUTES_PER_WEEK;
+  return (t >= open && t < close) || (t + MINUTES_PER_WEEK >= open && t + MINUTES_PER_WEEK < close);
+}
+
+/** Open right now? `null` when there are no hours. "Now" is placed in the venue's day by its UTC offset. */
 export function isOpenNow(place: SavedPlace, now = new Date()): boolean | null {
-  const periods = place.opening_hours?.periods;
-  if (!periods?.length || place.utc_offset_minutes == null) return null;
-  const t = localWeekMinute(now, place.utc_offset_minutes);
-  return periods.some((p: OpeningPeriod) => {
-    if (!p.close) return true;
-    const open = weekMinute(p.open);
-    let close = weekMinute(p.close);
-    if (close <= open) close += MINUTES_PER_WEEK;
-    return (t >= open && t < close) || (t + MINUTES_PER_WEEK >= open && t + MINUTES_PER_WEEK < close);
-  });
+  const periods = place.opening_hours;
+  if (!periods?.length) return null;
+  const t = localWeekMinute(now, venueOffset(place.utc_offset_minutes, now));
+  return periods.some((p) => periodCovers(p, t));
+}
+
+/** Newest saved first. */
+export function newestFirst(places: SavedPlace[]): SavedPlace[] {
+  return [...places].sort((a, b) => b.saved_at.localeCompare(a.saved_at));
 }
 
 /** Great-circle distance in metres. */

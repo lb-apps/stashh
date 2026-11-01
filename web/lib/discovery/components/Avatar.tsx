@@ -1,8 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { UserRound } from 'lucide-react';
+import { Glyph } from './Glyph';
 
 const SIZES: Record<string, number> = { xs: 28, sm: 36, md: 48, lg: 60, xl: 76 };
+/** Initials and the stand-in glyph, as a share of the avatar's diameter. */
+const INITIALS_SCALE = 0.36;
+const GLYPH_SCALE = 0.46;
 
 function initials(name = ''): string {
   return name
@@ -23,8 +28,10 @@ type AvatarProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
   style?: React.CSSProperties;
 };
 
+/** A photo, else initials, else a person glyph — never an empty disc. */
 export function Avatar({ src, name = '', size = 'md', ring = false, badge = null, style, ...rest }: AvatarProps) {
   const d = SIZES[size] || SIZES.md;
+  const letters = initials(name);
   return (
     <div style={{ position: 'relative', width: d, height: d, flex: '0 0 auto', ...style }} {...rest}>
       <div
@@ -43,17 +50,19 @@ export function Avatar({ src, name = '', size = 'md', ring = false, badge = null
       >
         {src ? (
           <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : !letters ? (
+          <Glyph icon={UserRound} size={Math.round(d * GLYPH_SCALE)} style={{ display: 'block', color: 'var(--grey-800)' }} />
         ) : (
           <span
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: Math.round(d * 0.36),
+              fontSize: Math.round(d * INITIALS_SCALE),
               fontWeight: 'var(--fw-black)',
               letterSpacing: '-0.02em',
               color: 'var(--ink)',
             }}
           >
-            {initials(name)}
+            {letters}
           </span>
         )}
       </div>

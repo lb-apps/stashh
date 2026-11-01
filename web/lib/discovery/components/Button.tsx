@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { TEXT_DANGER_STRONG } from '../pending-tokens';
 
 const SIZES: Record<string, { h: number; px: number; fs: number; r: string; gap: number }> = {
   sm: { h: 36, px: 14, fs: 15, r: 'var(--r-button)', gap: 6 },
@@ -64,7 +65,7 @@ function buttonStyle({ variant = 'primary', size = 'md', shape = 'rounded', full
       boxShadow: 'var(--gloss-top)',
     },
     ghost: { background: 'transparent', color: 'var(--text-primary)' },
-    danger: { background: 'var(--fill-secondary)', color: 'var(--text-danger)', boxShadow: 'var(--gloss-top)' },
+    danger: { background: 'var(--fill-secondary)', color: TEXT_DANGER_STRONG, boxShadow: 'var(--gloss-top)' },
     onBrand: {
       background: 'var(--white)',
       color: 'var(--cobalt-500)',

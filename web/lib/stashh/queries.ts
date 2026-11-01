@@ -36,7 +36,9 @@ export function useMe() {
   return useQuery({ queryKey: keys.me, queryFn: api.me, staleTime: Infinity });
 }
 
-export function usePlacePhotos(placeId: string | null, maxWidthPx: number) {
+/** Google photos of a saved place; places without a Google id have none to ask for. */
+export function usePlacePhotos(place: SavedPlace | null, maxWidthPx: number) {
+  const placeId = place?.google_place_id ? place.id : null;
   return useQuery({
     queryKey: keys.photos(placeId ?? ""),
     queryFn: async () => (await api.places.photos(placeId!, maxWidthPx)).urls,

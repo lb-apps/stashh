@@ -8,7 +8,8 @@ import type { CategoryGroup, SavedPlace } from "./types";
 /**
  * Writes against the library. Edits to a single place are optimistic: the
  * cache changes on tap and rolls back if the request fails, so the UI never
- * waits on the network for a toggle.
+ * waits on the network for a toggle. Refetches after a write run in the
+ * background — a screen moves on as soon as the write itself succeeds.
  */
 
 function patchPlace(client: QueryClient, placeId: string, patch: (p: SavedPlace) => SavedPlace | null) {
@@ -38,7 +39,7 @@ function useOptimisticPlaceMutation<V>(
     onError: (_error, _vars, context) => {
       if (context?.previous) client.setQueryData(keys.places, context.previous);
     },
-    onSettled: () => client.invalidateQueries({ queryKey: keys.places }),
+    onSettled: () => void client.invalidateQueries({ queryKey: keys.places }),
   });
 }
 
@@ -98,11 +99,42 @@ export function useSaveRecognised() {
       }
       return placeIds;
     },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: keys.places }),
-        client.invalidateQueries({ queryKey: keys.lists }),
-        client.invalidateQueries({ queryKey: keys.recents }),
-      ]),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.places });
+      void client.invalidateQueries({ queryKey: keys.lists });
+      void client.invalidateQueries({ queryKey: keys.recents });
+    },
+  });
+}
+
+/** Files an already-saved place into a list. */
+export function useAddToList() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listId, placeId }: { listId: string; placeId: string }) => api.lists.addPlace(listId, placeId),
+    onMutate: async ({ listId, placeId }) => {
+      await client.cancelQueries({ queryKey: keys.places });
+      return { previous: patchPlace(client, placeId, (p) => (p.list_ids.includes(listId) ? p : { ...p, list_ids: [...p.list_ids, listId] })) };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) client.setQueryData(keys.places, context.previous);
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.places });
+      void client.invalidateQueries({ queryKey: keys.lists });
+    },
+  });
+}
+
+/** Creates an empty list (or one seeded with saved places). */
+export function useCreateList() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { title: string; description: string | null; cover: CategoryGroup; placeIds: string[] }) =>
+      api.lists.create({ title: body.title, description: body.description, cover_category: body.cover, place_ids: body.placeIds }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.places });
+      void client.invalidateQueries({ queryKey: keys.lists });
+    },
   });
 }

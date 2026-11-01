@@ -22,3 +22,9 @@ export type PlaceCategory = (typeof PLACE_CATEGORIES)[number];
 export function categoryColor(category: PlaceCategory): string {
   return `var(--pin-${category})`;
 }
+
+/** The category as a fill: a pale wash top-left deepening to the full pin colour. */
+export function categoryGradient(category: PlaceCategory): string {
+  const c = categoryColor(category);
+  return `linear-gradient(152deg, color-mix(in srgb, ${c} 15%, transparent) 0%, ${c} 62%, color-mix(in srgb, ${c} 80%, transparent) 100%)`;
+}

@@ -17,10 +17,6 @@ export const en = {
     offline: "Offline — saved places still work",
     loading: "Loading",
   },
-  home: {
-    savedCount: (n: number) => (n === 1 ? "1 place saved" : `${n} places saved`),
-    nothingSaved: "Nothing saved yet",
-  },
   categories: {
     coffee: "Coffee",
     food: "Food",

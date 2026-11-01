@@ -15,10 +15,6 @@ export const tr: Dictionary = {
     offline: "Çevrimdışı — kayıtlı mekanların çalışmaya devam ediyor",
     loading: "Yükleniyor",
   },
-  home: {
-    savedCount: (n: number) => `${n} mekan kayıtlı`,
-    nothingSaved: "Henüz kayıtlı mekan yok",
-  },
   categories: {
     coffee: "Kahve",
     food: "Yemek",

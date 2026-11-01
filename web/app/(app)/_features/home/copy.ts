@@ -1,0 +1,61 @@
+import type { Scope } from "@/lib/stashh/selectors";
+import type { SourceType } from "@/lib/stashh/types";
+
+/** Copy for the home sheet. Counts arrive pre-formatted (`n`) with the raw number for the plural. */
+export const homeCopy = {
+  en: {
+    search: "Search saved places",
+    scopes: { all: "All", open: "Open now", togo: "To go", been: "Been" } satisfies Record<Scope, string>,
+    scopeGroup: "Show",
+    mySpots: "My spots",
+    newList: "New list",
+    nearYou: "Near you",
+    savedSpots: "Saved spots",
+    yourLists: "Your lists",
+    browseByType: "Browse by type",
+    fromReels: "From your reels",
+    spots: (n: string, count: number) => (count === 1 ? "1 Spot" : `${n} Spots`),
+    lists: (n: string, count: number) => (count === 1 ? "1 List" : `${n} Lists`),
+    /** When a scope (or the filters) leaves nothing to show. */
+    scopeEmpty: {
+      all: "No places match your filters.",
+      open: "Nothing’s open right now.",
+      togo: "You’ve been to all of them.",
+      been: "Places you’ve been show up here.",
+    } satisfies Record<Scope, string>,
+    useLocation: "Use my location",
+    locating: "Finding you…",
+    locationOff: "Location is off. Allow it for this site in your browser settings to sort by distance.",
+    reading: "Reading it now…",
+    placesFound: (n: string, count: number) => (count === 1 ? "1 place found" : `${n} places found`),
+    source: { reel: "Instagram Reel", post: "Instagram post", story: "Instagram story", tiktok: "TikTok" } satisfies Record<SourceType, string>,
+    sharedLink: "Shared link",
+  },
+  tr: {
+    search: "Kayıtlı mekanlarda ara",
+    scopes: { all: "Tümü", open: "Şimdi açık", togo: "Gidilecek", been: "Gidildi" },
+    scopeGroup: "Göster",
+    mySpots: "Mekanlarım",
+    newList: "Yeni liste",
+    nearYou: "Yakınında",
+    savedSpots: "Kaydettiklerin",
+    yourLists: "Listelerin",
+    browseByType: "Türe göre keşfet",
+    fromReels: "Reel’lerinden",
+    spots: (n: string) => `${n} mekan`,
+    lists: (n: string) => `${n} liste`,
+    scopeEmpty: {
+      all: "Filtrelerine uyan mekan yok.",
+      open: "Şu an açık mekan yok.",
+      togo: "Hepsine gitmişsin.",
+      been: "Gittiğin mekanlar burada görünür.",
+    },
+    useLocation: "Konumumu kullan",
+    locating: "Konumun bulunuyor…",
+    locationOff: "Konum kapalı. Uzaklığa göre sıralamak için tarayıcı ayarlarından bu siteye izin ver.",
+    reading: "Şu an okunuyor…",
+    placesFound: (n: string) => `${n} mekan bulundu`,
+    source: { reel: "Instagram Reel", post: "Instagram gönderisi", story: "Instagram hikâyesi", tiktok: "TikTok" },
+    sharedLink: "Paylaşılan bağlantı",
+  },
+};

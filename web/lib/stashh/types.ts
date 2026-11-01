@@ -38,21 +38,21 @@ export interface LatLng {
   longitude: number;
 }
 
-/** Google Places (New) `regularOpeningHours.periods[]` — the only hours the API stores. */
+/**
+ * One Google Places (New) `regularOpeningHours.periods[]` entry — the only
+ * hours the API stores (as the flat array). Day 0 is Sunday; no `close`
+ * means open around the clock.
+ */
 export interface OpeningPeriod {
   open: { day: number; hour: number; minute: number };
   close?: { day: number; hour: number; minute: number };
 }
 
-export interface OpeningHours {
-  periods?: OpeningPeriod[];
-}
-
 export type SourceType = "reel" | "post" | "story" | "tiktok";
 
-/** The post a place was saved from. */
+/** The post a place was saved from. `url` is null for a post shared inside a DM. */
 export interface PlaceSource {
-  url: string;
+  url: string | null;
   type: SourceType | null;
   thumbnail_url: string | null;
   author_username: string | null;
@@ -78,7 +78,8 @@ export interface SavedPlace {
   phone_number: string | null;
   google_maps_uri: string | null;
   business_status: string | null;
-  opening_hours: OpeningHours | null;
+  opening_hours: OpeningPeriod[] | null;
+  /** Null until the place is re-enriched from Google; see `isOpenNow`. */
   utc_offset_minutes: number | null;
   instagram_username: string | null;
   recommendations: VenueRecommendation[];
@@ -118,15 +119,19 @@ export interface Recognition {
 export interface RecentRecognition {
   recognition_id: string;
   status: RecognitionStatus;
+  stage: RecognitionStage | null;
   source_url: string;
   source_type: SourceType | null;
   source_thumbnail_url: string | null;
+  author_username: string | null;
+  result_id: string | null;
   place_count: number;
   created_at: string;
+  finished_at: string | null;
 }
 
 export interface Me {
-  id: string;
+  user_id: string;
   display_name: string | null;
   instagram_username: string | null;
   created_at: string;

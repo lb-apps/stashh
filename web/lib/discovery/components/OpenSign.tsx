@@ -1,20 +1,21 @@
 'use client';
 
 import * as React from 'react';
+import { SIGN_FACE } from '../pending-tokens';
 
 /** The hanging sign — a small glossy object that reports hours.
  * Built from CSS gradients so it scales; swap in a real 3D render via
  * GlossyObject when the moment deserves it. */
 type OpenSignProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
   open?: boolean;
+  /** The sign's word, localized by the caller; defaults to OPEN / CLOSED. */
+  label?: React.ReactNode;
   detail?: React.ReactNode;
   style?: React.CSSProperties;
 };
 
-export function OpenSign({ open = true, detail = 'until 9:00 PM', style, ...rest }: OpenSignProps) {
-  const face = open
-    ? 'linear-gradient(168deg, #E8FFE9 0%, #BEF3C8 52%, #9FE7B0 100%)'
-    : 'linear-gradient(168deg, #F2F0EC 0%, #E4E0D9 52%, #D6D1C8 100%)';
+export function OpenSign({ open = true, label, detail = 'until 9:00 PM', style, ...rest }: OpenSignProps) {
+  const face = open ? SIGN_FACE.open : SIGN_FACE.closed;
   const ink = open ? 'var(--text-open)' : 'var(--text-tertiary)';
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', ...style }} {...rest}>
@@ -36,7 +37,7 @@ export function OpenSign({ open = true, detail = 'until 9:00 PM', style, ...rest
         }}
       >
         <div style={{ fontFamily: 'var(--font-rounded)', fontSize: 'var(--fs-headline)', fontWeight: 'var(--fw-black)', letterSpacing: '0.02em', color: ink, lineHeight: 1 }}>
-          {open ? 'OPEN' : 'CLOSED'}
+          {label ?? (open ? 'OPEN' : 'CLOSED')}
         </div>
         {detail ? (
           <div style={{ marginTop: 2, fontFamily: 'var(--font-rounded)', fontSize: 'var(--fs-micro)', fontWeight: 'var(--fw-bold)', color: ink, opacity: 0.85, lineHeight: 1.2 }}>{detail}</div>
