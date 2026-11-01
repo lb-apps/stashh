@@ -36,6 +36,7 @@ export const FETCH_METHOD: Record<FetchMethod, string> = {
   downloader: "Downloader (fallback)",
   tiktok: "TikTok downloader",
   supplied: "From the DM",
+  caption: "Caption only",
 };
 
 export const DM_CONTENT: Record<DmContent, string> = { reel: "Reel", post: "Post", link: "Link", text: "Text", other: "Other" };

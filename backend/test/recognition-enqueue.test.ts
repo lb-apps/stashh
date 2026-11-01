@@ -41,6 +41,7 @@ function task(partial: Partial<RecognitionTaskRow> & { owner_user_id: string; so
     retry_count: 0,
     idempotency_key: null,
     source_media: null,
+    available_at: "2026-10-14T00:00:00Z",
     created_at: "2026-10-14T00:00:00Z",
     updated_at: "2026-10-14T00:00:00Z",
     ...partial,
@@ -92,6 +93,14 @@ describe("RecognitionService.enqueueRecognition", () => {
     const created = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-1" });
     expect(created.source_url).toBe("https://instagram.com/reel/ABC123");
     expect(created.idempotency_key).toBe("mid-1");
+  });
+
+  it("keeps the caption a channel sent with a link, and nothing when it sent none", async () => {
+    const { service } = setup();
+    const withCaption = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL, caption: "📍Ali Ustanın Yeri" } });
+    const without = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } });
+    expect(withCaption.source_media).toEqual({ caption: "📍Ali Ustanın Yeri" });
+    expect(without.source_media).toBeNull();
   });
 
   it("returns the original task for a repeated key", async () => {

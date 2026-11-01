@@ -20,9 +20,14 @@ export interface SourceContent {
   /** The post's cover image, if the source offers one (copied to storage by the worker). */
   thumbnail_url: string | null;
   /** How the media was obtained; recorded per run for scraper health. */
-  fetch_method: "scrape" | "downloader" | "tiktok" | "supplied";
-  /** Post caption. Instagram: og:description. TikTok: the post title. */
+  fetch_method: "scrape" | "downloader" | "tiktok" | "supplied" | "caption";
+  /** Post caption. Instagram: the one the channel received, else og:description. TikTok: the post title. */
   caption: string | null;
+  /**
+   * Why `media` is empty (`fetch_method: "caption"`): the media could not be fetched and the
+   * caption is read alone. When that finds no venue, this is the run's error.
+   */
+  media_error?: string;
   source_type: SourceType;
   platform: SourcePlatform;
 }
@@ -79,7 +84,8 @@ export interface AIAnalysisResult {
    */
   names_elsewhere: boolean;
   /** What the media turned out to be: "video" when any item the model read is one. */
-  media_kind: "video" | "image";
+  /** Null when the media could not be fetched and the caption was read alone. */
+  media_kind: "video" | "image" | null;
   /** Bytes the model read, over every item. */
   media_bytes: number;
   /** Items the model read; a carousel's slides, up to the configured cap. */

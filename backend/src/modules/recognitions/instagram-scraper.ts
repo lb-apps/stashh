@@ -289,9 +289,15 @@ async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<strin
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
+/**
+ * A post's media and caption. `channelCaption` is the caption a DM channel received with
+ * the post; it wins over the page's. With no media but a caption, the content comes back
+ * with no media (`fetch_method: "caption"`) so the caption can be read alone.
+ */
 export async function fetchInstagramContent(
   url: string,
   log: Logger,
+  channelCaption: string | null = null,
 ): Promise<SourceContent> {
   const shortcode = extractShortcode(url);
   const sourceType = detectSourceType(url);
@@ -307,7 +313,7 @@ export async function fetchInstagramContent(
     log.warn({ err: error instanceof Error ? error.message : String(error) }, "page unreadable; asking the downloader");
   }
 
-  const caption = html ? extractCaption(html) : null;
+  const caption = channelCaption ?? (html ? extractCaption(html) : null);
   const scrapedVideoUrl = html ? extractVideoUrl(html) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
@@ -342,10 +348,12 @@ export async function fetchInstagramContent(
 
   if (media.length === 0) {
     const downloader = downloaderFailure ? ` Downloader: ${downloaderFailure}` : "";
-    if (pageError) throw new Error(`${pageError instanceof Error ? pageError.message : String(pageError)}${downloader}`);
-    throw new Error(
-      `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.${downloader}`,
-    );
+    const mediaError = pageError
+      ? `${pageError instanceof Error ? pageError.message : String(pageError)}${downloader}`
+      : `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.${downloader}`;
+    if (!caption) throw new Error(mediaError);
+    log.warn({ err: mediaError }, "no media; reading the caption alone");
+    return { media: [], media_error: mediaError, thumbnail_url: thumbnailUrl, fetch_method: "caption", caption, source_type: sourceType, platform: "instagram" };
   }
 
   return {
