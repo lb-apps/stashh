@@ -56,16 +56,16 @@ function setup() {
   return { repo, service: new RecognitionService(repo as unknown as RecognitionRepository) };
 }
 
-describe("RecognitionService.getCachedResultId", () => {
+describe("RecognitionService.getCachedResult", () => {
   it("serves an earlier result only when it found something", async () => {
     const { repo, service } = setup();
     repo.results.push(
       { id: "empty", source_url: "instagram-media:1", places: [] },
       { id: "full", source_url: "instagram-media:2", places: [{ name: "Sofyalı Meyhane" }] },
     );
-    expect(await service.getCachedResultId("instagram-media:1")).toBeNull();
-    expect(await service.getCachedResultId("instagram-media:2")).toBe("full");
-    expect(await service.getCachedResultId("instagram-media:3")).toBeNull();
+    expect(await service.getCachedResult("instagram-media:1")).toBeNull();
+    expect(await service.getCachedResult("instagram-media:2")).toEqual({ id: "full", places: [{ name: "Sofyalı Meyhane" }] });
+    expect(await service.getCachedResult("instagram-media:3")).toBeNull();
   });
 });
 

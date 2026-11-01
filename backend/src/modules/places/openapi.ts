@@ -5,6 +5,7 @@ import {
   commonErrorResponses,
 } from "../../lib/openapi.js";
 import { PAGINATION_OPERATION_DESCRIPTION } from "../../lib/pagination.js";
+import { CATEGORY_GROUPS } from "./mapper.js";
 import {
   addPlacesBodySchema,
   nearbyPlacesQuerySchema,
@@ -15,7 +16,16 @@ import {
 
 // ── Response data schemas (documentation-only) ───────────────────────────────
 
-const savedPlaceSchema = z
+const savedPlaceSourceSchema = z
+  .object({
+    url: z.string().url().nullable().describe("The post's link; null for a post shared in a DM, which has none"),
+    type: z.enum(["reel", "post", "story", "tiktok"]).nullable(),
+    thumbnail_url: z.string().url().nullable().describe("The post's cover; null for a story or when it could not be copied"),
+    author_username: z.string().nullable().describe("The post's author, without @; null when the source does not name one"),
+  })
+  .openapi("SavedPlaceSource");
+
+export const savedPlaceSchema = z
   .object({
     id: z.string().uuid(),
     google_place_id: z.string().nullable(),
@@ -26,7 +36,10 @@ const savedPlaceSchema = z
     district: z.string().nullable(),
     country: z.string().nullable(),
     location: z.unknown().nullable(),
-    category: z.string().nullable(),
+    category: z.string().nullable().describe("Google primary type"),
+    category_group: z
+      .enum(CATEGORY_GROUPS)
+      .describe("What clients draw the place as (pin colour, icon, filter), derived from `category` and `types`. `default` when no group fits."),
     rating: z.number().nullable(),
     rating_count: z.number().nullable(),
     price_level: z.number().nullable(),
@@ -36,11 +49,21 @@ const savedPlaceSchema = z
     google_maps_uri: z.string().nullable(),
     business_status: z.string().nullable(),
     types: z.unknown().nullable(),
-    opening_hours: z.unknown().nullable(),
+    opening_hours: z.unknown().nullable().describe("Google `regularOpeningHours.periods`, in the place's local time"),
+    utc_offset_minutes: z
+      .number()
+      .int()
+      .nullable()
+      .describe("Offset of the place's local time from UTC, for computing open now from `opening_hours`; null until the place is enriched from Google"),
     instagram_username: z.string().nullable(),
     recommendations: z.unknown(),
     notes: z.string().nullable(),
     saved_at: z.string().datetime(),
+    list_ids: z.array(z.string().uuid()).describe("Your lists that hold this place"),
+    visited_at: z.string().datetime().nullable().describe("When you marked it visited (\"Been there\"); null when not visited"),
+    source: savedPlaceSourceSchema
+      .nullable()
+      .describe("The post the place was found in; null when saved from search or before sources were kept (2026-11)"),
   })
   .openapi("SavedPlace");
 
@@ -91,7 +114,9 @@ registry.registerPath({
   path: "/places",
   tags: ["Places"],
   summary: "List places",
-  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns all places the authenticated user has saved. Each item is a flat object combining place details (name, address, rating, photos, etc.) with your personal metadata (notes, saved date).
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns all places the authenticated user has saved. Each item is a flat object combining place details (name, address, rating, photos, etc.) with your personal metadata (notes, saved date, lists, visit, source post).
+
+Each item carries everything a client needs to search, filter and scope the library itself — \`category_group\`, \`district\`, \`list_ids\`, \`visited_at\`, \`opening_hours\` with \`utc_offset_minutes\` — so the web app loads the library once (\`limit=100\`, following \`next_cursor\`) and derives every view from it.
 
 ### Sorting
 
@@ -149,7 +174,7 @@ registry.registerPath({
   path: "/places/photos/{placeId}",
   tags: ["Places"],
   summary: "Photo URLs",
-  description: "Returns a list of photo URLs for any place. No ownership required — any authenticated user can fetch photos for any place ID. Ideal for lazy-loading a photo gallery after the main place details have been displayed.",
+  description: "Returns photo URLs for a place you have saved; any other place id is `404`. Ideal for lazy-loading a photo gallery after the main place details have been displayed. Sent with `Cache-Control: private, max-age=86400`: the links stay valid for days, so the browser keeps the answer for a day.",
   request: {
     params: placeIdParamsSchema.openapi("PlaceIdPhotosParams"),
     query: placePhotosQuerySchema.openapi("PlacePhotosQuery"),
@@ -236,6 +261,38 @@ registry.registerPath({
   },
   responses: {
     204: { description: "Place deleted" },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "put",
+  path: "/places/{placeId}/visit",
+  tags: ["Places"],
+  summary: "Mark visited",
+  description: "Marks a saved place visited (\"Been there\") and returns it with `visited_at` set. Idempotent: marking a place already visited keeps the earlier visit.",
+  request: { params: placeIdParamsSchema },
+  responses: {
+    200: {
+      description: "The saved place, visited",
+      content: { "application/json": { schema: successEnvelope(savedPlaceSchema, "MarkPlaceVisited") } },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/places/{placeId}/visit",
+  tags: ["Places"],
+  summary: "Unmark visited",
+  description: "Marks a saved place not visited, forgetting every visit, and returns it with `visited_at: null`. Idempotent.",
+  request: { params: placeIdParamsSchema },
+  responses: {
+    200: {
+      description: "The saved place, not visited",
+      content: { "application/json": { schema: successEnvelope(savedPlaceSchema, "UnmarkPlaceVisited") } },
+    },
     ...commonErrorResponses,
   },
 });

@@ -30,6 +30,8 @@ export interface SourceContent {
   media_error?: string;
   source_type: SourceType;
   platform: SourcePlatform;
+  /** The post's author on its platform, without @, when the source names one. */
+  author_username?: string | null;
 }
 
 // ── AI extraction result ───────────────────────────────────

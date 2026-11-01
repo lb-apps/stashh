@@ -4,6 +4,7 @@ import type { SourceType } from "../../types/schemas.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
+  RecognitionStage,
   RecognitionTaskInsert,
   RecognitionTaskRow,
 } from "./types.js";
@@ -44,6 +45,19 @@ interface UpsertRecognitionResultParams {
   sourceType: SourceType;
   /** Written only when present, so a failed copy never erases an earlier cover. */
   sourceThumbnailUrl: string | null;
+  /** Written only when present, so a share that does not name the author keeps an earlier one. */
+  authorUsername: string | null;
+}
+
+/** One of the owner's recognitions in a list: the task and its result's cover and count. */
+export interface RecognitionSummaryRow {
+  task: Pick<RecognitionTaskRow, "id" | "status" | "stage" | "source_url" | "result_id" | "created_at" | "finished_at">;
+  result: null | {
+    source_type: string | null;
+    source_thumbnail_url: string | null;
+    author_username: string | null;
+    place_count: number;
+  };
 }
 
 /** A finished recognition as the API presents it: the task and what its result says. */
@@ -118,14 +132,27 @@ export class RecognitionRepository {
     resultId: string,
     ownerUserId: string,
   ): Promise<RecognitionResultRow | null> {
+    return (await this.getOwnedRecognitionResult(resultId, ownerUserId))?.result ?? null;
+  }
+
+  /**
+   * The result and the owner's latest task that produced it (several people, or one person
+   * twice, can share a result); null when no task of the owner points at it.
+   */
+  async getOwnedRecognitionResult(
+    resultId: string,
+    ownerUserId: string,
+  ): Promise<{ result: RecognitionResultRow; taskId: string } | null> {
     const { data: tasks, error: taskError } = await this.supabaseClient
       .from("recognition_tasks")
       .select("id")
       .eq("result_id", resultId)
       .eq("owner_user_id", ownerUserId)
+      .order("created_at", { ascending: false })
       .limit(1);
     if (taskError) throw taskError;
-    if (!tasks?.length) return null;
+    const taskId = tasks?.[0]?.id;
+    if (!taskId) return null;
 
     const { data: result, error } = await this.supabaseClient
       .from("recognition_results")
@@ -133,7 +160,7 @@ export class RecognitionRepository {
       .eq("id", resultId)
       .maybeSingle();
     if (error) throw error;
-    return result;
+    return result ? { result, taskId } : null;
   }
 
   async claimQueuedRecognitions(params: ClaimRecognitionParams): Promise<RecognitionTaskRow[]> {
@@ -183,6 +210,7 @@ export class RecognitionRepository {
           caption: params.caption,
           source_type: params.sourceType,
           ...(params.sourceThumbnailUrl ? { source_thumbnail_url: params.sourceThumbnailUrl } : {}),
+          ...(params.authorUsername ? { author_username: params.authorUsername } : {}),
         },
         { onConflict: "source_url" },
       )
@@ -190,6 +218,38 @@ export class RecognitionRepository {
       .single();
     if (error) throw error;
     return data;
+  }
+
+  async setStage(recognitionId: string, stage: RecognitionStage): Promise<void> {
+    const { error } = await this.supabaseClient.from("recognition_tasks").update({ stage }).eq("id", recognitionId);
+    if (error) throw error;
+  }
+
+  /** The owner's latest recognitions, newest first, with each result's cover and place count. */
+  async listRecognitionsForOwner(ownerUserId: string, limit: number): Promise<RecognitionSummaryRow[]> {
+    const { data, error } = await this.supabaseClient
+      .from("recognition_tasks")
+      .select(
+        "id, status, stage, source_url, result_id, created_at, finished_at, recognition_results (source_type, source_thumbnail_url, author_username, places)",
+      )
+      .eq("owner_user_id", ownerUserId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+
+    type Row = RecognitionSummaryRow["task"] & {
+      recognition_results: null | { source_type: string | null; source_thumbnail_url: string | null; author_username: string | null; places: Json };
+    };
+    return (data as unknown as Row[]).map(({ recognition_results: result, ...task }) => ({
+      task,
+      result: result && {
+        source_type: result.source_type,
+        source_thumbnail_url: result.source_thumbnail_url,
+        author_username: result.author_username,
+        place_count: Array.isArray(result.places) ? result.places.length : 0,
+      },
+    }));
   }
 
   async insertRun(run: RecognitionRunInsert): Promise<void> {
@@ -219,6 +279,7 @@ export class RecognitionRepository {
         error_message: params.errorMessage,
         retry_count: params.backoff.retryCount,
         started_at: null,
+        stage: null,
         available_at: new Date(Date.now() + params.backoff.delayMilliseconds).toISOString(),
       })
       .eq("id", params.recognitionId);

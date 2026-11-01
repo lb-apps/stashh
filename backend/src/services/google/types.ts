@@ -16,6 +16,8 @@ export interface GooglePlaceV1 {
   googleMapsUri?: string;
   businessStatus?: string;
   regularOpeningHours?: unknown;
+  /** Offset of the place's local time from UTC, in minutes. */
+  utcOffsetMinutes?: number;
 }
 
 /** Result from the Places Text Search API (subset of fields we request). */

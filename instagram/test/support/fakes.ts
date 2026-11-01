@@ -112,6 +112,8 @@ export class FakeStashh implements StashhApi {
   createSteps: Array<Step<{ recognitionId: string }>> = [];
   getSteps: Array<Step<Recognition>> = [];
   eraseSteps: Array<Step<void>> = [];
+  minted: string[] = [];
+  mintSteps: Array<Step<{ url: string }>> = [];
 
   async resolveInstagramUser(igsid: string, profile?: InstagramProfile | null) {
     this.resolved.push(igsid);
@@ -147,6 +149,13 @@ export class FakeStashh implements StashhApi {
     return step;
   }
 
+  async mintSignInLink(userId: string) {
+    const step = this.mintSteps.shift() ?? { url: `https://stashh.me/app/a/${"c".repeat(31)}${this.minted.length}` };
+    if (step instanceof Error) throw step;
+    this.minted.push(userId);
+    return step;
+  }
+
   async getRecognition() {
     const step = this.getSteps.shift();
     if (!step) throw new Error("unexpected getRecognition");
@@ -171,8 +180,14 @@ export class FakeMessenger implements Messenger {
     this.typed.push(recipientId);
   }
 
+  /** What was said in words: text messages and the text above a button message. */
   texts(): string[] {
-    return this.sent.flatMap(({ message }) => (message.kind === "text" ? [message.text] : []));
+    return this.sent.flatMap(({ message }) => (message.kind === "text" || message.kind === "button" ? [message.text] : []));
+  }
+
+  /** Every link button sent, as title → url. */
+  buttons(): Array<{ title: string; url: string }> {
+    return this.sent.flatMap(({ message }) => (message.kind === "button" ? message.buttons : []));
   }
 }
 

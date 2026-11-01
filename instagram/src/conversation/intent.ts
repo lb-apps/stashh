@@ -7,12 +7,15 @@ export type Intent =
   | { kind: "recognize"; source: RecognitionSource }
   /** Erase everything Stashh holds about the sender ("sil"). */
   | { kind: "erase" }
+  /** A fresh link to the sender's map on the web ("harita"). */
+  | { kind: "link" }
   /** A share that carries nothing we can read (no media link, no id). */
   | { kind: "unsupported"; attachmentType: string }
   /** Anything else: explain what Stashh does. */
   | { kind: "help" };
 
 const ERASE_COMMANDS = new Set(["sil", "delete"]);
+const LINK_COMMANDS = new Set(["harita", "link"]);
 
 // Links the backend accepts; kept in step with backend/src/modules/recognitions/types.ts.
 const LINK_PATTERN =
@@ -28,7 +31,10 @@ export function interpret(message: { text: string | null; attachments: InboundAt
   }
 
   const text = message.text?.trim() ?? "";
-  if (ERASE_COMMANDS.has(text.toLocaleLowerCase("tr"))) return { kind: "erase" };
+  // Both casings: Turkish lowercases "SİL" to "sil" but "LINK" to "lınk".
+  const commands = [text.toLocaleLowerCase("tr"), text.toLowerCase()];
+  if (commands.some((c) => ERASE_COMMANDS.has(c))) return { kind: "erase" };
+  if (commands.some((c) => LINK_COMMANDS.has(c))) return { kind: "link" };
 
   const link = text.match(LINK_PATTERN)?.[0];
   if (link) return { kind: "recognize", source: { kind: "url", url: link } };

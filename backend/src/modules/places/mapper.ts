@@ -97,6 +97,7 @@ export function mapGooglePlaceV1ToPlacesInsert(
     business_status: g.businessStatus?.toLowerCase() ?? null,
     types: (g.types ?? null) as Json | null,
     opening_hours: (g.regularOpeningHours != null ? extractOpeningHoursPeriods(g.regularOpeningHours) : null) as Json | null,
+    utc_offset_minutes: g.utcOffsetMinutes ?? null,
     thumbnail_url: null,
     instagram_username: null,
     recommendations: [],
@@ -123,9 +124,110 @@ export function recognitionItemToPlacesInsert(item: RecognitionResultPlace): Pla
     google_maps_uri: null,
     types: null,
     opening_hours: null,
+    utc_offset_minutes: null,
     short_formatted_address: null,
     thumbnail_url: item.thumbnail_url ?? null,
     instagram_username: item.instagram_username ?? null,
     recommendations: (item.recommendations ?? []) as unknown as Json,
   };
+}
+
+/**
+ * The groups clients draw places by: one pin colour, icon and filter chip each. Every
+ * client reads `category_group` instead of mapping Google types itself, so web and iOS
+ * always agree. `rooftop` has no Google type yet; it is reserved for list covers and a
+ * future signal. `default` is everything else.
+ */
+export const CATEGORY_GROUPS = [
+  "coffee",
+  "food",
+  "bar",
+  "rooftop",
+  "sweets",
+  "bakery",
+  "wine",
+  "park",
+  "view",
+  "market",
+  "default",
+] as const;
+
+export type CategoryGroup = (typeof CATEGORY_GROUPS)[number];
+
+/** Google Places (New) types per group, Table A. Checked in this order, so wine wins over bar. */
+const GROUP_TYPES: ReadonlyArray<readonly [CategoryGroup, ReadonlySet<string>]> = [
+  ["wine", new Set(["wine_bar", "winery"])],
+  ["coffee", new Set(["coffee_shop", "cafe", "cafeteria", "tea_house", "coffee_roastery", "coffee_stand"])],
+  ["bakery", new Set(["bakery", "bagel_shop"])],
+  [
+    "sweets",
+    new Set([
+      "ice_cream_shop",
+      "dessert_shop",
+      "dessert_restaurant",
+      "confectionery",
+      "candy_store",
+      "chocolate_shop",
+      "chocolate_factory",
+      "donut_shop",
+      "pastry_shop",
+      "acai_shop",
+    ]),
+  ],
+  [
+    "bar",
+    new Set([
+      "bar",
+      "pub",
+      "night_club",
+      "cocktail_bar",
+      "lounge_bar",
+      "sports_bar",
+      "irish_pub",
+      "hookah_bar",
+      "brewery",
+      "brewpub",
+      "beer_garden",
+      "gastropub",
+    ]),
+  ],
+  ["park", new Set(["park", "national_park", "state_park", "city_park", "garden", "botanical_garden", "dog_park", "hiking_area"])],
+  ["view", new Set(["observation_deck", "scenic_spot", "vista_point", "lookout"])],
+  ["market", new Set(["market", "farmers_market", "flea_market", "supermarket", "grocery_store", "food_market"])],
+];
+
+/** Generic food types; any `*_restaurant` is food too, after the specific groups above. */
+const FOOD_TYPES = new Set([
+  "restaurant",
+  "food",
+  "food_court",
+  "meal_takeaway",
+  "meal_delivery",
+  "sandwich_shop",
+  "diner",
+  "deli",
+  "bistro",
+  "steak_house",
+]);
+
+function groupOfType(type: string): CategoryGroup | null {
+  for (const [group, types] of GROUP_TYPES) {
+    if (types.has(type)) return group;
+  }
+  if (FOOD_TYPES.has(type) || type.endsWith("_restaurant")) return "food";
+  return null;
+}
+
+/**
+ * The group of a place: its Google primary type decides, then its other types in Google's
+ * order, else `default`.
+ */
+export function categoryGroup(category: string | null, types: Json | null): CategoryGroup {
+  const candidates = [category, ...(Array.isArray(types) ? types : [])];
+  for (const type of candidates) {
+    if (typeof type !== "string") continue;
+    const group = groupOfType(type);
+    if (group) return group;
+  }
+  return "default";
 }

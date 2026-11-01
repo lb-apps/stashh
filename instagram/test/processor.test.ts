@@ -120,7 +120,9 @@ describe("recognizing a shared Reel", () => {
     await next(mid);
 
     expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2, intent: "recognize", finishedAt: time.now() });
-    expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var."]);
+    expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var, hepsini haritana ekledik."]);
+    expect(stashh.minted).toEqual(["00000000-0000-4000-8000-000000000001"]);
+    expect(messenger.buttons()).toEqual([{ title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }]);
     const carousel = messenger.sent[1]?.message;
     expect(carousel?.kind).toBe("carousel");
     if (carousel?.kind === "carousel") {
@@ -190,7 +192,7 @@ describe("recognizing a shared Reel", () => {
 
     stashh.getSteps.push(recognition("completed", [place(1)]));
     await next(mid);
-    expect(messenger.texts()).toEqual(["Bu videoda 1 mekân var."]);
+    expect(messenger.texts()).toEqual(["Bu videoda 1 mekân var, hepsini haritana ekledik."]);
   });
 
   it("recognizes a shared feed post from its media and names it as a post", async () => {
@@ -210,7 +212,7 @@ describe("recognizing a shared Reel", () => {
 
     stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
     await next(mid);
-    expect(messenger.texts()).toEqual(["Bu gönderide 2 mekân var."]);
+    expect(messenger.texts()).toEqual(["Bu gönderide 2 mekân var, hepsini haritana ekledik."]);
   });
 
   it("asks for the post's link when a shared list post shows none of its names", async () => {
@@ -242,7 +244,7 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", Array.from({ length: 12 }, (_, i) => place(i))));
     await next(mid);
 
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text", "carousel", "carousel"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button", "carousel", "carousel"]);
     expect(store.row(mid).repliesSent).toBe(3);
   });
 });
@@ -302,12 +304,12 @@ describe("failures and retries", () => {
     await next(mid);
 
     expect(store.row(mid)).toMatchObject({ status: "submitted", repliesSent: 1, attempts: 1 });
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button"]);
 
     stashh.getSteps.push(recognition("completed", [place(1)]));
     await next(mid);
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text", "carousel"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button", "carousel"]);
   });
 
   it("expires a message older than the 24-hour reply window without replying", async () => {
@@ -339,7 +341,59 @@ describe("other intents", () => {
     await tick();
     expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
     expect(store.row(mid).finishedAt).not.toBeNull();
-    expect(messenger.texts()).toEqual(['Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.']);
+    expect(messenger.texts()).toEqual([
+      'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim ve haritana ekleyelim. Haritanı açmak için "harita", verilerini silmek için "sil" yaz.',
+    ]);
+  });
+
+  it("sends a fresh personal link to the map for \"harita\"", async () => {
+    const mid = await deliver({ text: "Harita" });
+    await tick();
+
+    expect(stashh.resolved).toEqual([SENDER]);
+    expect(stashh.minted).toEqual(["00000000-0000-4000-8000-000000000001"]);
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "link" });
+    expect(messenger.sent).toEqual([
+      {
+        to: SENDER,
+        message: {
+          kind: "button",
+          text: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
+          buttons: [{ title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }],
+        },
+      },
+    ]);
+  });
+
+  it("retries the link when the backend cannot mint one", async () => {
+    stashh.mintSteps.push(new StashhApiError(503, null, "unavailable"));
+    const mid = await deliver({ text: "link" });
+    await tick();
+    expect(store.row(mid)).toMatchObject({ status: "received", attempts: 1 });
+
+    await next(mid);
+    expect(store.row(mid).status).toBe("replied");
+    expect(messenger.buttons()).toHaveLength(1);
+  });
+
+  it("still replies with the places when the map link cannot be minted", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.mintSteps.push(new StashhApiError(500, null, "boom"));
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+
+    expect(store.row(mid).status).toBe("replied");
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text", "carousel"]);
+    expect(messenger.texts()).toEqual(["Bu Reel'de 1 mekân var, hepsini haritana ekledik."]);
+  });
+
+  it("sends no map link when nothing was found", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("completed", []));
+    await next(mid);
+    expect(stashh.minted).toEqual([]);
   });
 
   it("says which shares it can read for an unsupported attachment", async () => {
@@ -358,7 +412,7 @@ describe("other intents", () => {
     stashh.getSteps.push(recognition("completed", [place(1)]));
     await next(mid);
     expect(store.row(mid)).toMatchObject({ status: "replied", intent: "recognize" });
-    expect(messenger.texts()).toEqual(["Bu hikâyede 1 mekân var."]);
+    expect(messenger.texts()).toEqual(["Bu hikâyede 1 mekân var, hepsini haritana ekledik."]);
   });
 
   it("ignores a redelivered message id", async () => {

@@ -55,6 +55,20 @@ describe("toGraphMessage", () => {
     }
   });
 
+  it("sends a button message as a button template within its limits", () => {
+    const body = toGraphMessage({
+      kind: "button",
+      text: "x".repeat(700),
+      buttons: Array.from({ length: 4 }, () => ({ title: "y".repeat(30), url: "https://stashh.me/app/a/abc" })),
+    }) as { attachment: { type: string; payload: { template_type: string; text: string; buttons: Array<{ type: string; title: string; url: string }> } } };
+
+    expect(body.attachment.type).toBe("template");
+    expect(body.attachment.payload.template_type).toBe("button");
+    expect([...body.attachment.payload.text]).toHaveLength(LIMITS.buttonTemplateTextChars);
+    expect(body.attachment.payload.buttons).toHaveLength(LIMITS.buttonsPerElement);
+    expect(body.attachment.payload.buttons[0]).toEqual({ type: "web_url", title: "y".repeat(19) + "…", url: "https://stashh.me/app/a/abc" });
+  });
+
   it("omits optional fields a card does not have", () => {
     const body = toGraphMessage({ kind: "carousel", cards: [{ title: "A", buttons: [] }] });
     expect(body).toEqual({
@@ -71,7 +85,7 @@ describe("composeRecognitionReply", () => {
       imageUrl: "https://cdn.example/forno.jpg",
       url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc",
       buttons: [
-        { title: "Haritada aç", url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc" },
+        { title: "Google Maps'te aç", url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc" },
         { title: "Instagram", url: "https://www.instagram.com/fornodiromatr/" },
       ],
     });
@@ -81,7 +95,7 @@ describe("composeRecognitionReply", () => {
     const card = toCard({ ...place, rating: null, address: null, thumbnail_url: null, instagram_username: null });
     expect(card).not.toHaveProperty("subtitle");
     expect(card).not.toHaveProperty("imageUrl");
-    expect(card.buttons.map((b) => b.title)).toEqual(["Haritada aç"]);
+    expect(card.buttons.map((b) => b.title)).toEqual(["Google Maps'te aç"]);
   });
 
   it("names the source the way the person shared it", () => {
@@ -90,6 +104,14 @@ describe("composeRecognitionReply", () => {
     expect(sourceKindOf({ kind: "url", url: "https://vm.tiktok.com/X/" })).toBe("video");
     expect(sourceKindOf({ kind: "instagram_media", format: "post", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("post");
     expect(sourceKindOf({ kind: "instagram_media", format: "story", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("story");
-    expect(composeRecognitionReply([place], "post")[0]).toEqual({ kind: "text", text: "Bu gönderide 1 mekân var." });
+    expect(composeRecognitionReply([place], "post")[0]).toEqual({ kind: "text", text: "Bu gönderide 1 mekân var, hepsini haritana ekledik." });
+  });
+
+  it("puts the person's map link under the summary when there is one", () => {
+    expect(composeRecognitionReply([place], "reel", "https://stashh.me/app/a/abc")[0]).toEqual({
+      kind: "button",
+      text: "Bu Reel'de 1 mekân var, hepsini haritana ekledik.",
+      buttons: [{ title: "Haritanda aç", url: "https://stashh.me/app/a/abc" }],
+    });
   });
 });

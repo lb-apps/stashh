@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { sendAccepted, sendError, sendNoContent, sendSuccess } from "../../http/response.js";
+import { sendAccepted, sendCreated, sendError, sendNoContent, sendSuccess } from "../../http/response.js";
 import { createChannelIdentityService } from "../identities/factory.js";
 import {
   channelIdentityParamsSchema,
@@ -13,6 +13,8 @@ import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
 import { createInternalRecognitionRequestSchema, toRecognitionSource } from "../recognitions/types.js";
+import { createSignInLinkService } from "../sign-in-links/factory.js";
+import { redeemSignInLinkBodySchema } from "../sign-in-links/types.js";
 
 /**
  * Service-to-service API for trusted channel adapters (the Instagram DM service).
@@ -143,6 +145,8 @@ internalRouter.post("/users/:userId/recognitions", async (req, res, next) => {
     const task = await createRecognitionServiceWithServiceRole().enqueueRecognition({
       ownerUserId: params.data.userId,
       source: toRecognitionSource(body.data),
+      // A channel has no "Add places" step: what it finds goes straight into the person's library.
+      options: { auto_save: true },
       idempotencyKey: idempotencyKey?.data,
     });
     sendAccepted(res, req, presentAcceptedRecognition(task));
@@ -168,6 +172,43 @@ internalRouter.get("/users/:userId/recognitions/:id", async (req, res, next) => 
       return;
     }
     sendSuccess(res, req, 200, presentRecognition(recognition));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Web sign-in links ───────────────────────────────────────────────────────
+
+/** A personal, one-time link to the web app, for the channel to send to `userId`. */
+internalRouter.post("/users/:userId/sign-in-links", async (req, res, next) => {
+  const params = userParamsSchema.safeParse(req.params);
+  if (!params.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid path", params.error.flatten().fieldErrors);
+    return;
+  }
+
+  try {
+    sendCreated(res, req, await createSignInLinkService().mint(params.data.userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Spends a link and returns the magic-link token the web app turns into a session. */
+internalRouter.post("/sign-in-links/redeem", async (req, res, next) => {
+  const body = redeemSignInLinkBodySchema.safeParse(req.body);
+  if (!body.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid request body", body.error.flatten().fieldErrors);
+    return;
+  }
+
+  try {
+    const redeemed = await createSignInLinkService().redeem(body.data.code);
+    if (!redeemed) {
+      sendError(res, req, 410, "SIGN_IN_LINK_INVALID", "This sign-in link is invalid, used or expired");
+      return;
+    }
+    sendSuccess(res, req, 200, redeemed);
   } catch (error) {
     next(error);
   }

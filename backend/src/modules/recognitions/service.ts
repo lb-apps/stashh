@@ -2,11 +2,12 @@ import { config } from "../../config.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
 import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
-import type { RecognitionRepository, RecognitionWithResult } from "./repository.js";
+import type { RecognitionRepository, RecognitionSummaryRow, RecognitionWithResult } from "./repository.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
   RecognitionSource,
+  RecognitionStage,
   RecognitionTaskOptions,
   RecognitionTaskRow,
   SharedMediaFormat,
@@ -165,6 +166,11 @@ export class RecognitionService {
     return this.recognitionRepository.getRecognitionByIdForOwner(recognitionId, ownerUserId);
   }
 
+  /** The owner's latest recognitions, newest first. */
+  async listRecognitions(ownerUserId: string, limit: number): Promise<RecognitionSummaryRow[]> {
+    return this.recognitionRepository.listRecognitionsForOwner(ownerUserId, limit);
+  }
+
   async getRecognitionResultForOwner(
     resultId: string,
     ownerUserId: string,
@@ -198,11 +204,24 @@ export class RecognitionService {
    * not served again: the next share runs afresh, so a post the pipeline could not read
    * yesterday gets another chance once it can.
    */
-  async getCachedResultId(sourceUrl: string): Promise<string | null> {
+  async getCachedResult(sourceUrl: string): Promise<{ id: string; places: RecognitionResultPlace[] } | null> {
     const cachedResult = await this.recognitionRepository.getRecognitionResultBySourceUrl(sourceUrl);
     if (!cachedResult) return null;
-    if (Array.isArray(cachedResult.places) && cachedResult.places.length === 0) return null;
-    return cachedResult.id;
+    const places = Array.isArray(cachedResult.places) ? (cachedResult.places as unknown as RecognitionResultPlace[]) : [];
+    if (places.length === 0) return null;
+    return { id: cachedResult.id, places };
+  }
+
+  /**
+   * Records the step a processing task is on, for clients showing live progress. Like
+   * metrics, an observer: a failed write is logged and swallowed.
+   */
+  async setStage(recognitionId: string, stage: RecognitionStage, log: Logger): Promise<void> {
+    try {
+      await this.recognitionRepository.setStage(recognitionId, stage);
+    } catch (error) {
+      log.warn({ err: error, stage }, "recognition stage not recorded");
+    }
   }
 
   mapPipelineResultToStoredPlaces(
@@ -239,6 +258,7 @@ export class RecognitionService {
       caption: sourceContent.caption,
       sourceType: sourceContent.source_type,
       sourceThumbnailUrl,
+      authorUsername: sourceContent.author_username ?? null,
     });
     return result.id;
   }
