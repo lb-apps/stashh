@@ -6,7 +6,7 @@ Production is two services and a tunnel, run as containers from the root [`compo
 |---|---|---|---|
 | `backend` | built from [`backend/Dockerfile`](../backend/Dockerfile) | 3000 | API and recognition worker in one process (`node dist/start.js`) |
 | `instagram` | built from [`instagram/Dockerfile`](../instagram/Dockerfile) | 3002 | Instagram DM channel (Node 24 runs the TypeScript as it is) |
-| `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`): `https://instagram.stashh.me` → `instagram:3002`, so Meta's webhook reaches the host |
+| `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`), routed by `deploy/tunnel/config.yml`: `https://instagram.stashh.me` → `instagram:3002` (Meta's webhook), `https://api.stashh.me` → `backend:3000` (the web app; of `/internal` only the sign-in-link redeem is public) |
 
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
 time. `web/` (Vercel) and `ops/` (local only) are not part of the stack. Images are built from
@@ -34,11 +34,13 @@ docker compose up -d --build --wait
   and runs unlimited (see [A Linux host instead](#a-linux-host-instead)).
 
 Verify: `docker compose ps` shows all three healthy; `curl localhost:3000/health` and
-`curl localhost:3002/health` answer; `curl https://instagram.stashh.me/health` → 200 through the tunnel.
+`curl localhost:3002/health` answer; `curl https://instagram.stashh.me/health` and
+`curl https://api.stashh.me/health` → 200 through the tunnel, `curl https://api.stashh.me/internal/v1/ops/recognitions` → 404.
 
 Naming: a tunnel is a connector identity, so it is named for the environment that runs it
 (`stashh-prod`; a staging host would get `stashh-staging`). Hostnames name the service behind them
-(`instagram.stashh.me`; `api.stashh.me` once the backend is exposed). The production connector runs
+(`instagram.stashh.me`, `api.stashh.me`). A new hostname is a rule in `deploy/tunnel/config.yml` plus
+`cloudflared tunnel route dns stashh-prod <hostname>` on a machine with the account certificate. The production connector runs
 only on the production host: a second connector anywhere else would receive half of Meta's deliveries.
 
 ## `home-server` follows the repo

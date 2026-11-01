@@ -1,0 +1,22 @@
+# Ingress of the stashh-prod tunnel: which public hostname reaches which container.
+# No secrets here — the connector authenticates with TUNNEL_TOKEN from tunnel.env.
+# Rules match top to bottom; the last one must be a catch-all.
+ingress:
+  # Meta's Instagram webhook and the DM channel.
+  - hostname: instagram.stashh.me
+    service: http://instagram:3002
+
+  # The public API the web app (stashh.me/app) calls from the browser.
+  # Of the internal API, only redeeming a DM sign-in link is reachable from the internet
+  # (stashh.me's server calls it, with its own service token). Everything else under
+  # /internal stays on the host, as does the development-only /dev.
+  - hostname: api.stashh.me
+    path: ^/internal/v1/sign-in-links/redeem$
+    service: http://backend:3000
+  - hostname: api.stashh.me
+    path: ^/(internal|dev)(/|$)
+    service: http_status:404
+  - hostname: api.stashh.me
+    service: http://backend:3000
+
+  - service: http_status:404
