@@ -1,0 +1,31 @@
+/** Copy for the "My places" sheet and the empty-library state. */
+export const libraryCopy = {
+  en: {
+    title: "My places",
+    placesSaved: "Places saved",
+    lists: "Lists",
+    neighbourhoods: "Neighbourhoods",
+    yourLists: "Your lists",
+    byNeighbourhood: "By neighbourhood",
+    byCategory: "By category",
+    recentlySaved: "Recently saved",
+    places: (n: string, count: number) => (count === 1 ? "1 place" : `${n} places`),
+    emptyHeadline: "Nothing saved here yet",
+    emptySub: "Paste a Reel and we’ll pull the places out of it.",
+    pasteReel: "Paste a Reel",
+  },
+  tr: {
+    title: "Mekanlarım",
+    placesSaved: "Kayıtlı mekan",
+    lists: "Liste",
+    neighbourhoods: "Semt",
+    yourLists: "Listelerin",
+    byNeighbourhood: "Semtlere göre",
+    byCategory: "Türlere göre",
+    recentlySaved: "Son kaydedilenler",
+    places: (n: string) => `${n} mekan`,
+    emptyHeadline: "Henüz bir şey kaydetmedin",
+    emptySub: "Bir Reel yapıştır, içindeki mekanları biz çıkaralım.",
+    pasteReel: "Reel yapıştır",
+  },
+};

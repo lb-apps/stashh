@@ -62,16 +62,22 @@ services:
           memory: 256m
     logging: *logging
 
-  # Meta's webhook → https://instagram.stashh.me → this connector → the instagram service.
-  # The tunnel is named for the environment that runs the connector (stashh-prod); hostnames name
-  # the service. It runs from its token; no certificate or credentials file is needed.
+  # The public hostnames → this connector → the containers, by deploy/tunnel/config.yml:
+  # https://instagram.stashh.me → instagram (Meta's webhook), https://api.stashh.me → backend
+  # (the web app). The tunnel is named for the environment that runs the connector
+  # (stashh-prod); hostnames name the service. It runs from its token; no certificate or
+  # credentials file is needed.
   tunnel:
     image: cloudflare/cloudflared:2026.10.0
     container_name: tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run --url http://instagram:3002
+    command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 --config /etc/cloudflared/config.yml run
     env_file: ${STASHH_ENV_DIR:-./deploy}/tunnel.env
+    volumes:
+      - ./deploy/tunnel/config.yml:/etc/cloudflared/config.yml:ro
     depends_on:
+      backend:
+        condition: service_healthy
       instagram:
         condition: service_healthy
     healthcheck:

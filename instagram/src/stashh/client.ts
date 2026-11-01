@@ -18,6 +18,8 @@ const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
 
+const signInLinkSchema = z.object({ url: z.string().url(), expires_at: z.string() });
+
 export const placeSchema = z.object({
   google_place_id: z.string(),
   name: z.string(),
@@ -86,6 +88,8 @@ export interface StashhApi {
   eraseInstagramUser(igsid: string): Promise<void>;
   createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }): Promise<{ recognitionId: string }>;
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
+  /** A personal, one-time link that signs the user in to the web app; for their DM only. */
+  mintSignInLink(userId: string): Promise<{ url: string }>;
 }
 
 export class HttpStashhApi implements StashhApi {
@@ -141,6 +145,11 @@ export class HttpStashhApi implements StashhApi {
 
   async getRecognition({ userId, recognitionId }: { userId: string; recognitionId: string }) {
     return this.request("GET", `/internal/v1/users/${userId}/recognitions/${recognitionId}`, recognitionSchema);
+  }
+
+  async mintSignInLink(userId: string) {
+    const data = await this.request("POST", `/internal/v1/users/${userId}/sign-in-links`, signInLinkSchema, { body: {} });
+    return { url: data.url };
   }
 
   private async request<T extends z.ZodType>(

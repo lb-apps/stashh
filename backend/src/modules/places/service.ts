@@ -8,13 +8,23 @@ import type { Json } from "../../types/database.js";
 import { AppHttpError } from "../../errors/appHttpError.js";
 import type { RecognitionRepository } from "../recognitions/repository.js";
 import type { RecognitionResultPlace } from "../recognitions/service.js";
-import { recognitionItemToPlacesInsert, mapGooglePlaceV1ToPlacesInsert } from "./mapper.js";
+import { categoryGroup, recognitionItemToPlacesInsert, mapGooglePlaceV1ToPlacesInsert, type CategoryGroup } from "./mapper.js";
 import { backfillPlacesInsertFromApi } from "./mergePlacesInsert.js";
-import type { PlaceInsert, PlacesRepository, PlaceRow } from "./repository.js";
+import type { PlaceInsert, PlacesRepository, PlaceRow, SavedPlaceRecord } from "./repository.js";
 import type { AddPlacesBody, NearbyPlacesQuery, PatchSavedPlaceBody, PlacesListQuery } from "./types.js";
 import { decodeOffsetCursor, encodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
-import type { NearbyPlaceRow } from "./repository.js";
+
+/** The post a saved place was found in. */
+export interface SavedPlaceSourceDto {
+  /** The post's link; null for a post shared in a DM, which has none. */
+  url: string | null;
+  type: "reel" | "post" | "story" | "tiktok" | null;
+  /** The post's cover, copied to storage; null for a story or when it could not be copied. */
+  thumbnail_url: string | null;
+  /** The post's author, without @; null when the source does not name one. */
+  author_username: string | null;
+}
 
 /**
  * Flat-merged DTO: canonical place fields + user-specific saved metadata.
@@ -31,6 +41,8 @@ export interface SavedPlaceDto {
   country: string | null;
   location: Json | null;
   category: string | null;
+  /** What clients draw the place as; derived from `category` and `types`. */
+  category_group: CategoryGroup;
   rating: number | null;
   rating_count: number | null;
   price_level: number | null;
@@ -41,25 +53,37 @@ export interface SavedPlaceDto {
   business_status: string | null;
   types: Json | null;
   opening_hours: Json | null;
+  /** Offset of the place's local time from UTC; `opening_hours` periods are in local time. */
+  utc_offset_minutes: number | null;
   instagram_username: string | null;
   recommendations: Json;
   notes: string | null;
   saved_at: string;
+  /** Ids of the owner's lists that hold this place. */
+  list_ids: string[];
+  /** When the owner last marked it visited; null when not visited. */
+  visited_at: string | null;
+  /** The recognition it was saved from; null when saved another way or before sources were kept. */
+  source: SavedPlaceSourceDto | null;
   /** Distance in metres from the requested coordinate. Only present for nearby queries. */
   distance_m?: number;
 }
 
-/**
- * The subset of a `places` row this mapper actually reads. Nearby results come from
- * an RPC that omits PostGIS-only columns (`geo_location`), so requiring a full
- * `PlaceRow` here would reject a perfectly valid row.
- */
-type SavedPlaceSource = Omit<PlaceRow, "geo_location">;
+const SOURCE_TYPES = new Set(["reel", "post", "story", "tiktok"]);
 
-function toSavedPlaceDto(
-  place: SavedPlaceSource,
-  saved: { notes: string | null; created_at: string },
-): SavedPlaceDto {
+function toSourceDto(source: SavedPlaceRecord["source"]): SavedPlaceSourceDto | null {
+  if (!source) return null;
+  const type = source.result?.source_type ?? null;
+  return {
+    // Shared media is keyed `instagram-media:<id>`, not a link.
+    url: /^https?:\/\//.test(source.source_url) ? source.source_url : null,
+    type: type && SOURCE_TYPES.has(type) ? (type as SavedPlaceSourceDto["type"]) : null,
+    thumbnail_url: source.result?.source_thumbnail_url ?? null,
+    author_username: source.result?.author_username ?? null,
+  };
+}
+
+export function toSavedPlaceDto({ place, saved_place: saved, list_ids, visits, source }: SavedPlaceRecord): SavedPlaceDto {
   return {
     id: place.id,
     google_place_id: place.google_place_id,
@@ -71,6 +95,7 @@ function toSavedPlaceDto(
     country: place.country,
     location: place.location,
     category: place.category,
+    category_group: categoryGroup(place.category, place.types),
     rating: place.rating,
     rating_count: place.rating_count,
     price_level: place.price_level,
@@ -81,10 +106,14 @@ function toSavedPlaceDto(
     business_status: place.business_status,
     types: place.types,
     opening_hours: place.opening_hours,
+    utc_offset_minutes: place.utc_offset_minutes,
     instagram_username: place.instagram_username,
     recommendations: place.recommendations,
     notes: saved.notes,
     saved_at: saved.created_at,
+    list_ids,
+    visited_at: visits.reduce<string | null>((latest, at) => (latest === null || at > latest ? at : latest), null),
+    source: toSourceDto(source),
   };
 }
 
@@ -127,9 +156,7 @@ export class PlacesService {
     ]);
 
     const hasMore = offset + rows.length < total;
-    const items: SavedPlaceDto[] = rows.map((r) =>
-      toSavedPlaceDto(r.place, r.saved_place),
-    );
+    const items = rows.map(toSavedPlaceDto);
     const pagination: ApiPaginationMeta = {
       limit: query.limit,
       next_cursor: hasMore ? encodeOffsetCursor(offset + query.limit) : null,
@@ -164,38 +191,17 @@ export class PlacesService {
     ]);
 
     const hasMore = offset + rows.length < total;
-    const items: SavedPlaceDto[] = rows.map((r: NearbyPlaceRow) => ({
-      ...toSavedPlaceDto(
-        {
-          id: r.id,
-          google_place_id: r.google_place_id,
-          name: r.name,
-          address: r.address,
-          short_formatted_address: r.short_formatted_address,
-          city: r.city,
-          district: r.district,
-          country: r.country,
-          location: r.location,
-          category: r.category,
-          rating: r.rating,
-          rating_count: r.rating_count,
-          price_level: r.price_level,
-          thumbnail_url: r.thumbnail_url,
-          website_url: r.website_url,
-          phone_number: r.phone_number,
-          google_maps_uri: r.google_maps_uri,
-          business_status: r.business_status,
-          types: r.types,
-          opening_hours: r.opening_hours,
-          instagram_username: r.instagram_username,
-          recommendations: r.recommendations,
-          created_at: r.saved_at,
-          updated_at: r.saved_at,
-        },
-        { notes: r.notes, created_at: r.saved_at },
-      ),
-      distance_m: r.distance_m,
-    }));
+    // The RPC orders by distance; the full rows (lists, visits, source) come in one more read.
+    const records = new Map(
+      (await this.placesRepo.getSavedPlacesByIds(rows.map((r) => r.saved_place_id), ownerUserId)).map((record) => [
+        record.saved_place.id,
+        record,
+      ]),
+    );
+    const items: SavedPlaceDto[] = rows.flatMap((r) => {
+      const record = records.get(r.saved_place_id);
+      return record ? [{ ...toSavedPlaceDto(record), distance_m: r.distance_m }] : [];
+    });
 
     const pagination: ApiPaginationMeta = {
       limit: query.limit,
@@ -213,7 +219,7 @@ export class PlacesService {
     if (!row) {
       throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
     }
-    return toSavedPlaceDto(row.place, row.saved_place);
+    return toSavedPlaceDto(row);
   }
 
   async patchSavedPlace(
@@ -247,14 +253,39 @@ export class PlacesService {
     return { deleted: true };
   }
 
+  /** Marks the saved place visited ("Been there"). Idempotent: an earlier visit is kept. */
+  async markVisited(ownerUserId: string, placeId: string): Promise<SavedPlaceDto> {
+    const existing = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
+    if (!existing) {
+      throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
+    }
+    await this.placesRepo.markVisited(existing.saved_place.id, ownerUserId, new Date());
+    return this.getSavedPlace(ownerUserId, placeId);
+  }
+
+  /** Marks the saved place not visited, forgetting every visit. Idempotent. */
+  async clearVisited(ownerUserId: string, placeId: string): Promise<SavedPlaceDto> {
+    const existing = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
+    if (!existing) {
+      throw new AppHttpError(404, "Saved place not found", "PLACE_NOT_FOUND");
+    }
+    await this.placesRepo.clearVisits(existing.saved_place.id, ownerUserId);
+    return this.getSavedPlace(ownerUserId, placeId);
+  }
+
   /**
-   * Returns fresh photo URLs for any canonical place (no ownership required).
+   * Returns fresh photo URLs for a place the owner has saved. Each call costs Places API
+   * requests, so a place outside the owner's library is a 404 like any other unknown id.
    */
   async getPlacePhotoUrls(
+    ownerUserId: string,
     placeId: string,
     limit: number,
     maxWidthPx: number,
   ): Promise<{ urls: string[] }> {
+    if (!(await this.placesRepo.userOwnsPlace(ownerUserId, placeId))) {
+      throw new AppHttpError(404, "Place not found", "PLACE_NOT_FOUND");
+    }
     const place = await this.placesRepo.getPlaceById(placeId);
     if (!place) {
       throw new AppHttpError(404, "Place not found", "PLACE_NOT_FOUND");
@@ -276,37 +307,41 @@ export class PlacesService {
   async addPlaces(ownerUserId: string, body: AddPlacesBody): Promise<{ results: AddPlaceResultEntry[] }> {
     const ids = [...new Set(body.place_ids)];
     this.log.info({ source: body.source, placeCount: ids.length }, "add places");
-    let itemsByGoogleId: Map<string, RecognitionResultPlace> | null = null;
 
-    if (body.source === "recognition") {
-      const result = await this.recognitionRepo.getRecognitionResultByIdForOwner(
-        body.recognition_result_id,
-        ownerUserId,
-      );
-      if (!result) {
-        throw new AppHttpError(403, "Result not found or access denied", "RESULT_FORBIDDEN");
-      }
-      const raw = result.places;
-      const list = Array.isArray(raw) ? (raw as unknown as RecognitionResultPlace[]) : [];
-      itemsByGoogleId = new Map(list.map((p) => [p.google_place_id, p]));
-      for (const googlePlaceId of ids) {
-        if (!itemsByGoogleId.has(googlePlaceId)) {
-          throw new AppHttpError(
-            400,
-            `Place ${googlePlaceId} is not in this recognition result`,
-            "PLACE_NOT_IN_RESULT",
-          );
-        }
-      }
+    if (body.source === "google") {
+      const results = await Promise.all(ids.map((googlePlaceId) => this.resolveAndSavePlace(googlePlaceId, ownerUserId, null, null)));
+      return { results };
     }
 
-    const results = await Promise.all(
-      ids.map((googlePlaceId) =>
-        this.resolveAndSavePlace(googlePlaceId, ownerUserId, body, itemsByGoogleId),
-      ),
-    );
+    const owned = await this.recognitionRepo.getOwnedRecognitionResult(body.recognition_result_id, ownerUserId);
+    if (!owned) {
+      throw new AppHttpError(403, "Result not found or access denied", "RESULT_FORBIDDEN");
+    }
+    const raw = owned.result.places;
+    const itemsByGoogleId = new Map((Array.isArray(raw) ? (raw as unknown as RecognitionResultPlace[]) : []).map((p) => [p.google_place_id, p]));
+    const items = ids.map((googlePlaceId) => {
+      const item = itemsByGoogleId.get(googlePlaceId);
+      if (!item) {
+        throw new AppHttpError(400, `Place ${googlePlaceId} is not in this recognition result`, "PLACE_NOT_IN_RESULT");
+      }
+      return item;
+    });
 
-    return { results };
+    return { results: await this.saveRecognitionPlaces(ownerUserId, items, owned.taskId) };
+  }
+
+  /**
+   * Saves places a recognition found to the owner's library, each linked to the task as its
+   * source. Idempotent: a place already saved keeps its notes and original source. Used by
+   * `POST /places` and by the worker for channel recognitions, which save automatically.
+   */
+  async saveRecognitionPlaces(
+    ownerUserId: string,
+    items: RecognitionResultPlace[],
+    sourceTaskId: string,
+  ): Promise<AddPlaceResultEntry[]> {
+    const unique = [...new Map(items.map((item) => [item.google_place_id, item])).values()];
+    return Promise.all(unique.map((item) => this.resolveAndSavePlace(item.google_place_id, ownerUserId, item, sourceTaskId)));
   }
 
   /** Validates that the user has saved the place identified by canonical places.id. */
@@ -332,12 +367,9 @@ export class PlacesService {
   private async resolveAndSavePlace(
     googlePlaceId: string,
     ownerUserId: string,
-    body: AddPlacesBody,
-    itemsByGoogleId: Map<string, RecognitionResultPlace> | null,
+    fromRecognition: RecognitionResultPlace | null,
+    sourceTaskId: string | null,
   ): Promise<AddPlaceResultEntry> {
-    const fromRecognition =
-      body.source === "recognition" ? (itemsByGoogleId!.get(googlePlaceId) ?? null) : null;
-
     const existingCanonical = await this.placesRepo.getPlaceByGooglePlaceId(googlePlaceId);
     let placeRow: PlaceRow;
     let place_source: string;
@@ -346,12 +378,12 @@ export class PlacesService {
       placeRow = await this.enrichExistingPlace(existingCanonical, googlePlaceId);
       place_source = "existing";
       this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: reused existing canonical place");
-    } else if (body.source === "google") {
+    } else if (!fromRecognition) {
       placeRow = await this.createPlaceFromGoogle(googlePlaceId);
       place_source = "google";
       this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from Google API");
     } else {
-      placeRow = await this.createPlaceFromRecognition(googlePlaceId, fromRecognition!);
+      placeRow = await this.createPlaceFromRecognition(googlePlaceId, fromRecognition);
       place_source = "recognition";
       this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from recognition result");
     }
@@ -359,6 +391,7 @@ export class PlacesService {
     const { created } = await this.placesRepo.tryInsertSavedPlace({
       owner_user_id: ownerUserId,
       place_id: placeRow.id,
+      source_recognition_task_id: sourceTaskId,
     });
 
     this.log.info(
@@ -378,7 +411,8 @@ export class PlacesService {
       existing.city === null ||
       existing.district === null ||
       existing.country === null ||
-      existing.location === null;
+      existing.location === null ||
+      existing.utc_offset_minutes === null;
 
     if (!needsEnrichment) return existing;
 
@@ -391,6 +425,9 @@ export class PlacesService {
     if (existing.district === null && apiInsert.district) patch.district = apiInsert.district;
     if (existing.country === null && apiInsert.country) patch.country = apiInsert.country;
     if (existing.location === null && apiInsert.location) patch.location = apiInsert.location;
+    if (existing.utc_offset_minutes === null && apiInsert.utc_offset_minutes != null) {
+      patch.utc_offset_minutes = apiInsert.utc_offset_minutes;
+    }
 
     if (Object.keys(patch).length === 0) return existing;
 

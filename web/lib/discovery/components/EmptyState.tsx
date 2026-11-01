@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { TEXT_SECONDARY_STRONG } from '../pending-tokens';
 
 /** Utility-mode empty state: a glossy object, a headline, one grey helper line. */
 type EmptyStateProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
@@ -48,7 +49,7 @@ export function EmptyState({ object = null, headline, sub, action = null, style,
               fontFamily: 'var(--font-text)',
               fontSize: 'var(--fs-body-lg)',
               lineHeight: 'var(--lh-body-lg)',
-              color: 'var(--text-secondary)',
+              color: TEXT_SECONDARY_STRONG,
             }}
           >
             {sub}

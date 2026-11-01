@@ -223,6 +223,7 @@ export type Database = {
           types: Json | null
           updated_at: string
           website_url: string | null
+          utc_offset_minutes: number | null
         }
         Insert: {
           address?: string | null
@@ -250,6 +251,7 @@ export type Database = {
           types?: Json | null
           updated_at?: string
           website_url?: string | null
+          utc_offset_minutes?: number | null
         }
         Update: {
           address?: string | null
@@ -277,6 +279,7 @@ export type Database = {
           types?: Json | null
           updated_at?: string
           website_url?: string | null
+          utc_offset_minutes?: number | null
         }
         Relationships: []
       }
@@ -292,6 +295,7 @@ export type Database = {
           source_url: string
           updated_at: string
           video_url: string | null
+          author_username: string | null
         }
         Insert: {
           caption?: string | null
@@ -304,6 +308,7 @@ export type Database = {
           source_url: string
           updated_at?: string
           video_url?: string | null
+          author_username?: string | null
         }
         Update: {
           caption?: string | null
@@ -316,6 +321,7 @@ export type Database = {
           source_url?: string
           updated_at?: string
           video_url?: string | null
+          author_username?: string | null
         }
         Relationships: []
       }
@@ -431,6 +437,7 @@ export type Database = {
           started_at: string | null
           status: string
           updated_at: string
+          stage: string | null
         }
         Insert: {
           available_at?: string
@@ -448,6 +455,7 @@ export type Database = {
           started_at?: string | null
           status?: string
           updated_at?: string
+          stage?: string | null
         }
         Update: {
           available_at?: string
@@ -465,6 +473,7 @@ export type Database = {
           started_at?: string | null
           status?: string
           updated_at?: string
+          stage?: string | null
         }
         Relationships: [
           {
@@ -484,6 +493,7 @@ export type Database = {
           owner_user_id: string
           place_id: string
           updated_at: string
+          source_recognition_task_id: string | null
         }
         Insert: {
           created_at?: string
@@ -492,6 +502,7 @@ export type Database = {
           owner_user_id: string
           place_id: string
           updated_at?: string
+          source_recognition_task_id?: string | null
         }
         Update: {
           created_at?: string
@@ -500,8 +511,16 @@ export type Database = {
           owner_user_id?: string
           place_id?: string
           updated_at?: string
+          source_recognition_task_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "saved_places_source_recognition_task_id_fkey"
+            columns: ["source_recognition_task_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_tasks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_places_place_id_fkey"
             columns: ["place_id"]
@@ -544,6 +563,7 @@ export type Database = {
           owner_user_id: string
           title: string
           updated_at: string
+          cover_category: string | null
         }
         Insert: {
           created_at?: string
@@ -553,6 +573,7 @@ export type Database = {
           owner_user_id: string
           title: string
           updated_at?: string
+          cover_category?: string | null
         }
         Update: {
           created_at?: string
@@ -562,6 +583,7 @@ export type Database = {
           owner_user_id?: string
           title?: string
           updated_at?: string
+          cover_category?: string | null
         }
         Relationships: []
       }
@@ -633,6 +655,33 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           username?: string
+        }
+        Relationships: []
+      }
+      web_sign_in_links: {
+        Row: {
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

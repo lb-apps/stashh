@@ -24,6 +24,11 @@ export function isTikTokUrl(url: string): boolean {
   }
 }
 
+/** The author in a `tiktok.com/@<user>/video/<id>` link; null for a short link. */
+export function tiktokAuthor(url: string): string | null {
+  return url.match(/tiktok\.com\/@([A-Za-z0-9._]{1,30})(?:[/?#]|$)/i)?.[1] ?? null;
+}
+
 export async function fetchTikTokContent(
   url: string,
   log: Logger,
@@ -61,5 +66,6 @@ export async function fetchTikTokContent(
     caption,
     source_type: "tiktok",
     platform: "tiktok",
+    author_username: tiktokAuthor(url),
   };
 }

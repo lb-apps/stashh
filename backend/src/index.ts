@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import helmet from "helmet";
 import http from "node:http";
 import { resolve } from "node:path";
@@ -9,6 +8,7 @@ import { listsRouter } from "./modules/lists/routes.js";
 import { libraryRouter } from "./modules/library/routes.js";
 import { placesRouter } from "./modules/places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
+import { meRouter } from "./modules/me/routes.js";
 import { rootLogger } from "./lib/logger.js";
 import { requireAuth } from "./middleware/auth.js";
 import { apiRateLimiter, internalRateLimiter } from "./middleware/rateLimiter.js";
@@ -16,6 +16,7 @@ import { createServiceAuth } from "./middleware/serviceAuth.js";
 import { internalRouter } from "./modules/internal/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestIdMiddleware } from "./http/requestId.js";
+import { createCors } from "./http/cors.js";
 import { apiMetrics, apiMetricsMiddleware } from "./lib/api-metrics.js";
 import { sendSuccess, sendError } from "./http/response.js";
 import { mountDocs } from "./docs.js";
@@ -46,8 +47,8 @@ export async function closeHttpServer(): Promise<void> {
   });
 }
 
-// Block all cross-origin web requests — this API is for the native iOS app only
-app.use(cors({ origin: false }));
+// The web app calls the API from the browser; every other origin stays blocked.
+app.use(createCors(config.WEB_ORIGINS));
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -91,6 +92,10 @@ app.use("/api/v1/places", requireAuth, apiRateLimiter, placesRouter);
 // ── Recognitions (protected + rate limited) ──────────────────────────────────
 
 app.use("/api/v1/recognitions", requireAuth, apiRateLimiter, recognitionsRouter);
+
+// ── Profile (protected + rate limited) ───────────────────────────────────────
+
+app.use("/api/v1/me", requireAuth, apiRateLimiter, meRouter);
 
 // ── Internal API (service-to-service; service token, never user JWTs) ───────
 

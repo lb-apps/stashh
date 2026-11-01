@@ -1,18 +1,10 @@
 'use client';
 
 import * as React from 'react';
-
-const CATEGORY: Record<string, string> = {
-  coffee: 'var(--pin-coffee)',
-  food: 'var(--pin-food)',
-  bar: 'var(--pin-bar)',
-  rooftop: 'var(--pin-rooftop)',
-  sweets: 'var(--pin-sweets)',
-  default: 'var(--pin-default)',
-};
+import { categoryColor, type PlaceCategory } from '../categories';
 
 /** A saved place as a row: category disc, name, address, and one trailing value. */
-export type PlaceCategory = 'coffee' | 'food' | 'bar' | 'rooftop' | 'sweets' | 'default';
+export type { PlaceCategory };
 
 type PlaceRowProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
   name: React.ReactNode;
@@ -62,7 +54,7 @@ export function PlaceRow({
             width: disc,
             height: disc,
             borderRadius: 'var(--r-circle)',
-            background: CATEGORY[category] || CATEGORY.default,
+            background: categoryColor(category),
             display: 'grid',
             placeItems: 'center',
             color: 'var(--white)',

@@ -7,6 +7,62 @@ export type SavedPlaceRow = Database["public"]["Tables"]["saved_places"]["Row"];
 export type SavedPlaceInsert = Database["public"]["Tables"]["saved_places"]["Insert"];
 export type SavedPlaceUpdate = Database["public"]["Tables"]["saved_places"]["Update"];
 
+/**
+ * A saved place with everything its DTO shows: the canonical place, the owner's lists and
+ * visits, and the recognition it was saved from. Every read of a saved place uses this one
+ * select, so the list, detail, nearby and list-detail endpoints return the same shape.
+ */
+export const SAVED_PLACE_SELECT = `
+  *,
+  places!inner (*),
+  list_places!list_places_user_place_id_fkey (list_id),
+  user_visits (visited_at),
+  recognition_tasks!saved_places_source_recognition_task_id_fkey (
+    source_url,
+    recognition_results (source_type, source_thumbnail_url, author_username)
+  )
+`;
+
+type SourceResult = { source_type: string | null; source_thumbnail_url: string | null; author_username: string | null };
+
+export interface SavedPlaceRecord {
+  saved_place: SavedPlaceRow;
+  place: PlaceRow;
+  list_ids: string[];
+  /** `visited_at` of every visit, in no particular order. */
+  visits: string[];
+  /** The recognition the place was saved from: its task's source and the result's details. */
+  source: null | { source_url: string; result: SourceResult | null };
+}
+
+type SavedPlaceSelectRow = SavedPlaceRow & {
+  places: PlaceRow | null;
+  list_places: Array<{ list_id: string }> | null;
+  user_visits: Array<{ visited_at: string }> | null;
+  recognition_tasks: null | { source_url: string; recognition_results: SourceResult | null };
+};
+
+/** Splits a {@link SAVED_PLACE_SELECT} row into its parts; null when the place embed is missing. */
+export function toSavedPlaceRecord(raw: unknown): SavedPlaceRecord | null {
+  const { places: place, list_places, user_visits, recognition_tasks, ...saved_place } = raw as SavedPlaceSelectRow;
+  if (!place) return null;
+  return {
+    saved_place,
+    place,
+    list_ids: (list_places ?? []).map((row) => row.list_id),
+    visits: (user_visits ?? []).map((row) => row.visited_at),
+    source: recognition_tasks
+      ? { source_url: recognition_tasks.source_url, result: recognition_tasks.recognition_results ?? null }
+      : null,
+  };
+}
+
+function requireSavedPlaceRecord(raw: unknown): SavedPlaceRecord {
+  const record = toSavedPlaceRecord(raw);
+  if (!record) throw new Error("places embed missing for saved_place");
+  return record;
+}
+
 /** A row returned by the get_nearby_saved_places RPC. */
 export interface NearbyPlaceRow {
   saved_place_id: string;
@@ -120,15 +176,10 @@ export class PlacesRepository {
       district?: string;
       category?: string;
     } = {},
-  ): Promise<
-    Array<{
-      saved_place: SavedPlaceRow;
-      place: PlaceRow;
-    }>
-  > {
+  ): Promise<SavedPlaceRecord[]> {
     let query = this.userSupabase
       .from("saved_places")
-      .select("*, places!inner (*)")
+      .select(SAVED_PLACE_SELECT)
       .eq("owner_user_id", ownerUserId);
 
     if (options.district) {
@@ -159,15 +210,19 @@ export class PlacesRepository {
     const { data, error } = await query;
 
     if (error) throw error;
-    const rows = data ?? [];
-    return rows.map((r) => {
-      const row = r as unknown as SavedPlaceRow & { places: PlaceRow | null };
-      const { places: place, ...saved_place } = row;
-      if (!place) {
-        throw new Error("places embed missing for saved_place");
-      }
-      return { saved_place, place };
-    });
+    return (data ?? []).map(requireSavedPlaceRecord);
+  }
+
+  /** Saved places by their `saved_places.id`, in no particular order. */
+  async getSavedPlacesByIds(savedPlaceIds: string[], ownerUserId: string): Promise<SavedPlaceRecord[]> {
+    if (savedPlaceIds.length === 0) return [];
+    const { data, error } = await this.userSupabase
+      .from("saved_places")
+      .select(SAVED_PLACE_SELECT)
+      .eq("owner_user_id", ownerUserId)
+      .in("id", savedPlaceIds);
+    if (error) throw error;
+    return (data ?? []).map(requireSavedPlaceRecord);
   }
 
   async getSavedPlaceForOwner(
@@ -192,23 +247,16 @@ export class PlacesRepository {
   /**
    * Lookup saved_place by canonical places.id + owner (for the canonical ID API).
    */
-  async getSavedPlaceByCanonicalId(
-    placeId: string,
-    ownerUserId: string,
-  ): Promise<{ saved_place: SavedPlaceRow; place: PlaceRow } | null> {
+  async getSavedPlaceByCanonicalId(placeId: string, ownerUserId: string): Promise<SavedPlaceRecord | null> {
     const { data, error } = await this.userSupabase
       .from("saved_places")
-      .select("*, places (*)")
+      .select(SAVED_PLACE_SELECT)
       .eq("place_id", placeId)
       .eq("owner_user_id", ownerUserId)
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return null;
-    const row = data as unknown as SavedPlaceRow & { places: PlaceRow | null };
-    const { places: place, ...saved_place } = row;
-    if (!place) return null;
-    return { saved_place, place };
+    return data ? toSavedPlaceRecord(data) : null;
   }
 
   async userOwnsPlace(ownerUserId: string, placeId: string): Promise<boolean> {
@@ -280,6 +328,33 @@ export class PlacesRepository {
       .eq("owner_user_id", ownerUserId);
     if (error) throw error;
     return (count ?? 0) > 0;
+  }
+
+  /** Records a visit unless the saved place already has one, so marking twice is a no-op. */
+  async markVisited(savedPlaceId: string, ownerUserId: string, visitedAt: Date): Promise<void> {
+    const { data, error } = await this.userSupabase
+      .from("user_visits")
+      .select("id")
+      .eq("saved_place_id", savedPlaceId)
+      .eq("owner_user_id", ownerUserId)
+      .limit(1);
+    if (error) throw error;
+    if (data.length > 0) return;
+
+    const { error: insertError } = await this.userSupabase
+      .from("user_visits")
+      .insert({ saved_place_id: savedPlaceId, owner_user_id: ownerUserId, visited_at: visitedAt.toISOString() });
+    if (insertError) throw insertError;
+  }
+
+  /** Forgets every visit to the saved place. */
+  async clearVisits(savedPlaceId: string, ownerUserId: string): Promise<void> {
+    const { error } = await this.userSupabase
+      .from("user_visits")
+      .delete()
+      .eq("saved_place_id", savedPlaceId)
+      .eq("owner_user_id", ownerUserId);
+    if (error) throw error;
   }
 
   /**

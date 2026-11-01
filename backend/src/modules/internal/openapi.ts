@@ -10,6 +10,7 @@ import {
 import { recognitionEnqueuedSchema, recognitionStatusSchema } from "../recognitions/openapi.js";
 import { OPS_RANGES, opsQuerySchema } from "../ops/types.js";
 import { createInternalRecognitionRequestSchema } from "../recognitions/types.js";
+import { redeemSignInLinkBodySchema } from "../sign-in-links/types.js";
 
 registry.registerComponent("securitySchemes", "ServiceToken", {
   type: "http",
@@ -111,6 +112,8 @@ from cache afterwards. A story's media is read but never stored.
 With \`source_url\`, the channel may also send the \`caption\` it received (a Reel shared in a DM carries it).
 It is read in place of the page's, and when the post's media cannot be fetched the venues are read from it alone.
 
+Everything an internal recognition finds is saved to \`userId\`'s places as soon as it completes (\`options.auto_save\`), each linked to this task as its source: a channel has no "Add places" step.
+
 Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key for the same user returns the original task instead of enqueuing a second one.`,
   request: {
     params: userParams,
@@ -208,6 +211,59 @@ registry.registerPath({
         },
       },
     },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "post",
+  path: "/users/{userId}/sign-in-links",
+  summary: "Mint web sign-in link",
+  description: `A personal, one-time link that signs \`userId\` in to the web app: \`<WEB_APP_URL>/a/<code>\`. The channel sends it to that person only.
+
+The link works once, for seven days; minting another does not revoke earlier ones. Only the code's SHA-256 is stored. \`404\` when the user does not exist.`,
+  request: { params: userParams },
+  responses: {
+    201: {
+      description: "Link minted",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({ url: z.string().url(), expires_at: z.string().datetime() }).openapi("SignInLink"),
+            "MintSignInLink",
+          ),
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "post",
+  path: "/sign-in-links/redeem",
+  summary: "Redeem web sign-in link",
+  description: `Spends a link's \`code\` and returns a Supabase magic-link token for its owner. The web app's server calls this; the browser then calls \`supabase.auth.verifyOtp({ token_hash, type: "magiclink" })\` and has a session. No PKCE, popup or mail involved, so it works inside Instagram's in-app browser.
+
+Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as is an unknown or expired code. The token itself expires with Supabase's OTP lifetime (one hour by default), so exchange it right away.`,
+  request: { body: { content: { "application/json": { schema: redeemSignInLinkBodySchema.openapi("RedeemSignInLinkBody") } } } },
+  responses: {
+    200: {
+      description: "Token for verifyOtp",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z
+              .object({ user_id: z.string().uuid(), token_hash: z.string(), type: z.literal("magiclink") })
+              .openapi("RedeemedSignInLink"),
+            "RedeemSignInLink",
+          ),
+        },
+      },
+    },
+    410: { description: "Code unknown, already used or expired" },
     ...commonErrorResponses,
   },
 });
