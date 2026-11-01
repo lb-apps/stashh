@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { TEXT_DANGER_STRONG } from '../pending-tokens';
 
 const SIZES: Record<string, { h: number; px: number; fs: number; r: string; gap: number }> = {
   sm: { h: 36, px: 14, fs: 15, r: 'var(--r-button)', gap: 6 },
@@ -18,23 +19,18 @@ type ButtonProps = Omit<React.ComponentPropsWithoutRef<'button'>, 'style'> & {
   style?: React.CSSProperties;
 };
 
-export function Button({
-  children,
-  variant = 'primary',
-  size = 'md',
-  shape = 'rounded',
-  fullWidth = false,
-  disabled = false,
-  leadingIcon = null,
-  trailingIcon = null,
-  onClick,
-  style,
-  ...rest
-}: ButtonProps) {
-  const s = SIZES[size] || SIZES.md;
-  const [pressed, setPressed] = React.useState(false);
+type ButtonLook = {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'onBrand';
+  size?: 'sm' | 'md' | 'lg';
+  shape?: 'rounded' | 'pill';
+  fullWidth?: boolean;
+};
 
-  const base = {
+/** The Button spec as styles — shared by `Button` and `ButtonLink`. */
+function buttonStyle({ variant = 'primary', size = 'md', shape = 'rounded', fullWidth = false }: ButtonLook, pressed: boolean, disabled: boolean): React.CSSProperties {
+  const s = SIZES[size] || SIZES.md;
+
+  const base: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -49,6 +45,7 @@ export function Button({
     fontSize: s.fs,
     fontWeight: 'var(--fw-semibold)',
     letterSpacing: 'var(--tr-tight)',
+    textDecoration: 'none',
     cursor: disabled ? 'default' : 'pointer',
     opacity: disabled ? 0.4 : 1,
     transform: pressed && !disabled ? 'scale(var(--press-scale))' : 'scale(1)',
@@ -68,13 +65,31 @@ export function Button({
       boxShadow: 'var(--gloss-top)',
     },
     ghost: { background: 'transparent', color: 'var(--text-primary)' },
-    danger: { background: 'var(--fill-secondary)', color: 'var(--text-danger)', boxShadow: 'var(--gloss-top)' },
+    danger: { background: 'var(--fill-secondary)', color: TEXT_DANGER_STRONG, boxShadow: 'var(--gloss-top)' },
     onBrand: {
       background: 'var(--white)',
       color: 'var(--cobalt-500)',
       boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
     },
   };
+
+  return { ...base, ...(variants[variant] || variants.primary) };
+}
+
+export function Button({
+  children,
+  variant = 'primary',
+  size = 'md',
+  shape = 'rounded',
+  fullWidth = false,
+  disabled = false,
+  leadingIcon = null,
+  trailingIcon = null,
+  onClick,
+  style,
+  ...rest
+}: ButtonProps) {
+  const [pressed, setPressed] = React.useState(false);
 
   return (
     <button
@@ -84,12 +99,49 @@ export function Button({
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      style={{ ...base, ...(variants[variant] || variants.primary), ...style }}
+      style={{ ...buttonStyle({ variant, size, shape, fullWidth }, pressed, disabled), ...style }}
       {...rest}
     >
       {leadingIcon}
       {children}
       {trailingIcon}
     </button>
+  );
+}
+
+type ButtonLinkProps = Omit<React.ComponentPropsWithoutRef<'a'>, 'style'> &
+  ButtonLook & {
+    href: string;
+    leadingIcon?: React.ReactNode;
+    trailingIcon?: React.ReactNode;
+    style?: React.CSSProperties;
+  };
+
+/** A Button that navigates: an `<a>` drawn to the same spec. */
+export function ButtonLink({
+  children,
+  variant = 'primary',
+  size = 'md',
+  shape = 'rounded',
+  fullWidth = false,
+  leadingIcon = null,
+  trailingIcon = null,
+  style,
+  ...rest
+}: ButtonLinkProps) {
+  const [pressed, setPressed] = React.useState(false);
+
+  return (
+    <a
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      style={{ ...buttonStyle({ variant, size, shape, fullWidth }, pressed, false), ...style }}
+      {...rest}
+    >
+      {leadingIcon}
+      {children}
+      {trailingIcon}
+    </a>
   );
 }

@@ -793,3 +793,26 @@ TikTok result has `instagram_username: null`, Instagram result still has
 - Boundary: a YouTube URL is still rejected with VALIDATION_ERROR
 - End to end through the web console: 425ms queue, 42.8s work, 43.2s total, 24 requests
 - backend typecheck, web lint, web build all clean
+
+---
+
+# Web app — "Stashh - stack lists" design (2026-11-01)
+
+Plan: `~/.claude/plans/simdi-bu-tasarimi-gelistirmeni-linear-mango.md`. Web (Next 16) map app for the
+Instagram in-app browser; Mapbox Standard; real Liquid Glass (WebGL custom layer); DM sign-in link;
+every Instagram sender is one Supabase account; en + tr.
+
+- [x] PR 1 — backend + instagram (B1–B15): lb-apps/stashh#14 (branch `claude/kind-wing-88a0c2`), CI green;
+      migrations already on production; backfill dry-run only (110 places) — merge + backfill pending
+- [x] PR 2 — web foundation: /app shell, DM-link + dev sign-in, i18n, IAB hardening, API client,
+      queries/mutations/selectors, DetentSheet, Glass API (`b16eec5`)
+- [x] PR 3 — Mapbox map, GL pins, selected/dropping DOM pins, LiquidGlass layer (`b16eec5`)
+      - [ ] verify on a real map (needs `NEXT_PUBLIC_MAPBOX_TOKEN` in `web/.env.local`)
+- [x] PR 4 — screens: home, place, paste → recognizing → results → list picker / new list →
+      celebrate, library, list detail, search, filter, profile — verified at 375px against the PR 1
+      backend (API only, port 3010): sign-in, home, place peek/full, Been there, paste recents,
+      results → save without list, search (accent-insensitive), filter, profile
+      - [ ] live recognition end to end (needs a worker; local runs API only so prod DMs aren't raced)
+- [ ] Glass + new pin tokens pushed back into the Discovery DS project
+- [ ] End-to-end with the backend branch (CORS, DTO fields), 375px, then real iPhone + Android
+      in the Instagram in-app browser via a DM link
