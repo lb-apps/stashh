@@ -24,7 +24,7 @@ export type InstagramMessageRow = {
   next_attempt_at: string;
   locked_until: string | null;
   last_error: string | null;
-  intent: "recognize" | "help" | "unsupported" | "erase" | null;
+  intent: "recognize" | "help" | "unsupported" | "erase" | "link" | null;
   finished_at: string | null;
   created_at: string;
   updated_at: string;

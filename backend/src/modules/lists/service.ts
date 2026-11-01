@@ -1,10 +1,12 @@
 import { AppHttpError } from "../../errors/appHttpError.js";
 import { isPostgrestError } from "../../errors/supabaseHttp.js";
 import type { Logger } from "../../lib/logger.js";
-import type { PlacesService } from "../places/service.js";
+import type { CategoryGroup } from "../places/mapper.js";
+import { toSavedPlaceDto, type PlacesService, type SavedPlaceDto } from "../places/service.js";
+import { toSavedPlaceRecord } from "../places/repository.js";
 import { buildPaginationMeta, decodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
-import type { ListsRepository, ListPlaceWithPlace } from "./repository.js";
+import type { ListRecord, ListsRepository, ListPlaceWithPlace } from "./repository.js";
 import type { AddListPlaceBody, CreateListBody, ListPlacesQuery, PatchListBody } from "./types.js";
 
 export interface ListSummaryDto {
@@ -12,6 +14,7 @@ export interface ListSummaryDto {
   title: string;
   description: string | null;
   emoji: string | null;
+  cover_category: CategoryGroup | null;
   created_at: string;
   updated_at: string;
   place_count: number;
@@ -21,11 +24,19 @@ export interface ListPlaceItemDto {
   list_place_id: string;
   place_id: string;
   created_at: string;
-  place: {
-    id: string;
-    name: string;
-    thumbnail_url: string | null;
-    address: string | null;
+  place: SavedPlaceDto;
+}
+
+function toListSummaryDto(row: ListRecord, placeCount: number): ListSummaryDto {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    emoji: row.emoji,
+    cover_category: row.cover_category as CategoryGroup | null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    place_count: placeCount,
   };
 }
 
@@ -40,15 +51,7 @@ export class ListsService {
     const rows = await this.repo.listListsForOwner(ownerUserId);
     const ids = rows.map((r) => r.id);
     const counts = await this.repo.countListPlacesByListIds(ownerUserId, ids);
-    return rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
-      emoji: r.emoji,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      place_count: counts.get(r.id) ?? 0,
-    }));
+    return rows.map((r) => toListSummaryDto(r, counts.get(r.id) ?? 0));
   }
 
   async getList(ownerUserId: string, listId: string): Promise<ListSummaryDto> {
@@ -56,16 +59,7 @@ export class ListsService {
     if (!row) {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
-    const place_count = await this.repo.countListPlacesForList(ownerUserId, listId);
-    return {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      emoji: row.emoji,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      place_count,
-    };
+    return toListSummaryDto(row, await this.repo.countListPlacesForList(ownerUserId, listId));
   }
 
   async createList(ownerUserId: string, body: CreateListBody): Promise<ListSummaryDto> {
@@ -74,6 +68,7 @@ export class ListsService {
       title: body.title,
       description: body.description ?? null,
       emoji: body.emoji ?? null,
+      cover_category: body.cover_category ?? null,
     });
 
     const placeIds = body.place_ids ?? [];
@@ -92,15 +87,7 @@ export class ListsService {
     }
 
     this.log.info({ listId: row.id, title: body.title, placeCount: placeIds.length }, "list created");
-    return {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      emoji: row.emoji,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      place_count: placeIds.length,
-    };
+    return toListSummaryDto(row, placeIds.length);
   }
 
   async updateList(ownerUserId: string, listId: string, body: PatchListBody): Promise<ListSummaryDto> {
@@ -112,21 +99,14 @@ export class ListsService {
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.emoji !== undefined ? { emoji: body.emoji } : {}),
+      ...(body.cover_category !== undefined ? { cover_category: body.cover_category } : {}),
     });
     if (!updated) {
       throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
     }
     const place_count = await this.repo.countListPlacesForList(ownerUserId, listId);
     this.log.info({ listId }, "list updated");
-    return {
-      id: updated.id,
-      title: updated.title,
-      description: updated.description,
-      emoji: updated.emoji,
-      created_at: updated.created_at,
-      updated_at: updated.updated_at,
-      place_count,
-    };
+    return toListSummaryDto(updated, place_count);
   }
 
   async deleteList(ownerUserId: string, listId: string): Promise<{ id: string; deleted: boolean }> {
@@ -161,20 +141,15 @@ export class ListsService {
   }
 
   private mapListPlaceRow(row: ListPlaceWithPlace): ListPlaceItemDto {
-    const place = row.saved_places?.places;
-    if (!place?.id) {
+    const record = row.saved_places ? toSavedPlaceRecord(row.saved_places) : null;
+    if (!record) {
       throw new AppHttpError(500, "Place data missing for list entry", "INTERNAL");
     }
     return {
       list_place_id: row.id,
-      place_id: place.id,
+      place_id: record.place.id,
       created_at: row.created_at,
-      place: {
-        id: place.id,
-        name: place.name,
-        thumbnail_url: place.thumbnail_url,
-        address: place.address,
-      },
+      place: toSavedPlaceDto(record),
     };
   }
 

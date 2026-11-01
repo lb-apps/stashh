@@ -45,6 +45,20 @@ const envSchema = z.object({
    * (Supabase Auth requires an email or phone on every user). Must be a domain we own.
    */
   CHANNEL_IDENTITY_EMAIL_DOMAIN: z.string().default("identities.stashh.me"),
+  /**
+   * Browser origins allowed to call the API (the web app), comma-separated and exact:
+   * scheme, host and port. Every other origin gets no CORS headers, so a browser blocks it.
+   */
+  WEB_ORIGINS: z
+    .string()
+    .default("https://stashh.me,https://www.stashh.me,http://localhost:3001")
+    .transform((value) => value.split(",").map((origin) => origin.trim().replace(/\/$/, "")).filter(Boolean)),
+  /** The web app's base URL; DM sign-in links open `<WEB_APP_URL>/a/<code>`. */
+  WEB_APP_URL: z
+    .string()
+    .url()
+    .default("https://stashh.me/app")
+    .transform((value) => value.replace(/\/$/, "")),
 });
 
 const parsed = envSchema.safeParse(process.env);

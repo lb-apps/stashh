@@ -87,10 +87,13 @@ placesRouter.get("/photos/:placeId", async (req, res, next) => {
     const service = tryCreatePlacesServiceFromRequestOr503(req, res);
     if (!service) return;
     const data = await service.getPlacePhotoUrls(
+      ownerUserId,
       parsedParams.data.placeId,
       parsedQuery.data.limit,
       parsedQuery.data.max_width_px,
     );
+    // Photo links stay valid for days; the browser keeps them for one, for this user only.
+    res.set("Cache-Control", "private, max-age=86400");
     sendSuccess(res, req, 200, data);
   } catch (err) {
     next(err);
@@ -143,6 +146,31 @@ placesRouter.delete("/:placeId", async (req, res, next) => {
     next(err);
   }
 });
+
+/** "Been there": PUT marks the saved place visited, DELETE unmarks it. Both return the place. */
+for (const method of ["put", "delete"] as const) {
+  placesRouter[method]("/:placeId/visit", async (req, res, next) => {
+    const parsedParams = placeIdParamsSchema.safeParse(req.params);
+    if (!parsedParams.success) {
+      sendError(res, req, 400, "VALIDATION_ERROR", "Invalid place id", parsedParams.error.flatten().fieldErrors);
+      return;
+    }
+    const ownerUserId = req.user?.sub;
+    if (!ownerUserId) {
+      sendError(res, req, 401, "UNAUTHORIZED", "Unauthorized");
+      return;
+    }
+    try {
+      const service = tryCreatePlacesServiceFromRequestOr503(req, res);
+      if (!service) return;
+      const placeId = parsedParams.data.placeId;
+      const data = method === "put" ? await service.markVisited(ownerUserId, placeId) : await service.clearVisited(ownerUserId, placeId);
+      sendSuccess(res, req, 200, data);
+    } catch (err) {
+      next(err);
+    }
+  });
+}
 
 placesRouter.get("/nearby", async (req, res, next) => {
   const ownerUserId = req.user?.sub;

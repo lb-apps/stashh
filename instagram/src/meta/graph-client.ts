@@ -8,6 +8,7 @@ export const LIMITS = {
   subtitleChars: 80,
   buttonsPerElement: 3,
   buttonTitleChars: 20,
+  buttonTemplateTextChars: 640,
 } as const;
 
 export interface UrlButton {
@@ -24,8 +25,11 @@ export interface CarouselCard {
   buttons: UrlButton[];
 }
 
-/** One outbound message, in channel-neutral terms. */
-export type OutboundMessage = { kind: "text"; text: string } | { kind: "carousel"; cards: CarouselCard[] };
+/** One outbound message, in channel-neutral terms. A `button` message is text with link buttons under it. */
+export type OutboundMessage =
+  | { kind: "text"; text: string }
+  | { kind: "button"; text: string; buttons: UrlButton[] }
+  | { kind: "carousel"; cards: CarouselCard[] };
 
 export class GraphApiError extends Error {
   readonly status: number;
@@ -143,6 +147,18 @@ async function graphError(response: Response): Promise<GraphApiError> {
 /** Maps an outbound message to the Send API body, enforcing every documented limit. */
 export function toGraphMessage(message: OutboundMessage): Record<string, unknown> {
   if (message.kind === "text") return { text: truncateUtf8(message.text, LIMITS.textBytes) };
+  if (message.kind === "button") {
+    return {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: truncateGraphemes(message.text, LIMITS.buttonTemplateTextChars),
+          buttons: message.buttons.slice(0, LIMITS.buttonsPerElement).map(toGraphButton),
+        },
+      },
+    };
+  }
 
   return {
     attachment: {
@@ -154,13 +170,13 @@ export function toGraphMessage(message: OutboundMessage): Record<string, unknown
           ...(card.subtitle ? { subtitle: truncateGraphemes(card.subtitle, LIMITS.subtitleChars) } : {}),
           ...(card.imageUrl ? { image_url: card.imageUrl } : {}),
           ...(card.url ? { default_action: { type: "web_url", url: card.url } } : {}),
-          buttons: card.buttons.slice(0, LIMITS.buttonsPerElement).map((button) => ({
-            type: "web_url",
-            title: truncateGraphemes(button.title, LIMITS.buttonTitleChars),
-            url: button.url,
-          })),
+          buttons: card.buttons.slice(0, LIMITS.buttonsPerElement).map(toGraphButton),
         })),
       },
     },
   };
+}
+
+function toGraphButton(button: UrlButton): Record<string, unknown> {
+  return { type: "web_url", title: truncateGraphemes(button.title, LIMITS.buttonTitleChars), url: button.url };
 }

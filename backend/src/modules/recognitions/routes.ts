@@ -1,14 +1,36 @@
 import { Router } from "express";
 import { sendAccepted, sendError, sendSuccess } from "../../http/response.js";
 import { createRecognitionServiceForRequest } from "./factory.js";
-import { presentAcceptedRecognition, presentRecognition } from "./presenter.js";
+import { presentAcceptedRecognition, presentRecognition, presentRecognitionSummary } from "./presenter.js";
 import {
   createRecognitionRequestSchema,
+  listRecognitionsQuerySchema,
   recognitionIdentifierSchema,
   recognitionResultQuerySchema,
 } from "./types.js";
 
 export const recognitionsRouter = Router();
+
+recognitionsRouter.get("/", async (req, res, next) => {
+  const parsedQuery = listRecognitionsQuerySchema.safeParse({ limit: req.query["limit"] });
+  if (!parsedQuery.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid query", parsedQuery.error.flatten().fieldErrors);
+    return;
+  }
+
+  const ownerUserId = req.user?.sub;
+  if (!ownerUserId) {
+    sendError(res, req, 401, "UNAUTHORIZED", "Unauthorized");
+    return;
+  }
+
+  try {
+    const rows = await createRecognitionServiceForRequest(req).listRecognitions(ownerUserId, parsedQuery.data.limit);
+    sendSuccess(res, req, 200, { items: rows.map(presentRecognitionSummary) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 recognitionsRouter.get("/result", async (req, res, next) => {
   const idRaw = req.query.id;

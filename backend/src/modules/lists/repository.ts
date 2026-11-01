@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../types/database.js";
+import { SAVED_PLACE_SELECT } from "../places/repository.js";
 
 export type ListRecord = Database["public"]["Tables"]["user_lists"]["Row"];
 export type ListInsert = Database["public"]["Tables"]["user_lists"]["Insert"];
@@ -147,24 +148,7 @@ export class ListsRepository {
   ): Promise<ListPlaceWithPlace[]> {
     const { data, error } = await this.supabase
       .from("list_places")
-      .select(
-        `
-        id,
-        list_id,
-        saved_place_id,
-        created_at,
-        saved_places!list_places_user_place_id_fkey (
-          id,
-          place_id,
-          places (
-            id,
-            name,
-            thumbnail_url,
-            address
-          )
-        )
-      `,
-      )
+      .select(`id, list_id, saved_place_id, created_at, saved_places!list_places_user_place_id_fkey (${SAVED_PLACE_SELECT})`)
       .eq("list_id", listId)
       .eq("owner_user_id", ownerUserId)
       .order("created_at", { ascending: true })
@@ -176,20 +160,11 @@ export class ListsRepository {
   }
 }
 
-/** Shape returned by Supabase embed resolver (best-effort). */
+/** A list entry with its saved place in {@link SAVED_PLACE_SELECT} shape. */
 export interface ListPlaceWithPlace {
   id: string;
   list_id: string;
   saved_place_id: string;
   created_at: string;
-  saved_places: null | {
-    id: string;
-    place_id: string;
-    places: null | {
-      id: string;
-      name: string;
-      thumbnail_url: string | null;
-      address: string | null;
-    };
-  };
+  saved_places: unknown;
 }

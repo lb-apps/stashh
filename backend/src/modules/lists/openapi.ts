@@ -4,6 +4,8 @@ import {
   successEnvelope,
   commonErrorResponses,
 } from "../../lib/openapi.js";
+import { CATEGORY_GROUPS } from "../places/mapper.js";
+import { savedPlaceSchema } from "../places/openapi.js";
 import { PAGINATION_OPERATION_DESCRIPTION, paginationQuerySchema } from "../../lib/pagination.js";
 import {
   createListBodySchema,
@@ -21,6 +23,7 @@ const listSummarySchema = z
     title: z.string(),
     description: z.string().nullable(),
     emoji: z.string().nullable().describe("Emoji character displayed on the list card. null if not set."),
+    cover_category: z.enum(CATEGORY_GROUPS).nullable().describe("Category group drawn as the list cover; null for the default art."),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
     place_count: z.number().int(),
@@ -32,12 +35,7 @@ const listPlaceItemSchema = z
     list_place_id: z.string().uuid(),
     place_id: z.string().uuid(),
     created_at: z.string().datetime(),
-    place: z.object({
-      id: z.string().uuid(),
-      name: z.string(),
-      thumbnail_url: z.string().nullable(),
-      address: z.string().nullable(),
-    }),
+    place: savedPlaceSchema.describe("The full saved place, same shape as `GET /places/{placeId}`"),
   })
   .openapi("ListPlaceItem");
 
@@ -165,7 +163,7 @@ registry.registerPath({
   path: "/lists/{listId}/places",
   tags: ["Lists"],
   summary: "List places",
-  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns the places in this list, each including the essential place fields (name, address, thumbnail) needed to render a list item.`,
+  description: `${PAGINATION_OPERATION_DESCRIPTION} Returns the places in this list, oldest first. Each \`place\` is the full saved place (same shape as \`GET /places/{placeId}\`), so a list renders and maps without another request; \`list_place_id\` is what \`DELETE /lists/{listId}/places/{listPlaceId}\` takes.`,
   request: {
     params: listIdParamsSchema,
     query: paginationQuerySchema,
