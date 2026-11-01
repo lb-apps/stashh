@@ -46,6 +46,21 @@ export function createPlacesAuthOnlyServiceFromRequest(req: Request): PlacesServ
   );
 }
 
+/**
+ * Service-role PlacesService for trusted server paths (the worker, scripts) that act for an
+ * explicit owner. Every saved-place query filters by that owner, not by RLS.
+ */
+export function createPlacesServiceWithServiceRole(): PlacesService {
+  const serviceSb = createSupabaseServiceClient();
+  return new PlacesService(
+    new PlacesRepository(serviceSb, serviceSb),
+    new RecognitionRepository(serviceSb),
+    new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY, placesLog),
+    new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY, placesLog),
+    placesLog,
+  );
+}
+
 /** Returns null and sends 503 if service-role Supabase is not configured. */
 export function tryCreatePlacesServiceFromRequestOr503(req: Request, res: Response): PlacesService | null {
   try {

@@ -14,8 +14,11 @@ import { GooglePhotoMediaClient } from "../../services/google/google-photo-media
 import { uploadPlaceThumbnail } from "../../lib/thumbnailUploader.js";
 import { createRecognitionServiceWithServiceRole } from "./factory.js";
 import { buildRunRecord } from "./run-record.js";
-import type { RecognitionService } from "./service.js";
-import type { RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
+import type { RecognitionResultPlace, RecognitionService } from "./service.js";
+import { createPlacesServiceWithServiceRole } from "../places/factory.js";
+import type { PlacesService } from "../places/service.js";
+import { autoSavePlaces } from "./auto-save.js";
+import type { RecognitionStage, RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
 import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
 import { uploadSourceThumbnail } from "../../lib/sourceThumbnailUploader.js";
 
@@ -70,6 +73,7 @@ async function waitForWakeSignal(maximumWaitMilliseconds: number): Promise<void>
 
 async function processRecognition(
   recognitionService: RecognitionService,
+  placesService: PlacesService,
   recognition: RecognitionTaskRow,
   googlePlacesClient: GooglePlacesClient,
   googlePhotoMediaClient: GooglePhotoMediaClient,
@@ -87,20 +91,33 @@ async function processRecognition(
   let analyzed: AIAnalysisResult | undefined;
   let fetchMethod: SourceContent["fetch_method"] | undefined;
 
+  const stage = (name: RecognitionStage) => recognitionService.setStage(recognition.id, name, tl.log);
+  const savePlaces = (places: RecognitionResultPlace[]) =>
+    tl.step(
+      "places auto-saved",
+      () => autoSavePlaces(placesService, recognition, places),
+      (created) => ({ total: places.length, created }),
+    );
+
   try {
-    const cachedResultId = taskOptions.bypass_cache
+    await stage("fetching");
+    const cached = taskOptions.bypass_cache
       ? null
       : await tl.step(
           "cache checked",
-          () => recognitionService.getCachedResultId(recognition.source_url),
-          (hit) => ({ hit: Boolean(hit), resultId: hit }),
+          () => recognitionService.getCachedResult(recognition.source_url),
+          (hit) => ({ hit: Boolean(hit), resultId: hit?.id ?? null }),
         );
 
-    if (cachedResultId) {
+    if (cached) {
+      if (taskOptions.auto_save) {
+        await stage("saving");
+        await savePlaces(cached.places);
+      }
       await tl.step(
         "served from cache",
-        () => recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId: cachedResultId }),
-        () => ({ resultId: cachedResultId }),
+        () => recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId: cached.id }),
+        () => ({ resultId: cached.id }),
       );
       tl.done();
       await recognitionService.recordRun(
@@ -124,6 +141,7 @@ async function processRecognition(
         ? uploadSourceThumbnail(sourceContent.thumbnail_url, recognition.source_url, createSupabaseServiceClient(), tl.log)
         : Promise.resolve(null);
 
+    await stage("analyzing");
     const analysis = await tl.step(
       "media analyzed",
       async (stepLog) => {
@@ -138,6 +156,7 @@ async function processRecognition(
       (result) => ({ kind: result.media_kind, media: result.media_count, placeCount: result.places.length, namesElsewhere: result.names_elsewhere }),
     );
 
+    await stage("matching");
     const placeMatches = await tl.step(
       "places found",
       (stepLog) => matchPlaces(analysis.places, googlePlacesClient, stepLog),
@@ -177,28 +196,30 @@ async function processRecognition(
       (urls) => ({ total: matchedPlaces.length, saved: urls.size, failed: matchedPlaces.length - urls.size }),
     );
 
+    const extractedPlaces = analysis.places.map((place) => ({
+      raw_name: place.name,
+      location_hint: place.location_hint,
+      instagram_username: place.instagram_username,
+      recommendations: place.recommendations,
+      confidence_score: place.confidence_score,
+      source: place.source,
+      matched_place: placeMatches.get(place.name) ?? null,
+    }));
+    const places = recognitionService.mapPipelineResultToStoredPlaces(
+      { status: "completed", source_url: recognition.source_url, source_content: sourceContent, extracted_places: extractedPlaces },
+      thumbnailUrls,
+    );
+
+    await stage("saving");
     const resultId = await tl.step(
       "result saved",
-      () => {
-        const extractedPlaces = analysis.places.map((place) => ({
-          raw_name: place.name,
-          location_hint: place.location_hint,
-          instagram_username: place.instagram_username,
-          recommendations: place.recommendations,
-          confidence_score: place.confidence_score,
-          source: place.source,
-          matched_place: placeMatches.get(place.name) ?? null,
-        }));
-        const places = recognitionService.mapPipelineResultToStoredPlaces(
-          { status: "completed", source_url: recognition.source_url, source_content: sourceContent, extracted_places: extractedPlaces },
-          thumbnailUrls,
-        );
-        return sourceThumbnail.then((thumbnailUrl) =>
+      () =>
+        sourceThumbnail.then((thumbnailUrl) =>
           recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis, thumbnailUrl),
-        );
-      },
+        ),
       (id) => ({ resultId: id }),
     );
+    if (taskOptions.auto_save) await savePlaces(places);
 
     await recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId });
 
@@ -245,6 +266,7 @@ async function runWorker(): Promise<void> {
   const recoveryScanIntervalMilliseconds = config.RECOGNITIONS_RECOVERY_SCAN_INTERVAL_MS;
 
   const recognitionService = createRecognitionServiceWithServiceRole();
+  const placesService = createPlacesServiceWithServiceRole();
   const googlePlacesClient = new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY);
   const googlePhotoMediaClient = new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY);
 
@@ -316,7 +338,7 @@ async function runWorker(): Promise<void> {
       for (const recognition of claimedRecognitions) {
         if (!shouldKeepRunning) break;
         trackInFlightTask(
-          processRecognition(recognitionService, recognition, googlePlacesClient, googlePhotoMediaClient, workerLog),
+          processRecognition(recognitionService, placesService, recognition, googlePlacesClient, googlePhotoMediaClient, workerLog),
         );
       }
     } catch (error) {

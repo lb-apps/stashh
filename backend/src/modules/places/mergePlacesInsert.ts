@@ -39,6 +39,7 @@ export function backfillPlacesInsertFromApi(partial: PlacesInsert, api: PlacesIn
     "business_status",
     "types",
     "opening_hours",
+    "utc_offset_minutes",
     "thumbnail_url",
   ];
 

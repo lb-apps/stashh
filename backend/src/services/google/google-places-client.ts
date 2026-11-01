@@ -18,6 +18,7 @@ const PLACE_DETAILS_FIELD_MASK = [
   "googleMapsUri",
   "businessStatus",
   "regularOpeningHours",
+  "utcOffsetMinutes",
 ].join(",");
 
 const TEXT_SEARCH_FIELD_MASK = [

@@ -5,8 +5,14 @@ export type RecognitionTaskRow = Database["public"]["Tables"]["recognition_tasks
 export type RecognitionTaskInsert = Database["public"]["Tables"]["recognition_tasks"]["Insert"];
 export type RecognitionResultRow = Database["public"]["Tables"]["recognition_results"]["Row"];
 
+/** What a processing recognition is doing, in order. Mirrors the DB check constraint. */
+export const RECOGNITION_STAGES = ["fetching", "analyzing", "matching", "saving"] as const;
+export type RecognitionStage = (typeof RECOGNITION_STAGES)[number];
+
 export interface RecognitionTaskOptions {
   bypass_cache?: boolean;
+  /** Save every place found to the owner's library on completion (channel recognitions). */
+  auto_save?: boolean;
 }
 
 /**
@@ -77,6 +83,11 @@ export function toRecognitionSource(body: z.infer<typeof createInternalRecogniti
 
 export const recognitionIdentifierSchema = z.object({
   id: z.string().uuid("Recognition id must be a UUID"),
+});
+
+/** Query for GET /recognitions?limit= */
+export const listRecognitionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 /** Query for GET /recognitions/result?id= */

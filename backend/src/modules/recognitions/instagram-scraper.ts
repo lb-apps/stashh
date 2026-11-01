@@ -240,6 +240,23 @@ export function extractCaption(html: string): string | null {
   return caption.trim() || null;
 }
 
+const USERNAME = /^[A-Za-z0-9._]{1,30}$/;
+
+/**
+ * The post's author: the username in a `/<user>/reel/<code>` link, else the one in the
+ * page's og:description (`<likes> - <user> on <date>: …`, served in English). Null when
+ * neither names one.
+ */
+export function extractAuthor(url: string, html: string | null): string | null {
+  const segments = new URL(url).pathname.split("/").filter(Boolean);
+  const head = segments[0];
+  if (head && segments.length >= 3 && ["p", "reel", "reels", "tv"].includes(segments[1]!) && USERNAME.test(head)) return head;
+
+  const description = html?.match(/<meta property="og:description" content="([^"]*)"/)?.[1];
+  const author = description ? decodeHtmlEntities(description).match(/ - ([A-Za-z0-9._]{1,30}) on [^:]+: /)?.[1] : undefined;
+  return author ?? null;
+}
+
 async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<string> {
   const urls = [
     `https://www.instagram.com/reel/${shortcode}/`,
@@ -314,6 +331,7 @@ export async function fetchInstagramContent(
   }
 
   const caption = channelCaption ?? (html ? extractCaption(html) : null);
+  const authorUsername = extractAuthor(url, html);
   const scrapedVideoUrl = html ? extractVideoUrl(html) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
@@ -353,7 +371,16 @@ export async function fetchInstagramContent(
       : `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.${downloader}`;
     if (!caption) throw new Error(mediaError);
     log.warn({ err: mediaError }, "no media; reading the caption alone");
-    return { media: [], media_error: mediaError, thumbnail_url: thumbnailUrl, fetch_method: "caption", caption, source_type: sourceType, platform: "instagram" };
+    return {
+      media: [],
+      media_error: mediaError,
+      thumbnail_url: thumbnailUrl,
+      fetch_method: "caption",
+      caption,
+      source_type: sourceType,
+      platform: "instagram",
+      author_username: authorUsername,
+    };
   }
 
   return {
@@ -363,5 +390,6 @@ export async function fetchInstagramContent(
     caption,
     source_type: sourceType,
     platform: "instagram",
+    author_username: authorUsername,
   };
 }
