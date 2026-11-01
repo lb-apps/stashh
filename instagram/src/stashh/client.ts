@@ -36,6 +36,8 @@ const recognitionSchema = z.object({
   /** The post announced venues whose names were not in what was read: a list seen by its cover only. */
   names_elsewhere: z.boolean().optional().default(false),
   error_message: z.string().nullable(),
+  /** Why it failed, for the reply's wording; a code this build does not know reads as null. */
+  error_code: z.enum(["private", "temporarily_unavailable", "unreadable"]).nullable().optional().catch(null).default(null),
 });
 export type Recognition = z.infer<typeof recognitionSchema>;
 
@@ -50,10 +52,11 @@ export const TERMINAL_STATUSES: ReadonlySet<Recognition["status"]> = new Set([
 /**
  * What to recognize: a link the backend scrapes, or media shared in a DM that has no
  * permalink — a feed post (with its caption) or a story (no caption; Meta forbids
- * keeping its media, so only the CDN link travels).
+ * keeping its media, so only the CDN link travels). A shared Reel is a link that also
+ * carries its caption: the backend reads the venues from it when the video is withheld.
  */
 export type RecognitionSource =
-  | { kind: "url"; url: string }
+  | { kind: "url"; url: string; caption?: string | null }
   | { kind: "instagram_media"; format: "post" | "story"; mediaId: string; mediaUrl: string; caption: string | null };
 
 export class StashhApiError extends Error {
@@ -127,7 +130,7 @@ export class HttpStashhApi implements StashhApi {
   async createRecognition({ userId, source, idempotencyKey }: { userId: string; source: RecognitionSource; idempotencyKey: string }) {
     const body =
       source.kind === "url"
-        ? { source_url: source.url }
+        ? { source_url: source.url, ...(source.caption ? { caption: source.caption } : {}) }
         : { shared_media: { provider: "instagram", format: source.format, media_id: source.mediaId, media_url: source.mediaUrl, caption: source.caption } };
     const data = await this.request("POST", `/internal/v1/users/${userId}/recognitions`, recognitionAcceptedSchema, {
       body,

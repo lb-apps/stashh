@@ -40,7 +40,8 @@ export function interpret(message: { text: string | null; attachments: InboundAt
 }
 
 /**
- * What a shared attachment lets us read. A Reel carries its public permalink. A feed
+ * What a shared attachment lets us read. A Reel carries its public permalink and its
+ * caption (`title`), which the backend falls back on when the video is withheld. A feed
  * post carries no permalink, only a signed CDN link to its media, the caption and a
  * media id that Instagram Login cannot resolve, so the media itself is the source. A
  * story share (`ig_story`) carries the story's media link and id; a story mention
@@ -49,7 +50,7 @@ export function interpret(message: { text: string | null; attachments: InboundAt
 function sharedSource(attachment: InboundAttachment): RecognitionSource | null {
   const payload = attachment.payload ?? {};
   if (PERMALINK_ATTACHMENTS.has(attachment.type)) {
-    return payload.url && LINK_PATTERN.test(payload.url) ? { kind: "url", url: payload.url } : null;
+    return payload.url && LINK_PATTERN.test(payload.url) ? { kind: "url", url: payload.url, caption: payload.title?.trim() || null } : null;
   }
   if (attachment.type === "ig_post") {
     const mediaId = payload["ig_post_media_id"];

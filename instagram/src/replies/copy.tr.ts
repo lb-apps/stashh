@@ -1,4 +1,4 @@
-import type { RecognitionSource } from "../stashh/client.ts";
+import type { Recognition, RecognitionSource } from "../stashh/client.ts";
 
 /**
  * Every word Stashh says in a DM, in Turkish. Discovery voice: plain, warm, "sen",
@@ -9,12 +9,15 @@ import type { RecognitionSource } from "../stashh/client.ts";
 /** What the person shared, so the reply names it the way they would. */
 export type SourceKind = "reel" | "video" | "post" | "story";
 
-const NOUN: Record<SourceKind, { locative: string; accusative: string }> = {
-  reel: { locative: "Reel'de", accusative: "Reel'i" },
-  video: { locative: "videoda", accusative: "videoyu" },
-  post: { locative: "gönderide", accusative: "gönderiyi" },
-  story: { locative: "hikâyede", accusative: "hikâyeyi" },
+const NOUN: Record<SourceKind, { nominative: string; locative: string; accusative: string }> = {
+  reel: { nominative: "Reel", locative: "Reel'de", accusative: "Reel'i" },
+  video: { nominative: "video", locative: "videoda", accusative: "videoyu" },
+  post: { nominative: "gönderi", locative: "gönderide", accusative: "gönderiyi" },
+  story: { nominative: "hikâye", locative: "hikâyede", accusative: "hikâyeyi" },
 };
+
+/** Where the shared thing lives; a "video" is a TikTok link. */
+const platformOf = (kind: SourceKind) => (kind === "video" ? "TikTok" : "Instagram");
 
 export function sourceKindOf(source: RecognitionSource): SourceKind {
   if (source.kind === "instagram_media") return source.format;
@@ -29,7 +32,15 @@ export const copy = {
   found: (count: number, kind: SourceKind) => `Bu ${NOUN[kind].locative} ${count} mekân var.`,
   empty: (kind: SourceKind) =>
     `Bu ${NOUN[kind].locative} bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım.`,
-  failed: (kind: SourceKind) => `Bu ${NOUN[kind].accusative} şu an okuyamadık. Birazdan tekrar gönderir misin?`,
+  failed: (kind: SourceKind) => `Bu ${NOUN[kind].accusative} okurken bir sorun çıktı. Birazdan tekrar gönderir misin?`,
+  /** The reply for a failed recognition, worded from the backend's `error_code`. */
+  failedBecause: (code: Recognition["error_code"], kind: SourceKind): string => {
+    if (code === "private")
+      return `Bu ${NOUN[kind].nominative} gizli bir hesaptan, açamadık. Herkese açık bir ${NOUN[kind].nominative} gönderirsen içindeki mekânları çıkarırız.`;
+    if (code === "temporarily_unavailable")
+      return `${platformOf(kind)} bu ${NOUN[kind].accusative} şu an bize açmıyor. Birkaç dakika sonra tekrar gönderir misin?`;
+    return copy.failed(kind);
+  },
   listNeedsLink:
     "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
   help: 'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.',
