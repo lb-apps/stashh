@@ -13,6 +13,10 @@ describe("extractCaption", () => {
     expect(extractCaption(page("3 likes - user on May 1: &quot;#burger #kad&#x131;k&#xf6;y&quot;."))).toBe("#burger #kadıköy");
   });
 
+  it("drops the wrapping when the attribute ends in whitespace", () => {
+    expect(extractCaption(page("3 likes - user on May 1: &quot;Tam yin ve yang&quot;. \n"))).toBe("Tam yin ve yang");
+  });
+
   it("leaves an out-of-range entity as written", () => {
     expect(extractCaption(page("&#x110000; ok"))).toBe("&#x110000; ok");
   });

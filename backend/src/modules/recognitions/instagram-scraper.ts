@@ -228,7 +228,8 @@ export function extractCaption(html: string): string | null {
   const match = html.match(/<meta property="og:description" content="([^"]*)"/);
   if (!match) return null;
 
-  const raw = decodeHtmlEntities(match[1]!);
+  // Trimmed first: the attribute often ends in whitespace, which kept `".` on every caption.
+  const raw = decodeHtmlEntities(match[1]!).trim();
   const colonIdx = raw.indexOf(": ");
   const caption =
     colonIdx !== -1
@@ -294,13 +295,22 @@ export async function fetchInstagramContent(
   const shortcode = extractShortcode(url);
   const sourceType = detectSourceType(url);
 
-  const html = await fetchInstagramHtml(shortcode, log);
+  // Instagram often answers a server with an empty app shell (200, no og tags). The page only
+  // adds the caption and a signed video URL; the downloader does not need it, so it still runs.
+  let html: string | null = null;
+  let pageError: unknown = null;
+  try {
+    html = await fetchInstagramHtml(shortcode, log);
+  } catch (error) {
+    pageError = error;
+    log.warn({ err: error instanceof Error ? error.message : String(error) }, "page unreadable; asking the downloader");
+  }
 
-  const caption = extractCaption(html);
-  const scrapedVideoUrl = extractVideoUrl(html);
+  const caption = html ? extractCaption(html) : null;
+  const scrapedVideoUrl = html ? extractVideoUrl(html) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
-  let thumbnailUrl = extractThumbnail(html);
+  let thumbnailUrl = html ? extractThumbnail(html) : null;
   let media: SourceMediaItem[] = [];
   let fetchMethod: "scrape" | "downloader" = "scrape";
 
@@ -328,6 +338,7 @@ export async function fetchInstagramContent(
   }
 
   if (media.length === 0) {
+    if (pageError) throw pageError;
     throw new Error(
       `Could not extract media from Instagram page (shortcode: ${shortcode}). The post may be private, deleted, or Instagram changed their HTML structure.`,
     );
