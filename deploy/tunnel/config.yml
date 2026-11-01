@@ -5,6 +5,11 @@ ingress:
   # Meta's Instagram webhook and the DM channel.
   - hostname: instagram.stashh.me
     service: http://instagram:3002
+  # Meta's callback is still https://ig-dev.stashh.me/webhooks/instagram (registered when this
+  # hostname was the dev tunnel, then pointed at stashh-prod). Until the callback moves to the
+  # webhook relay (hooks.stashh.me), this hostname must keep reaching the instagram service.
+  - hostname: ig-dev.stashh.me
+    service: http://instagram:3002
 
   # The public API the web app (stashh.me/app) calls from the browser.
   # Of the internal API, only redeeming a DM sign-in link is reachable from the internet
