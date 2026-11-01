@@ -129,3 +129,19 @@ branch locally and on origin, and confirm whatever auto-deploys is tracking the 
 before the branch disappears. When the classifier denies a follow-up under the same label, use
 plain single commands (`git checkout develop`, then `git pull --ff-only`) — never widen the
 allow list just to get past a denial.
+
+## 2026-11-01 — Replacing a catch-all ingress took Instagram DMs down
+
+**What happened:** To add `api.stashh.me`, the tunnel moved from `--url http://instagram:3002`
+(every hostname → instagram) to an ingress file that named only `instagram.stashh.me`. Meta's
+callback was really `https://ig-dev.stashh.me/webhooks/instagram`, a hostname that had been
+repointed at the prod tunnel and only worked because of the catch-all. After the deploy Meta got
+404s, and DMs went unanswered until a hotfix (#18) put the `ig-dev` rule back.
+
+**Why it was wrong:** I checked the hostnames I knew (docs said `instagram.stashh.me`) instead of
+the ones actually routed: the DNS records pointing at the tunnel and the callback Meta has stored.
+
+**How to apply:** Before narrowing any routing (tunnel ingress, proxy, DNS), list what really
+uses it — every DNS name CNAMEd to the tunnel, and every external caller's configured URL (Meta
+callback, OAuth redirects) — and keep a rule for each, or move the caller first. After the deploy,
+watch real traffic (`instagram_messages` rows, container logs), not only `/health`.
