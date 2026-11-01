@@ -12,7 +12,7 @@
       "type": "http",
       "url": "https://mcp.railway.com"
     },
-    "cloudflare": {
+    "cloudflare-lba": {
       "type": "http",
       "url": "https://mcp.cloudflare.com/mcp"
     },
