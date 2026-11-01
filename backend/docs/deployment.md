@@ -1,8 +1,8 @@
 # Backend in production
 
 The backend runs as the `backend` container of the root `compose.yaml`: the image compiles
-`src/` with `tsc` and starts `node dist/start.js`. How the stack is deployed, and how the home
-Pi deploys it on every push, is in [docs/deploy.md](../../docs/deploy.md). This page is what
+`src/` with `tsc` and starts `node dist/start.js`. How the stack is deployed, and how
+`home-server` deploys it on every push, is in [docs/deploy.md](../../docs/deploy.md). This page is what
 is specific to the backend process.
 
 ## Process topology

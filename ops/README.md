@@ -12,8 +12,9 @@ npm install
 npm run dev                  # http://127.0.0.1:3003
 ```
 
-`STASHH_API_URL` and `INSTAGRAM_API_URL` point at production on the home Pi (`http://<pi>:3000`,
-`http://<pi>:3002`; see [docs/deploy.md](../docs/deploy.md)) or at local dev servers.
+`STASHH_API_URL` and `INSTAGRAM_API_URL` point at production on `home-server`
+(`http://home-server:3000`, `http://home-server:3002`; see [docs/deploy.md](../docs/deploy.md)) or at
+local dev servers.
 
 ## Tokens
 

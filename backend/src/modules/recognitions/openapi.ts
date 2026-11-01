@@ -4,6 +4,7 @@ import {
   successEnvelope,
   commonErrorResponses,
 } from "../../lib/openapi.js";
+import { recognitionErrorCodes } from "./failure-reason.js";
 import {
   createRecognitionRequestSchema,
   recognitionIdentifierSchema,
@@ -31,6 +32,10 @@ export const recognitionStatusSchema = z
       .boolean()
       .describe("The post presents several venues whose names were not in the media and caption read — a list post seen by its cover only. With an empty `places`, ask for the post's link."),
     error_message: z.string().nullable(),
+    error_code: z
+      .enum(recognitionErrorCodes)
+      .nullable()
+      .describe("Set when `status` is `failed`: `private` (behind a private account), `temporarily_unavailable` (the media could not be fetched; sending it again later usually works) or `unreadable` (anything else). Word the reply from this; `error_message` is the precise reason, for operators."),
     retry_count: z.number().int(),
     started_at: z.string().nullable(),
     finished_at: z.string().nullable(),

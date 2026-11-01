@@ -1,3 +1,4 @@
+import { recognitionErrorCode } from "./failure-reason.js";
 import type { RecognitionWithResult } from "./repository.js";
 import type { RecognitionTaskRow } from "./types.js";
 
@@ -11,6 +12,7 @@ export function presentRecognition({ task, places, names_elsewhere }: Recognitio
     places,
     names_elsewhere,
     error_message: task.error_message,
+    error_code: recognitionErrorCode(task),
     retry_count: task.retry_count,
     started_at: task.started_at,
     finished_at: task.finished_at,

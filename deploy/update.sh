@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Pull-based deploy. Fetches the tracked branch and, when its commit moved, rebuilds the images
-# and restarts the compose stack. stashh-update.timer (deploy/systemd) runs it every minute;
-# by hand:
+# and restarts the compose stack. Run every minute by the host's scheduler: a LaunchDaemon on
+# home-server, stashh-update.timer (deploy/systemd) on a Linux host. By hand:
 #   deploy/update.sh           deploy if the branch moved
 #   deploy/update.sh --force   rebuild and restart even if it did not (after an env file change)
 # To roll back, revert on the branch: the next run deploys the revert.
-# Settings (stashh-update.service loads them from /srv/stashh/env/deploy.env):
+# Settings (the scheduler loads them from the host's deploy.env; see docs/deploy.md):
 #   STASHH_REPO_DIR   checkout to deploy from   default: the repo this script is in
 #   STASHH_BRANCH     branch to follow           default: develop
 #   STASHH_ENV_DIR    where the *.env files are  default: <repo>/deploy

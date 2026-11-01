@@ -33,11 +33,13 @@ export const createRecognitionRequestSchema = z.object({
  * What a recognition reads. A URL is scraped; shared media arrives with its content
  * because the channel that received it holds the only copy (an Instagram post or story
  * shared in a DM has no permalink, just a signed CDN link and, for a post, the caption).
+ * A Reel shared in a DM is a URL, and the channel also sends the caption it received:
+ * it is exact where the page's is not, and it is there when the page cannot be read.
  */
 export type SharedMediaFormat = "post" | "story";
 
 export type RecognitionSource =
-  | { kind: "url"; url: string }
+  | { kind: "url"; url: string; caption?: string | null }
   | { kind: "shared_media"; provider: "instagram"; format: SharedMediaFormat; mediaId: string; mediaUrl: string; caption: string | null };
 
 /** Hosts Instagram's messaging CDN serves shared media from. */
@@ -61,14 +63,14 @@ const sharedMediaSchema = z.object({
   caption: z.string().max(10_000).nullable().optional(),
 });
 
-/** Internal API: a URL like the public API, or media a channel received. */
+/** Internal API: a URL like the public API (with the caption the channel received, if any), or media a channel received. */
 export const createInternalRecognitionRequestSchema = z.union([
-  createRecognitionRequestSchema,
+  createRecognitionRequestSchema.extend({ caption: z.string().max(10_000).nullable().optional() }),
   z.object({ shared_media: sharedMediaSchema }),
 ]);
 
 export function toRecognitionSource(body: z.infer<typeof createInternalRecognitionRequestSchema>): RecognitionSource {
-  if ("source_url" in body) return { kind: "url", url: body.source_url };
+  if ("source_url" in body) return { kind: "url", url: body.source_url, caption: body.caption?.trim() || null };
   const media = body.shared_media;
   return { kind: "shared_media", provider: media.provider, format: media.format, mediaId: media.media_id, mediaUrl: media.media_url, caption: media.caption ?? null };
 }

@@ -20,12 +20,18 @@ const place = (n: number): Place => ({
   recommendations: [],
 });
 
-const recognition = (status: Recognition["status"], places: Place[] | null = null, error: string | null = null): Recognition => ({
+const recognition = (
+  status: Recognition["status"],
+  places: Place[] | null = null,
+  error: string | null = null,
+  code: Recognition["error_code"] = null,
+): Recognition => ({
   recognition_id: RECOGNITION_ID,
   status,
   places,
   names_elsewhere: false,
   error_message: error,
+  error_code: code,
 });
 
 let time: ReturnType<typeof clock>;
@@ -101,7 +107,7 @@ describe("recognizing a shared Reel", () => {
 
     expect(messenger.typed).toEqual([SENDER]);
     expect(stashh.created).toEqual([
-      { userId: "00000000-0000-4000-8000-000000000001", source: { kind: "url", url: REEL_URL }, idempotencyKey: mid },
+      { userId: "00000000-0000-4000-8000-000000000001", source: { kind: "url", url: REEL_URL, caption: "caption" }, idempotencyKey: mid },
     ]);
     expect(store.row(mid)).toMatchObject({ status: "submitted", recognitionId: RECOGNITION_ID, lockedUntil: null });
 
@@ -140,7 +146,28 @@ describe("recognizing a shared Reel", () => {
     await next(mid);
 
     expect(store.row(mid)).toMatchObject({ status: "failed", lastError: "video unavailable" });
-    expect(messenger.texts()).toEqual(["Bu Reel'i şu an okuyamadık. Birazdan tekrar gönderir misin?"]);
+    expect(messenger.texts()).toEqual(["Bu Reel'i okurken bir sorun çıktı. Birazdan tekrar gönderir misin?"]);
+  });
+
+  it("says the post is private when the backend says so", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("failed", null, "Instagram returned a login page", "private"));
+    await next(mid);
+
+    expect(messenger.texts()).toEqual([
+      "Bu Reel gizli bir hesaptan, açamadık. Herkese açık bir Reel gönderirsen içindeki mekânları çıkarırız.",
+    ]);
+  });
+
+  it("asks to send it again later when Instagram withheld the media", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("failed", null, "Downloader: throttled: 28 blank items", "temporarily_unavailable"));
+    await next(mid);
+
+    expect(store.row(mid)).toMatchObject({ status: "failed", lastError: "Downloader: throttled: 28 blank items" });
+    expect(messenger.texts()).toEqual(["Instagram bu Reel'i şu an bize açmıyor. Birkaç dakika sonra tekrar gönderir misin?"]);
   });
 
   it("gives up with an apology when the recognition never finishes", async () => {
@@ -153,7 +180,7 @@ describe("recognizing a shared Reel", () => {
 
     expect(store.row(mid).status).toBe("failed");
     expect(store.row(mid).lastError).toMatch(/timed out/);
-    expect(messenger.texts()).toEqual(["Bu Reel'i şu an okuyamadık. Birazdan tekrar gönderir misin?"]);
+    expect(messenger.texts()).toEqual(["Bu Reel'i okurken bir sorun çıktı. Birazdan tekrar gönderir misin?"]);
   });
 
   it("recognizes a pasted TikTok link and names it as a video", async () => {
@@ -244,7 +271,7 @@ describe("failures and retries", () => {
 
     expect(store.row(mid).status).toBe("failed");
     expect(store.row(mid).attempts).toBeGreaterThan(1);
-    expect(messenger.texts()).toEqual(["Bu Reel'i şu an okuyamadık. Birazdan tekrar gönderir misin?"]);
+    expect(messenger.texts()).toEqual(["Bu Reel'i okurken bir sorun çıktı. Birazdan tekrar gönderir misin?"]);
   });
 
   it("fails at once with an apology on a permanent error", async () => {

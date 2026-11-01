@@ -416,6 +416,7 @@ export type Database = {
       }
       recognition_tasks: {
         Row: {
+          available_at: string
           created_at: string
           error_message: string | null
           finished_at: string | null
@@ -432,6 +433,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          available_at?: string
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -448,6 +450,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          available_at?: string
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -840,6 +843,7 @@ export type Database = {
       claim_recognitions: {
         Args: { p_claim_limit?: number; p_worker_identifier: string }
         Returns: {
+          available_at: string
           created_at: string
           error_message: string | null
           finished_at: string | null
@@ -1125,6 +1129,7 @@ export type Database = {
       recover_stale_recognitions: {
         Args: { p_claim_limit?: number; p_stale_after_milliseconds: number }
         Returns: {
+          available_at: string
           created_at: string
           error_message: string | null
           finished_at: string | null

@@ -58,12 +58,19 @@ describe("extractInboundMessages", () => {
 });
 
 describe("interpret", () => {
-  const reel = (url: string) => ({ text: null, attachments: [{ type: "ig_reel", payload: { url } }] });
+  const reel = (url: string, title?: string) => ({ text: null, attachments: [{ type: "ig_reel", payload: { url, title } }] });
 
   it("recognizes a shared Reel by its permalink", () => {
     expect(interpret(reel("https://www.instagram.com/reel/Dd31ojZOgKL/"))).toEqual({
       kind: "recognize",
-      source: { kind: "url", url: "https://www.instagram.com/reel/Dd31ojZOgKL/" },
+      source: { kind: "url", url: "https://www.instagram.com/reel/Dd31ojZOgKL/", caption: null },
+    });
+  });
+
+  it("sends a shared Reel's caption with its permalink", () => {
+    expect(interpret(reel("https://www.instagram.com/reel/DfAfig_IlO9/", "📍Ali Ustanın Yeri : Üçkuyular İzmir\n"))).toEqual({
+      kind: "recognize",
+      source: { kind: "url", url: "https://www.instagram.com/reel/DfAfig_IlO9/", caption: "📍Ali Ustanın Yeri : Üçkuyular İzmir" },
     });
   });
 

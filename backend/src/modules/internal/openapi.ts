@@ -108,6 +108,9 @@ signed Instagram CDN link and, for a post, the caption it received; the task is 
 \`instagram-media:<media_id>\` (post) or \`instagram-story:<media_id>\` (story), so the same share is served
 from cache afterwards. A story's media is read but never stored.
 
+With \`source_url\`, the channel may also send the \`caption\` it received (a Reel shared in a DM carries it).
+It is read in place of the page's, and when the post's media cannot be fetched the venues are read from it alone.
+
 Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key for the same user returns the original task instead of enqueuing a second one.`,
   request: {
     params: userParams,
