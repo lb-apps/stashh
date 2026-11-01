@@ -75,6 +75,11 @@
   --color-pin-bar: var(--pin-bar);
   --color-pin-rooftop: var(--pin-rooftop);
   --color-pin-sweets: var(--pin-sweets);
+  --color-pin-bakery: var(--pin-bakery);
+  --color-pin-wine: var(--pin-wine);
+  --color-pin-park: var(--pin-park);
+  --color-pin-view: var(--pin-view);
+  --color-pin-market: var(--pin-market);
 
   /* type scale — `text-display-1` … `text-nano` */
   --text-display-1: var(--fs-display-1);
@@ -226,4 +231,49 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;
+}
+
+/*
+ * App shell (stashh.me/app).
+ *
+ * The document never scrolls. In-app browsers (Instagram's WKWebView) resize
+ * the viewport while a page scrolls, which breaks every `vh` unit, and a
+ * scrolling body hands pull-to-refresh and the host's dismiss gesture a
+ * chance to fight the sheet. So the root is pinned to the window and every
+ * size is measured from it; only the sheet's own content scrolls, contained.
+ */
+.app-document,
+.app-document body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+/* Labels behave like an app's, not a document's: no selection while a finger
+   drags the sheet, no callout on long-press. Fields stay selectable. */
+.app-document body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app-document :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.app-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Insets: never smaller than the token, never under the notch or home bar. */
+.app-inset-top { padding-top: max(env(safe-area-inset-top), var(--sp-7)); }
+.app-inset-bottom { padding-bottom: max(env(safe-area-inset-bottom), var(--sp-7)); }
+
+/* Mapbox's logo and attribution sit just above the sheet and move with it.
+   `--sheet-cover` is written by the sheet every frame (no React render). */
+.app-map .mapboxgl-ctrl-bottom-left,
+.app-map .mapboxgl-ctrl-bottom-right {
+  bottom: var(--sheet-cover, 0px);
 }

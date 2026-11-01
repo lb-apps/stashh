@@ -19,4 +19,20 @@
   /* translucent material — used only for chips floating over a live map */
   --material-chip: rgba(247, 245, 242, 0.82); /* @kind color */
   --material-blur: saturate(180%) blur(20px); /* @kind other */
+
+  /* Liquid Glass — floating chrome over the live map (lib/discovery/liquid-glass).
+     The map refracts through each pane: a convex bezel bends what lies past the
+     edge inward, a rim catches light from the top-left, the pane lifts on a warm
+     shadow, and touching it lights it from inside. Panes closer than
+     --glass-merge melt into one another like gel. */
+  --glass-bezel: 18px; /* @kind spacing */
+  --glass-refraction: 0.55; /* @kind other */
+  --glass-blur: 1.5px; /* @kind spacing */
+  --glass-tint: rgba(247, 245, 242, 0.34); /* @kind color */
+  --glass-specular: 0.5; /* @kind other */
+  --glass-merge: 14px; /* @kind spacing */
+  --glass-shadow: rgba(28, 25, 20, 0.16); /* @kind color */
+  --glass-shadow-spread: 22px; /* @kind spacing */
+  --glass-shadow-offset: 6px; /* @kind spacing */
+  --glass-press-glow: 0.22; /* @kind other */
 }

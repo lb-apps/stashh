@@ -1,18 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { categoryColor, type PlaceCategory } from '../categories';
 
-const CATEGORY: Record<string, string> = {
-  coffee: 'var(--pin-coffee)',
-  food: 'var(--pin-food)',
-  bar: 'var(--pin-bar)',
-  rooftop: 'var(--pin-rooftop)',
-  sweets: 'var(--pin-sweets)',
-  default: 'var(--pin-default)',
-};
+/** Pin geometry in px — shared with the map's GL pin images, which must match. */
+export const MAP_PIN = { disc: 44, discSelected: 56, ring: 3, ringSelected: 4, glyph: 20, glyphSelected: 24 } as const;
 
 type MapPinProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
-  category?: 'coffee' | 'food' | 'bar' | 'rooftop' | 'sweets' | 'default';
+  category?: PlaceCategory;
   glyph?: React.ReactNode;
   label?: React.ReactNode;
   selected?: boolean;
@@ -21,7 +16,7 @@ type MapPinProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style'> & {
 };
 
 export function MapPin({ category = 'default', glyph = null, label, selected = false, count, style, ...rest }: MapPinProps) {
-  const d = selected ? 56 : 44;
+  const d = selected ? MAP_PIN.discSelected : MAP_PIN.disc;
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 5, ...style }} {...rest}>
       <div style={{ position: 'relative' }}>
@@ -30,13 +25,13 @@ export function MapPin({ category = 'default', glyph = null, label, selected = f
             width: d,
             height: d,
             borderRadius: 'var(--r-circle)',
-            background: CATEGORY[category] || CATEGORY.default,
+            background: categoryColor(category),
             display: 'grid',
             placeItems: 'center',
             color: 'var(--white)',
             boxShadow: selected
-              ? '0 0 0 4px var(--white), 0 0 0 7px var(--cobalt-500), var(--sh-pin)'
-              : '0 0 0 3px var(--white), var(--sh-pin)',
+              ? `0 0 0 ${MAP_PIN.ringSelected}px var(--white), 0 0 0 ${MAP_PIN.ringSelected + 3}px var(--cobalt-500), var(--sh-pin)`
+              : `0 0 0 ${MAP_PIN.ring}px var(--white), var(--sh-pin)`,
             transform: selected ? 'scale(1)' : 'scale(1)',
             transition: 'width var(--dur) var(--ease-spring), height var(--dur) var(--ease-spring)',
           }}
