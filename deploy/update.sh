@@ -29,6 +29,12 @@ main() {
   git checkout --quiet --force -B "$branch" "origin/$branch"
   docker compose build --pull
   docker compose up -d --remove-orphans --wait --wait-timeout 240
+  # cloudflared reads its ingress only at start, and a bind-mounted file's edit doesn't change the
+  # compose config, so `up -d` leaves the tunnel running the old routes. Recreate it when they moved.
+  if ! git diff --quiet "$current" "$target" -- deploy/tunnel/config.yml; then
+    echo "tunnel ingress changed: recreating the tunnel"
+    docker compose up -d --force-recreate --no-deps --wait --wait-timeout 120 tunnel
+  fi
   docker image prune -f >/dev/null
   echo "deployed $branch @ ${target:0:12}"
 }
