@@ -1,4 +1,5 @@
 import { loadConfig } from "./config.ts";
+import { outboundMode } from "./conversation/outbound.ts";
 import { MessageProcessor } from "./conversation/processor.ts";
 import { MessageWorker } from "./conversation/worker.ts";
 import { createDb } from "./db/client.ts";
@@ -13,6 +14,7 @@ import { HttpStashhApi } from "./stashh/client.ts";
 import { CaptureSink } from "./webhooks/capture-sink.ts";
 import type { WebhookSink } from "./webhooks/routes.ts";
 import { createWebhookCounters } from "./webhooks/counters.ts";
+import { instanceEnvironment } from "./webhooks/relay.ts";
 import { FanOutSink, StoreSink } from "./webhooks/store-sink.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -22,8 +24,13 @@ const MESSAGE_RETENTION_MS = 30 * 24 * HOUR_MS;
 const config = loadConfig();
 const log = createLogger(config);
 
+// Which environment this instance is to the hooks relay, and whom it may write to (docs/webhook-relay.md).
+const environment = instanceEnvironment(config.NODE_ENV);
+const outbound = outboundMode(environment, config.META_OUTBOUND);
+log.info({ environment, outbound, relay: Boolean(config.HOOKS_RELAY_SECRET) }, "instagram channel environment");
+
 const db = createDb({ url: config.SUPABASE_URL, secretKey: config.SUPABASE_SECRET_KEY });
-const store = new SupabaseMessageStore(db);
+const store = new SupabaseMessageStore(db, { environment });
 const tokens = new InstagramTokenStore({
   db,
   accountId: config.INSTAGRAM_ACCOUNT_ID,
@@ -38,6 +45,7 @@ const processor = new MessageProcessor({
   messenger: new InstagramMessenger({ apiVersion: config.GRAPH_API_VERSION, tokens }),
   profiles,
   log: log.child({ component: "processor" }),
+  outbound,
 });
 const worker = new MessageWorker({
   store,
@@ -47,12 +55,15 @@ const worker = new MessageWorker({
 });
 
 const webhookCounters = createWebhookCounters();
-const sinks: WebhookSink[] = [new StoreSink({ store, accountId: config.INSTAGRAM_ACCOUNT_ID, log, counters: webhookCounters })];
+const sinks: WebhookSink[] = [
+  new StoreSink({ store, accountId: config.INSTAGRAM_ACCOUNT_ID, environment, log, counters: webhookCounters }),
+];
 if (config.WEBHOOK_CAPTURE_DIR) sinks.push(new CaptureSink(config.WEBHOOK_CAPTURE_DIR, log));
 
 const app = createApp({
   appSecret: config.INSTAGRAM_APP_SECRET,
   verifyToken: config.WEBHOOK_VERIFY_TOKEN,
+  relaySecret: config.HOOKS_RELAY_SECRET,
   sink: sinks.length === 1 ? sinks[0]! : new FanOutSink(sinks),
   log,
   counters: webhookCounters,

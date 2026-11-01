@@ -1,8 +1,11 @@
 import type { RecognitionSource } from "../stashh/client.ts";
+import type { CommandOutcome } from "../webhooks/core/commands.ts";
 import type { InboundAttachment } from "./events.ts";
 
 /** What a person wants from a message, decided before any side effect. */
 export type Intent =
+  /** A hooks relay `/env` command (docs/webhook-relay.md): answered with what the relay did. */
+  | { kind: "env"; outcome: CommandOutcome }
   /** Find the places in a Reel, a shared post or story, or a pasted link. */
   | { kind: "recognize"; source: RecognitionSource }
   /** Erase everything Stashh holds about the sender ("sil"). */
@@ -24,7 +27,10 @@ const LINK_PATTERN =
 /** Attachment types that carry a readable permalink in `payload.url`. */
 const PERMALINK_ATTACHMENTS = new Set(["ig_reel"]);
 
-export function interpret(message: { text: string | null; attachments: InboundAttachment[] }): Intent {
+export function interpret(message: { text: string | null; attachments: InboundAttachment[]; relayCommand?: CommandOutcome | null }): Intent {
+  // Only the relay's sealed envelope makes a message a command; a typed "/env" alone is help.
+  if (message.relayCommand) return { kind: "env", outcome: message.relayCommand };
+
   for (const attachment of message.attachments) {
     const source = sharedSource(attachment);
     if (source) return { kind: "recognize", source };
