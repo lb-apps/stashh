@@ -1,6 +1,6 @@
 import type { Logger } from "../lib/logger.ts";
 import { GraphApiError, type Messenger, type OutboundMessage, type ProfileReader } from "../meta/graph-client.ts";
-import { composeRecognitionReply } from "../replies/compose.ts";
+import { composeRecognitionReply, mapLinkMessage } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
 import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
 import { interpret } from "./intent.ts";
@@ -26,6 +26,7 @@ export interface ProcessorDeps {
  * Advances one claimed message by one step of its state machine:
  *
  *   received  ── help / unsupported ──▶ reply ──▶ replied
+ *             ── link ──▶ resolve user, mint a sign-in link, reply ──▶ replied
  *             ── erase ──▶ erase user, reply, forget the sender
  *             ── recognize ──▶ create recognition (idempotent on mid) ──▶ submitted
  *   submitted ── still running ──▶ poll again later
@@ -78,6 +79,11 @@ export class MessageProcessor {
         return this.reply(message, [text(copy.help)]);
       case "unsupported":
         return this.reply(message, [text(copy.unsupported)]);
+      case "link": {
+        const { userId } = await this.stashh.resolveInstagramUser(message.senderId);
+        const { url } = await this.stashh.mintSignInLink(userId);
+        return this.reply(message, [mapLinkMessage(copy.mapLink, url)]);
+      }
       case "erase":
         await this.stashh.eraseInstagramUser(message.senderId);
         await this.reply(message, [text(copy.erased)]);
@@ -130,7 +136,8 @@ export class MessageProcessor {
       if (places.length === 0 && recognition.names_elsewhere && this.isSharedPost(message)) {
         return this.reply(message, [text(copy.listNeedsLink)]);
       }
-      return this.reply(message, composeRecognitionReply(places, kind));
+      const mapUrl = places.length > 0 ? await this.mapUrl(message.userId, message.mid) : null;
+      return this.reply(message, composeRecognitionReply(places, kind, mapUrl));
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
       return this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
@@ -142,6 +149,19 @@ export class MessageProcessor {
       return this.reply(message, [text(copy.failed(kind))], "failed", `recognition timed out after ${Math.round(elapsed / 1000)}s`);
     }
     await this.settle(message, { nextAttemptAt: new Date(now.getTime() + pollDelayMs(elapsed)) });
+  }
+
+  /**
+   * A sign-in link for the reply's map button. The places are saved either way, so a link
+   * that cannot be minted drops the button rather than holding back the reply.
+   */
+  private async mapUrl(userId: string, mid: string): Promise<string | null> {
+    try {
+      return (await this.stashh.mintSignInLink(userId)).url;
+    } catch (error) {
+      this.log.warn({ err: error, mid }, "sign-in link not minted; replying without the map button");
+      return null;
+    }
   }
 
   /** Sends what has not been delivered yet, then settles the message. */

@@ -29,7 +29,7 @@ export function sourceKindOf(source: RecognitionSource): SourceKind {
 const ratingFormat = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export const copy = {
-  found: (count: number, kind: SourceKind) => `Bu ${NOUN[kind].locative} ${count} mekân var.`,
+  found: (count: number, kind: SourceKind) => `Bu ${NOUN[kind].locative} ${count} mekân var, hepsini haritana ekledik.`,
   empty: (kind: SourceKind) =>
     `Bu ${NOUN[kind].locative} bir mekân bulamadık. Başka bir Reel gönder, içindekileri çıkaralım.`,
   failed: (kind: SourceKind) => `Bu ${NOUN[kind].accusative} okurken bir sorun çıktı. Birazdan tekrar gönderir misin?`,
@@ -43,11 +43,16 @@ export const copy = {
   },
   listNeedsLink:
     "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
-  help: 'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim. Verilerini silmek için "sil" yaz.',
+  help: 'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim ve haritana ekleyelim. Haritanı açmak için "harita", verilerini silmek için "sil" yaz.',
   unsupported:
     "Şimdilik Reel'leri, gönderileri, hikâyeleri ve Instagram ya da TikTok linklerini okuyabiliyoruz. Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları listeleyelim.",
   erased: "Stashh'teki verilerini sildik.",
-  openInMaps: "Haritada aç",
+  /** With a fresh sign-in link, when someone writes "harita". */
+  mapLink: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
+  /** The personal sign-in link to the web map. */
+  openMyMap: "Haritanda aç",
+  /** A card's link to the place on Google Maps. */
+  openInMaps: "Google Maps'te aç",
   instagram: "Instagram",
   rating: (rating: number) => `★ ${ratingFormat.format(rating)}`,
 } as const;

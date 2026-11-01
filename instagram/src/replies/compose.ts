@@ -2,8 +2,12 @@ import { LIMITS, type CarouselCard, type OutboundMessage } from "../meta/graph-c
 import type { Place } from "../stashh/client.ts";
 import { copy, type SourceKind } from "./copy.tr.ts";
 
-/** The reply to a finished recognition: a one-line summary, then the places as carousels. */
-export function composeRecognitionReply(places: Place[], kind: SourceKind): OutboundMessage[] {
+/**
+ * The reply to a finished recognition: a one-line summary, then the places as carousels.
+ * With `mapUrl` (the person's sign-in link) the summary carries a button to their map,
+ * where the places were just saved.
+ */
+export function composeRecognitionReply(places: Place[], kind: SourceKind, mapUrl: string | null = null): OutboundMessage[] {
   if (places.length === 0) return [{ kind: "text", text: copy.empty(kind) }];
 
   const cards = places.map(toCard);
@@ -11,7 +15,13 @@ export function composeRecognitionReply(places: Place[], kind: SourceKind): Outb
   for (let i = 0; i < cards.length; i += LIMITS.templateElements) {
     carousels.push({ kind: "carousel", cards: cards.slice(i, i + LIMITS.templateElements) });
   }
-  return [{ kind: "text", text: copy.found(places.length, kind) }, ...carousels];
+  const summary = copy.found(places.length, kind);
+  return [mapUrl ? mapLinkMessage(summary, mapUrl) : { kind: "text", text: summary }, ...carousels];
+}
+
+/** `text` with the button that opens the person's map through their sign-in link. */
+export function mapLinkMessage(text: string, mapUrl: string): OutboundMessage {
+  return { kind: "button", text, buttons: [{ title: copy.openMyMap, url: mapUrl }] };
 }
 
 export function toCard(place: Place): CarouselCard {

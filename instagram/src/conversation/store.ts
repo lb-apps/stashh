@@ -26,7 +26,7 @@ export interface StoredMessage {
 }
 
 /** What a message was read as; recorded so the ops stats can say what people ask for. */
-export type MessageIntent = "recognize" | "help" | "unsupported" | "erase";
+export type MessageIntent = "recognize" | "help" | "unsupported" | "erase" | "link";
 
 /**
  * The outcome of one processing step. Settling always releases the claim, and a final

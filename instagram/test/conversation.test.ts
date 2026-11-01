@@ -93,6 +93,10 @@ describe("interpret", () => {
     expect(interpret({ text, attachments: [] })).toEqual({ kind: "erase" });
   });
 
+  it.each(["harita", "Harita", " HARİTA ", "link", "LINK"])("reads %j as a request for the map link", (text) => {
+    expect(interpret({ text, attachments: [] })).toEqual({ kind: "link" });
+  });
+
   it("does not erase on a sentence that merely contains the word", () => {
     expect(interpret({ text: "bunu sil lütfen", attachments: [] })).toEqual({ kind: "help" });
   });
