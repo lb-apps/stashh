@@ -73,16 +73,16 @@ vec3 scene(vec2 px) {
   return texture2D(u_scene, clamp(px / u_resolution, 0.0, 1.0)).rgb;
 }
 
+// Two rings of eight taps (at r and r/2) around the centre: a soft disc blur
+// that stays smooth at the larger radius regular glass needs over busy maps.
 vec3 frosted(vec2 px) {
-  vec3 c = scene(px) * 0.2;
-  c += scene(px + vec2( u_blur, 0.0)) * 0.1;
-  c += scene(px + vec2(-u_blur, 0.0)) * 0.1;
-  c += scene(px + vec2(0.0,  u_blur)) * 0.1;
-  c += scene(px + vec2(0.0, -u_blur)) * 0.1;
-  c += scene(px + vec2( u_blur,  u_blur) * 0.7071) * 0.1;
-  c += scene(px + vec2(-u_blur,  u_blur) * 0.7071) * 0.1;
-  c += scene(px + vec2( u_blur, -u_blur) * 0.7071) * 0.1;
-  c += scene(px + vec2(-u_blur, -u_blur) * 0.7071) * 0.1;
+  vec3 c = scene(px) * 0.12;
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.785398 + 0.3927;
+    vec2 d = vec2(cos(a), sin(a)) * u_blur;
+    c += scene(px + d) * 0.055;
+    c += scene(px + d * 0.5) * 0.055;
+  }
   return c;
 }
 

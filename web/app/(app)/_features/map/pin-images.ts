@@ -31,7 +31,9 @@ function pinShadow(): { y: number; blur: number; color: string } {
 function glyphImage(category: PlaceCategory, color: string): Promise<HTMLImageElement> {
   const svg = renderToStaticMarkup(createElement(Glyph, { icon: CATEGORY_GLYPH[category], size: GLYPH, color }));
   const image = new Image();
-  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"'))}`;
+  // A data-URI SVG must be standalone XML: it needs the namespace (Lucide already emits it — adding a second is invalid).
+  const standalone = svg.includes("xmlns=") ? svg : svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(standalone)}`;
   return image.decode().then(() => image);
 }
 

@@ -27,8 +27,8 @@
      --glass-merge melt into one another like gel. */
   --glass-bezel: 18px; /* @kind spacing */
   --glass-refraction: 0.55; /* @kind other */
-  --glass-blur: 1.5px; /* @kind spacing */
-  --glass-tint: rgba(247, 245, 242, 0.34); /* @kind color */
+  --glass-blur: 4px; /* @kind spacing */
+  --glass-tint: rgba(247, 245, 242, 0.56); /* @kind color */
   --glass-specular: 0.5; /* @kind other */
   --glass-merge: 14px; /* @kind spacing */
   --glass-shadow: rgba(28, 25, 20, 0.16); /* @kind color */

@@ -145,7 +145,13 @@ export function MapView({
 
       map.on("style.load", async () => {
         if (!map) return;
-        for (const image of await drawPinImages()) {
+        // Pins are decoration on a working map: if their images fail, the map, glass and selection still load.
+        const images = await drawPinImages().catch((error: unknown) => {
+          console.error("Map pin images failed", error);
+          return [];
+        });
+        if (!map) return;
+        for (const image of images) {
           if (!map.hasImage(image.id)) map.addImage(image.id, image.data, { pixelRatio: image.pixelRatio });
         }
         map.addSource(SOURCE, { type: "geojson", data: toFeatures(initialPlaces(), new Set()) });
