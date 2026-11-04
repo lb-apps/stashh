@@ -18,6 +18,7 @@ class MemoryRepo implements Pick<AssistantRepository, "listRecentMessages" | "fi
   async listRecentMessages(userId: string, channel: string, { limit, since }: { limit: number; since: Date }) {
     return this.messages
       .filter((m) => m.user_id === userId && m.channel === channel && new Date(m.created_at) >= since)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at) || (a.role === "user" ? -1 : 1))
       .slice(-limit);
   }
 
@@ -53,7 +54,7 @@ class MemoryRepo implements Pick<AssistantRepository, "listRecentMessages" | "fi
   async insertMessages(rows: AssistantMessageInsert[]) {
     for (const row of rows) {
       if (row.external_message_id && this.messages.some((m) => m.channel === row.channel && m.external_message_id === row.external_message_id)) continue;
-      this.messages.push({ id: `msg-${++this.seq}`, created_at: new Date().toISOString(), rich: null, external_message_id: null, turn_id: null, ...row } as AssistantMessageRow);
+      this.messages.push({ id: `msg-${++this.seq}`, rich: null, external_message_id: null, turn_id: null, created_at: new Date().toISOString(), ...row } as AssistantMessageRow);
     }
   }
 }
@@ -142,6 +143,24 @@ describe("AssistantService.turn", () => {
     expect(again).toEqual(first);
     expect(model.requests).toHaveLength(1);
     expect(repo.turns).toHaveLength(1);
+  });
+
+  it("stamps the person's messages at the turn's start and the reply at its end, so history pairs them in order", async () => {
+    const repo = new MemoryRepo();
+    let tick = 0;
+    const now = () => new Date(1_700_000_000_000 + 1000 * tick++);
+    const model = scriptedModel([[{ name: "reply", args: { text: "Bir." } }], [{ name: "reply", args: { text: "İki." } }]]);
+    const svc = new AssistantService({
+      repo: repo as unknown as AssistantRepository, model, modelId: "test/model", systemPrompt: "S", tools: tools(),
+      identities: { findProfileByUserId: async () => null }, maxSteps: 4, dailyTurnCap: 60, suggestedReplies: false, log: rootLogger, now,
+    });
+    await svc.turn({ userId: USER, channel: "instagram", messages: [{ external_id: "a", text: "bir" }, { external_id: "b", text: "bir-devam" }] });
+    await svc.turn({ userId: USER, channel: "instagram", messages: [{ external_id: "c", text: "iki" }] });
+    const [a, b, reply1, c] = repo.messages;
+    expect([a!.content, b!.content, reply1!.content, c!.content]).toEqual(["bir", "bir-devam", "Bir.", "iki"]);
+    expect(a!.created_at < b!.created_at && b!.created_at < reply1!.created_at && reply1!.created_at < c!.created_at).toBe(true);
+    const history = model.requests[1]!.messages.slice(1, -1);
+    expect(history.map((m) => (m as { content: string }).content)).toEqual(["bir", "bir-devam", "Bir."]);
   });
 
   it("feeds earlier messages back as history with a note of what was shown", async () => {

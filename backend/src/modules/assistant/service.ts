@@ -65,12 +65,16 @@ export class AssistantService {
 
     const startedAt = this.now();
     const ctx = { userId: input.userId, services: this.deps.tools };
-    const userRows = input.messages.map((message) => ({
+    // Explicit times: the person's messages at the turn's start, the reply at its end. Rows written
+    // in one statement would otherwise share a timestamp, and the history would pair a question
+    // with the answer before it.
+    const userRows = input.messages.map((message, index) => ({
       user_id: input.userId,
       channel: input.channel,
       role: "user",
       content: formatInbound(message),
       external_message_id: message.external_id,
+      created_at: new Date(startedAt.getTime() + index).toISOString(),
     }));
 
     const turnsToday = await repo.countTurnsSince(input.userId, input.channel, new Date(startedAt.getTime() - CAP_WINDOW_MS));
@@ -125,7 +129,15 @@ export class AssistantService {
       });
       await repo.insertMessages([
         ...userRows.map((row) => ({ ...row, turn_id: turn.id })),
-        { user_id: input.userId, channel: input.channel, role: "assistant", content: result.reply.text, rich: richNote(result.reply, plan), turn_id: turn.id },
+        {
+          user_id: input.userId,
+          channel: input.channel,
+          role: "assistant",
+          content: result.reply.text,
+          rich: richNote(result.reply, plan),
+          turn_id: turn.id,
+          created_at: this.now().toISOString(),
+        },
       ]);
       log.info(
         { userId: input.userId, turnId: turn.id, status: result.status, steps: result.steps, tools: result.toolNames, cost: result.usage.cost_usd, cached: result.usage.cached_tokens },

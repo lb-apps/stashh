@@ -20,7 +20,8 @@ export class AssistantRepository {
       .eq("channel", channel)
       .gte("created_at", options.since.toISOString())
       .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
+      // Same instant (older rows written in one statement): the person's message came first.
+      .order("role", { ascending: true })
       .limit(options.limit);
     if (error) throw error;
     return (data ?? []).reverse();
