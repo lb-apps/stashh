@@ -37,8 +37,8 @@
         "PROD_URL": "https://instagram.stashh.me",
         "DEV_URL": "https://ig-dev.stashh.me"
       },
-      // stashh-hooks-routes: replace with the id `wrangler kv namespace create` prints (rollout step 1).
-      "kv_namespaces": [{ "binding": "ROUTES", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+      // stashh-hooks-routes, in the account that holds the stashh.me zone.
+      "kv_namespaces": [{ "binding": "ROUTES", "id": "eda829c3c6384dedbae0a645679b37fb" }],
       "queues": {
         "producers": [{ "binding": "DELIVERIES", "queue": "stashh-hooks-deliveries" }],
         "consumers": [
