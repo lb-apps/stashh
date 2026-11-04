@@ -177,3 +177,27 @@ organization altinda zaten proje."
 **How to apply:** For Workers Builds or any GitHub App, name exactly what happens: the
 owner installs the provider's GitHub App on the existing `lb-apps` org, only for the one
 repo. Never word it as a new account or a new connection.
+
+## 2026-11-04 — Rows written in one statement share a timestamp
+
+**What happened:** The DM assistant answered one message late ("Naber" got the answer to the previous
+question). Each turn's user and assistant rows were inserted in one statement, so they had the same
+`created_at`; the history sort broke the tie by random id and often filed the answer before its
+question. Hours went into prompt rules ("never repeat yourself") and message reordering before a
+dump of the actual request showed the pairing.
+
+**How to apply:** When ordering matters across rows written together, give them explicit, distinct
+timestamps (or a sequence) and a deterministic tiebreak. And when a model misbehaves in a way a
+prompt rule does not fix, dump the exact request it receives before touching the prompt again.
+
+## 2026-11-04 — The owner's bar for the assistant's language
+
+**Corrections:** "süzebilir gibi İngilizceden direkt çeviriler olmamalı" · "hazır cevaplar olmasa daha iyi
+(kullanıcıya opsiyon olarak sunulan)" · "agent daha net, Gen-Z ile arkadaş olabilecek bir tonda, emojileri
+yerli kullanan".
+
+**Rules:** No dictionary translations of English product words; the loanwords locals use
+("filtrele", "link", "post", "Reel"). No next-step quick-reply chips under answers; people write what they
+want (the feature stays behind `ASSISTANT_SUGGESTED_REPLIES` / `RECOGNITION_SUGGESTED_REPLIES`, off).
+A friend's register with emoji where they add meaning. Small talk is answered as small talk, never with
+the product pitch. Verbatim samples in the prompt get copied: keep them few and mark their language.

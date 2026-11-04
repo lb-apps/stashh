@@ -17,7 +17,8 @@ async function seed(store: MemoryStore, count: number) {
     Array.from({ length: count }, (_, i) => ({
       mid: `m${i}`,
       accountId: "A",
-      senderId: "S",
+      // One sender is worked on one message at a time, so each seeded message has its own.
+      senderId: `S${i}`,
       sentAt: new Date(),
       text: "hi",
       attachments: [],

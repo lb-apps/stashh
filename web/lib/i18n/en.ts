@@ -32,8 +32,8 @@ export const en = {
   },
   auth: {
     signingIn: "Opening your map",
-    linkExpiredTitle: "That link has expired",
-    linkExpiredBody: "Send “map” to @stashh.me on Instagram and we’ll send you a fresh one.",
+    linkInvalidTitle: "That link doesn’t work",
+    linkInvalidBody: "Send “map” to @stashh.me on Instagram and we’ll send you a new one.",
     signedOutTitle: "Your map lives in your DMs",
     signedOutBody: "Send a Reel to @stashh.me on Instagram. Every reply carries a link that opens your map.",
     openInstagram: "Message @stashh.me",

@@ -1,5 +1,5 @@
 import type { BadgeVariantName } from "@/components/ui/badge";
-import type { Channel, DependencyHealth, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
 
 type DependencyKey = DependencyHealth["key"];
 
@@ -46,7 +46,9 @@ export const INTENT: Record<string, string> = {
   help: "Help",
   unsupported: "Unsupported",
   erase: "Delete data",
+  link: "Map link",
   env: "Relay command",
+  chat: "Assistant",
 };
 
 export const intentLabel = (intent: string | null) => (intent ? (INTENT[intent] ?? intent) : "Unknown");
@@ -71,3 +73,27 @@ export const DEPENDENCY: Record<DependencyKey, { label: string; detail: string }
 };
 
 export const stepLabel = (step: string | null | undefined) => (step ? (STEPS[step] ?? step) : "—");
+
+export const ASSISTANT_STATUS: Record<AssistantTurnStatus, { label: string; variant: BadgeVariantName }> = {
+  replied: { label: "Replied", variant: "success" },
+  fallback: { label: "Fixed line", variant: "warning" },
+  capped: { label: "Daily cap", variant: "secondary" },
+  failed: { label: "Failed", variant: "danger" },
+};
+
+/** The assistant's tools, in the words of what they do. */
+export const ASSISTANT_TOOL: Record<string, string> = {
+  get_list_places: "Read a list",
+  create_list: "Create a list",
+  update_list: "Rename a list",
+  delete_list: "Delete a list",
+  add_to_list: "Add to a list",
+  remove_from_list: "Remove from a list",
+  search_saved_places: "Search the library",
+  get_recent_recognitions: "Recent shares",
+  get_place: "Place details",
+  mark_visited: "Mark visited",
+  remove_place: "Remove a place",
+  get_map_link: "Map link",
+};
+export const toolLabel = (name: string) => ASSISTANT_TOOL[name] ?? name;

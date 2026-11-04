@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Tapped } from "../conversation/events.ts";
 import type { InstagramProfile } from "../meta/graph-client.ts";
 
 /**
@@ -18,7 +19,43 @@ const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
 
-const signInLinkSchema = z.object({ url: z.string().url(), expires_at: z.string() });
+const signInLinkSchema = z.object({ url: z.string().url() });
+
+// ── The assistant's reply plan ──────────────────────────────────────────────
+// What the backend's assistant asks the channel to send, in order. Mirrors
+// backend/src/modules/assistant/types.ts.
+
+const quickReplyPlanSchema = z.object({ title: z.string().min(1), payload: z.string().min(1) });
+const buttonPlanSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("web_url"), title: z.string().min(1), url: z.string().url() }),
+  z.object({ type: z.literal("postback"), title: z.string().min(1), payload: z.string().min(1) }),
+]);
+const cardPlanSchema = z.object({
+  title: z.string().min(1),
+  subtitle: z.string().optional(),
+  image_url: z.string().url().optional(),
+  url: z.string().url().optional(),
+  buttons: z.array(buttonPlanSchema),
+});
+const planMessageSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), text: z.string().min(1), quick_replies: z.array(quickReplyPlanSchema).optional() }),
+  z.object({ kind: z.literal("button"), text: z.string().min(1), buttons: z.array(buttonPlanSchema).min(1), quick_replies: z.array(quickReplyPlanSchema).optional() }),
+  z.object({ kind: z.literal("carousel"), cards: z.array(cardPlanSchema).min(1) }),
+]);
+const replyPlanSchema = z.object({ messages: z.array(planMessageSchema).min(1) });
+export type ReplyPlan = z.infer<typeof replyPlanSchema>;
+export type PlanMessage = z.infer<typeof planMessageSchema>;
+
+/** One of the person's messages in an assistant turn; several when quick follow-ups were folded in. */
+export interface TurnMessage {
+  /** The Instagram mid; the backend replays the same plan for a repeat. */
+  externalId: string;
+  text: string;
+  tapped?: Tapped | null;
+}
+
+/** The assistant may take several model calls; the channel waits this long for the whole turn. */
+const ASSISTANT_TURN_TIMEOUT_MS = 60_000;
 
 export const placeSchema = z.object({
   google_place_id: z.string(),
@@ -88,8 +125,10 @@ export interface StashhApi {
   eraseInstagramUser(igsid: string): Promise<void>;
   createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }): Promise<{ recognitionId: string }>;
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
-  /** A personal, one-time link that signs the user in to the web app; for their DM only. */
+  /** A personal link that signs the user in to the web app, for good; for their DM only. */
   mintSignInLink(userId: string): Promise<{ url: string }>;
+  /** One conversational turn for the user: the assistant answers and acts on their account. */
+  assistantTurn(params: { userId: string; messages: TurnMessage[] }): Promise<ReplyPlan>;
 }
 
 export class HttpStashhApi implements StashhApi {
@@ -152,11 +191,21 @@ export class HttpStashhApi implements StashhApi {
     return { url: data.url };
   }
 
+  async assistantTurn({ userId, messages }: { userId: string; messages: TurnMessage[] }) {
+    return this.request("POST", `/internal/v1/users/${userId}/assistant/turns`, replyPlanSchema, {
+      body: {
+        channel: "instagram",
+        messages: messages.map((m) => ({ external_id: m.externalId, text: m.text, tapped: m.tapped ?? null })),
+      },
+      timeoutMs: ASSISTANT_TURN_TIMEOUT_MS,
+    });
+  }
+
   private async request<T extends z.ZodType>(
     method: string,
     path: string,
     schema: T | null,
-    options: { body?: unknown; headers?: Record<string, string> } = {},
+    options: { body?: unknown; headers?: Record<string, string>; timeoutMs?: number } = {},
   ): Promise<z.infer<T>> {
     let response: Response;
     try {
@@ -168,7 +217,7 @@ export class HttpStashhApi implements StashhApi {
           ...options.headers,
         },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(options.timeoutMs ?? this.timeoutMs),
       });
     } catch (error) {
       throw new StashhApiError(0, null, `Stashh API unreachable: ${(error as Error).message}`);

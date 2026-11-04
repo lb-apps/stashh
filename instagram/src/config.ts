@@ -59,6 +59,12 @@ const envSchema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
 
   /**
+   * Quick replies under a finished recognition ("Listeye koy", "Haritamı aç") that hand the
+   * next step to the assistant. Off by the owner's call (2026-11-04): people write what they want.
+   */
+  RECOGNITION_SUGGESTED_REPLIES: z.enum(["on", "off"]).default("off"),
+
+  /**
    * Development only: when set, every verified webhook body is written here verbatim
    * so real payloads can be turned into test fixtures. Refused in production.
    */

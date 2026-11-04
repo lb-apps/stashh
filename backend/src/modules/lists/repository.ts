@@ -124,6 +124,19 @@ export class ListsRepository {
     return data ?? [];
   }
 
+  /** Removes a saved place from a list by the saved place's id; false when it was not in the list. */
+  async deleteListPlaceBySavedPlaceId(savedPlaceId: string, listId: string, ownerUserId: string): Promise<boolean> {
+    const { error, count } = await this.supabase
+      .from("list_places")
+      .delete({ count: "exact" })
+      .eq("saved_place_id", savedPlaceId)
+      .eq("list_id", listId)
+      .eq("owner_user_id", ownerUserId);
+
+    if (error) throw error;
+    return (count ?? 0) > 0;
+  }
+
   async deleteListPlace(listPlaceId: string, listId: string, ownerUserId: string): Promise<boolean> {
     const { error, count } = await this.supabase
       .from("list_places")

@@ -9,11 +9,29 @@ export const LIMITS = {
   buttonsPerElement: 3,
   buttonTitleChars: 20,
   buttonTemplateTextChars: 640,
+  quickReplies: 13,
+  quickReplyTitleChars: 20,
 } as const;
 
 export interface UrlButton {
+  type?: "web_url";
   title: string;
   url: string;
+}
+
+/** A button that sends its `payload` back to us as a postback when tapped. */
+export interface PostbackButton {
+  type: "postback";
+  title: string;
+  payload: string;
+}
+
+export type Button = UrlButton | PostbackButton;
+
+/** A tap target under a message; comes back as a message with the title as text and the payload beside it. */
+export interface QuickReply {
+  title: string;
+  payload: string;
 }
 
 export interface CarouselCard {
@@ -22,13 +40,16 @@ export interface CarouselCard {
   imageUrl?: string;
   /** Opened when the card itself is tapped. */
   url?: string;
-  buttons: UrlButton[];
+  buttons: Button[];
 }
 
-/** One outbound message, in channel-neutral terms. A `button` message is text with link buttons under it. */
+/**
+ * One outbound message, in channel-neutral terms. A `button` message is text with buttons under
+ * it. Quick replies ride on a text or button message and show only while it is the latest message.
+ */
 export type OutboundMessage =
-  | { kind: "text"; text: string }
-  | { kind: "button"; text: string; buttons: UrlButton[] }
+  | { kind: "text"; text: string; quickReplies?: QuickReply[] }
+  | { kind: "button"; text: string; buttons: Button[]; quickReplies?: QuickReply[] }
   | { kind: "carousel"; cards: CarouselCard[] };
 
 export class GraphApiError extends Error {
@@ -48,9 +69,16 @@ export class GraphApiError extends Error {
   }
 }
 
+/**
+ * Presence signals (https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/messaging-api/sender-actions):
+ * `mark_seen` puts "Seen" under the person's last message, `typing_on` shows the typing
+ * bubble for about 20 seconds or until we send something, `typing_off` hides it.
+ */
+export type SenderAction = "mark_seen" | "typing_on" | "typing_off";
+
 export interface Messenger {
   send(recipientId: string, message: OutboundMessage): Promise<void>;
-  typing(recipientId: string): Promise<void>;
+  senderAction(recipientId: string, action: SenderAction): Promise<void>;
 }
 
 export interface AccessTokenSource {
@@ -71,8 +99,8 @@ export class InstagramMessenger implements Messenger {
     await this.post({ recipient: { id: recipientId }, message: toGraphMessage(message) });
   }
 
-  async typing(recipientId: string): Promise<void> {
-    await this.post({ recipient: { id: recipientId }, sender_action: "typing_on" });
+  async senderAction(recipientId: string, action: SenderAction): Promise<void> {
+    await this.post({ recipient: { id: recipientId }, sender_action: action });
   }
 
   private async post(body: unknown): Promise<void> {
@@ -146,7 +174,7 @@ async function graphError(response: Response): Promise<GraphApiError> {
 
 /** Maps an outbound message to the Send API body, enforcing every documented limit. */
 export function toGraphMessage(message: OutboundMessage): Record<string, unknown> {
-  if (message.kind === "text") return { text: truncateUtf8(message.text, LIMITS.textBytes) };
+  if (message.kind === "text") return { text: truncateUtf8(message.text, LIMITS.textBytes), ...toGraphQuickReplies(message.quickReplies) };
   if (message.kind === "button") {
     return {
       attachment: {
@@ -157,6 +185,7 @@ export function toGraphMessage(message: OutboundMessage): Record<string, unknown
           buttons: message.buttons.slice(0, LIMITS.buttonsPerElement).map(toGraphButton),
         },
       },
+      ...toGraphQuickReplies(message.quickReplies),
     };
   }
 
@@ -177,6 +206,16 @@ export function toGraphMessage(message: OutboundMessage): Record<string, unknown
   };
 }
 
-function toGraphButton(button: UrlButton): Record<string, unknown> {
-  return { type: "web_url", title: truncateGraphemes(button.title, LIMITS.buttonTitleChars), url: button.url };
+function toGraphButton(button: Button): Record<string, unknown> {
+  const title = truncateGraphemes(button.title, LIMITS.buttonTitleChars);
+  return button.type === "postback" ? { type: "postback", title, payload: button.payload } : { type: "web_url", title, url: button.url };
+}
+
+function toGraphQuickReplies(quickReplies: QuickReply[] | undefined): Record<string, unknown> {
+  if (!quickReplies || quickReplies.length === 0) return {};
+  return {
+    quick_replies: quickReplies
+      .slice(0, LIMITS.quickReplies)
+      .map((item) => ({ content_type: "text", title: truncateGraphemes(item.title, LIMITS.quickReplyTitleChars), payload: item.payload })),
+  };
 }

@@ -18,6 +18,19 @@ export class ChannelIdentityRepository {
     return data ? { provider, externalId, userId: data.user_id } : null;
   }
 
+  /** The stored profile of the user's identity on `provider`; null when the user has none there. */
+  async findProfileByUserId(provider: ChannelProvider, userId: string): Promise<{ username: string | null; displayName: string | null } | null> {
+    const { data, error } = await this.supabase
+      .from("channel_identities")
+      .select("username, display_name")
+      .eq("provider", provider)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? { username: data.username, displayName: data.display_name } : null;
+  }
+
   /** Inserts the mapping; a concurrent insert of the same identity is a no-op. */
   async insert(identity: ChannelIdentity): Promise<void> {
     const { error } = await this.supabase

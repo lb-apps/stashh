@@ -220,9 +220,9 @@ registry.registerPath({
   method: "post",
   path: "/users/{userId}/sign-in-links",
   summary: "Mint web sign-in link",
-  description: `A personal, one-time link that signs \`userId\` in to the web app: \`<WEB_APP_URL>/a/<code>\`. The channel sends it to that person only.
+  description: `A personal link that signs \`userId\` in to the web app: \`<WEB_APP_URL>/a/<code>\`. The channel sends it to that person only.
 
-The link works once, for seven days; minting another does not revoke earlier ones. Only the code's SHA-256 is stored. \`404\` when the user does not exist.`,
+The link never expires and works every time it is opened, until the user is erased; minting another does not revoke earlier ones. Only the code's SHA-256 is stored. \`404\` when the user does not exist.`,
   request: { params: userParams },
   responses: {
     201: {
@@ -230,7 +230,7 @@ The link works once, for seven days; minting another does not revoke earlier one
       content: {
         "application/json": {
           schema: successEnvelope(
-            z.object({ url: z.string().url(), expires_at: z.string().datetime() }).openapi("SignInLink"),
+            z.object({ url: z.string().url() }).openapi("SignInLink"),
             "MintSignInLink",
           ),
         },
@@ -245,9 +245,9 @@ registry.registerPath({
   method: "post",
   path: "/sign-in-links/redeem",
   summary: "Redeem web sign-in link",
-  description: `Spends a link's \`code\` and returns a Supabase magic-link token for its owner. The web app's server calls this; the browser then calls \`supabase.auth.verifyOtp({ token_hash, type: "magiclink" })\` and has a session. No PKCE, popup or mail involved, so it works inside Instagram's in-app browser.
+  description: `Returns a fresh Supabase magic-link token for the owner of a link's \`code\`. The web app's server calls this; the browser then calls \`supabase.auth.verifyOtp({ token_hash, type: "magiclink" })\` and has a session. No PKCE, popup or mail involved, so it works inside Instagram's in-app browser.
 
-Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as is an unknown or expired code. The token itself expires with Supabase's OTP lifetime (one hour by default), so exchange it right away.`,
+A code can be redeemed any number of times; an unknown code, or one whose owner was erased, is \`410 SIGN_IN_LINK_INVALID\`. The token itself expires with Supabase's OTP lifetime (one hour by default), so exchange it right away.`,
   request: { body: { content: { "application/json": { schema: redeemSignInLinkBodySchema.openapi("RedeemSignInLinkBody") } } } },
   responses: {
     200: {
@@ -263,7 +263,108 @@ Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as
         },
       },
     },
-    410: { description: "Code unknown, already used or expired" },
+    410: { description: "Code unknown, or its owner was erased" },
+    ...commonErrorResponses,
+  },
+});
+
+// ── Ops: the DM assistant ───────────────────────────────────────────────────
+
+const assistantSettingsSchema = z
+  .object({
+    model: z.string(),
+    system_prompt: z.string().nullable(),
+    default_prompt: z.string(),
+    max_steps: z.number().int(),
+    daily_turn_cap: z.number().int(),
+    suggested_replies: z.boolean(),
+    enabled: z.boolean(),
+    updated_at: z.string().nullable(),
+  })
+  .openapi("AssistantSettings");
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant",
+  summary: "Assistant ops stats",
+  description: `What the DM assistant has been doing, for the local ops dashboard: \`stats\` (\`assistant_ops_stats()\`: turns by status per bucket, cost, tokens and cache share, typical and slowest-5 % durations, tool and model mix, the previous window for trends) and \`turns\` (\`assistant_ops_list()\`: the latest 60 turns with who asked, what, and the answer).`,
+  request: { query: opsQuerySchema },
+  responses: {
+    200: {
+      description: "Assistant stats and latest turns",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({
+              range: z.enum(OPS_RANGES),
+              since: z.string().datetime(),
+              bucket: z.enum(["hour", "day"]),
+              generated_at: z.string().datetime(),
+              stats: z.record(z.unknown()),
+              turns: z.array(z.record(z.unknown())),
+            }),
+            "InternalOpsAssistant",
+          ),
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant/turns/{id}",
+  summary: "Assistant turn detail",
+  description: "One assistant turn in full: usage, cost, the plan it sent, and the messages around it (the turn's own and the ten before). For the ops dashboard's detail view.",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "The turn", content: { "application/json": { schema: successEnvelope(z.record(z.unknown()), "InternalOpsAssistantTurn") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant/settings",
+  summary: "Assistant settings",
+  description: "The assistant's settings as the owner set them, with the shipped default prompt beside the owner's (`system_prompt` null means the default is in use).",
+  responses: {
+    200: { description: "Settings", content: { "application/json": { schema: successEnvelope(assistantSettingsSchema, "InternalOpsAssistantSettings") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "put",
+  path: "/ops/assistant/settings",
+  summary: "Change assistant settings",
+  description: "Changes one or more settings; the next turn runs with them (within 15 seconds on an instance that already read them). `system_prompt: null` returns to the shipped prompt.",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z
+            .object({
+              model: z.string().min(1).max(200).optional(),
+              system_prompt: z.string().min(1).max(60_000).nullable().optional(),
+              max_steps: z.number().int().min(1).max(12).optional(),
+              daily_turn_cap: z.number().int().min(1).max(10_000).optional(),
+              suggested_replies: z.boolean().optional(),
+              enabled: z.boolean().optional(),
+            })
+            .openapi("AssistantSettingsPatch"),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Settings after the change", content: { "application/json": { schema: successEnvelope(assistantSettingsSchema, "UpdateInternalOpsAssistantSettings") } } },
     ...commonErrorResponses,
   },
 });

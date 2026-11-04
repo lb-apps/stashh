@@ -101,12 +101,12 @@ Task status lifecycle: `queued → processing → completed → committed` (also
 
 ## Web sign-in (DM link)
 
-Everyone who writes to @stashh.me on Instagram is a Supabase user already (`channel_identities`). The web app signs them in with a personal, one-time link the DM service sends: `<WEB_APP_URL>/a/<code>` (default `https://stashh.me/app/a/<code>`), valid seven days.
+Everyone who writes to @stashh.me on Instagram is a Supabase user already (`channel_identities`). The web app signs them in with a personal link the DM service sends: `<WEB_APP_URL>/a/<code>` (default `https://stashh.me/app/a/<code>`). It never expires and opens the map every time, until the person is erased.
 
 | Step | Caller | Route |
 |---|---|---|
 | Mint a link for a user | DM service (service token) | `POST /internal/v1/users/:userId/sign-in-links` |
-| Spend the code, get a magic-link `token_hash` | web app's server (service token) | `POST /internal/v1/sign-in-links/redeem` |
+| Redeem the code, get a magic-link `token_hash` | web app's server (service token) | `POST /internal/v1/sign-in-links/redeem` |
 | Turn the token into a session | browser | `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })` |
 
 The DM reply to every recognition carries a "Haritanda aç" button with a fresh link; writing "harita" or "link" gets one on demand.

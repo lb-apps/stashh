@@ -1,24 +1,29 @@
 import type { RecognitionSource } from "../stashh/client.ts";
 import type { CommandOutcome } from "../webhooks/core/commands.ts";
-import type { InboundAttachment } from "./events.ts";
+import type { InboundAttachment, Tapped } from "./events.ts";
 
 /** What a person wants from a message, decided before any side effect. */
 export type Intent =
-  /** A hooks relay `/env` command (docs/webhook-relay.md): answered with what the relay did. */
-  | { kind: "env"; outcome: CommandOutcome }
   /** Find the places in a Reel, a shared post or story, or a pasted link. */
   | { kind: "recognize"; source: RecognitionSource }
-  /** Erase everything Stashh holds about the sender ("sil"). */
+  /** Erase everything Stashh holds about the sender ("sil", or the confirming tap). */
   | { kind: "erase" }
   /** A fresh link to the sender's map on the web ("harita"). */
   | { kind: "link" }
+  /** A relay `/env` command, answered with what the relay did. */
+  | { kind: "env"; outcome: CommandOutcome }
   /** A share that carries nothing we can read (no media link, no id). */
   | { kind: "unsupported"; attachmentType: string }
-  /** Anything else: explain what Stashh does. */
+  /** Something typed or tapped: a question, a request, a quick reply. The assistant answers. */
+  | { kind: "chat"; text: string; tapped: Tapped | null }
+  /** Nothing to go on (an empty message): explain what Stashh does. */
   | { kind: "help" };
 
 const ERASE_COMMANDS = new Set(["sil", "delete"]);
 const LINK_COMMANDS = new Set(["harita", "link"]);
+
+/** The one quick-reply payload with a fixed meaning: the person confirmed erasing their data. */
+export const ERASE_CONFIRM_PAYLOAD = "ERASE_CONFIRM";
 
 // Links the backend accepts; kept in step with backend/src/modules/recognitions/types.ts.
 const LINK_PATTERN =
@@ -27,14 +32,22 @@ const LINK_PATTERN =
 /** Attachment types that carry a readable permalink in `payload.url`. */
 const PERMALINK_ATTACHMENTS = new Set(["ig_reel"]);
 
-export function interpret(message: { text: string | null; attachments: InboundAttachment[]; relayCommand?: CommandOutcome | null }): Intent {
-  // Only the relay's sealed envelope makes a message a command; a typed "/env" alone is help.
+export function interpret(message: {
+  text: string | null;
+  attachments: InboundAttachment[];
+  tapped?: Tapped | null;
+  relayCommand?: CommandOutcome | null;
+}): Intent {
   if (message.relayCommand) return { kind: "env", outcome: message.relayCommand };
 
   for (const attachment of message.attachments) {
     const source = sharedSource(attachment);
     if (source) return { kind: "recognize", source };
   }
+
+  const tapped = message.tapped ?? null;
+  if (tapped?.payload === ERASE_CONFIRM_PAYLOAD) return { kind: "erase" };
+  if (tapped) return { kind: "chat", text: message.text?.trim() || tapped.title, tapped };
 
   const text = message.text?.trim() ?? "";
   // Both casings: Turkish lowercases "SİL" to "sil" but "LINK" to "lınk".
@@ -48,7 +61,7 @@ export function interpret(message: { text: string | null; attachments: InboundAt
   const firstAttachment = message.attachments[0];
   if (firstAttachment) return { kind: "unsupported", attachmentType: firstAttachment.type };
 
-  return { kind: "help" };
+  return text ? { kind: "chat", text, tapped: null } : { kind: "help" };
 }
 
 /**

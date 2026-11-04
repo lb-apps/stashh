@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      assistant_messages: {
+        Row: {
+          channel: string
+          content: string
+          created_at: string
+          external_message_id: string | null
+          id: string
+          rich: Json | null
+          role: string
+          turn_id: string | null
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          content: string
+          created_at?: string
+          external_message_id?: string | null
+          id?: string
+          rich?: Json | null
+          role: string
+          turn_id?: string | null
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          content?: string
+          created_at?: string
+          external_message_id?: string | null
+          id?: string
+          rich?: Json | null
+          role?: string
+          turn_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_settings: {
+        Row: {
+          created_at: string
+          daily_turn_cap: number
+          enabled: boolean
+          id: boolean
+          max_steps: number
+          model: string
+          suggested_replies: boolean
+          system_prompt: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_turn_cap?: number
+          enabled?: boolean
+          id?: boolean
+          max_steps?: number
+          model?: string
+          suggested_replies?: boolean
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_turn_cap?: number
+          enabled?: boolean
+          id?: boolean
+          max_steps?: number
+          model?: string
+          suggested_replies?: boolean
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      assistant_turns: {
+        Row: {
+          cached_tokens: number | null
+          channel: string
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          model: string | null
+          plan: Json | null
+          prompt_tokens: number | null
+          provider: string | null
+          status: string
+          steps: number
+          tool_names: string[]
+          user_id: string
+        }
+        Insert: {
+          cached_tokens?: number | null
+          channel: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model?: string | null
+          plan?: Json | null
+          prompt_tokens?: number | null
+          provider?: string | null
+          status: string
+          steps?: number
+          tool_names?: string[]
+          user_id: string
+        }
+        Update: {
+          cached_tokens?: number | null
+          channel?: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model?: string | null
+          plan?: Json | null
+          prompt_tokens?: number | null
+          provider?: string | null
+          status?: string
+          steps?: number
+          tool_names?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       channel_identities: {
         Row: {
           created_at: string
@@ -662,25 +799,19 @@ export type Database = {
         Row: {
           code_hash: string
           created_at: string
-          expires_at: string
           id: string
-          used_at: string | null
           user_id: string
         }
         Insert: {
           code_hash: string
           created_at?: string
-          expires_at: string
           id?: string
-          used_at?: string | null
           user_id: string
         }
         Update: {
           code_hash?: string
           created_at?: string
-          expires_at?: string
           id?: string
-          used_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -858,6 +989,18 @@ export type Database = {
             }
             Returns: string
           }
+      assistant_ops_detail: {
+        Args: { p_turn_id: string }
+        Returns: Json
+      }
+      assistant_ops_list: {
+        Args: { p_limit: number }
+        Returns: Json
+      }
+      assistant_ops_stats: {
+        Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
       claim_instagram_messages: {
         Args: { p_lease_seconds: number; p_limit: number }
         Returns: {

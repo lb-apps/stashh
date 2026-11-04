@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n/provider";
 import { SignedOut } from "../../../_components/signed-out";
 import { redeem } from "./actions";
 
-/** Turns a DM link's one-time code into a session, then opens the map. */
+/** Turns a DM link's code into a session, then opens the map. */
 export function RedeemLink({ code }: { code: string }) {
   const t = useT();
   const router = useRouter();
@@ -17,7 +17,7 @@ export function RedeemLink({ code }: { code: string }) {
   const started = React.useRef(false);
 
   React.useEffect(() => {
-    // Strict Mode runs effects twice in development; the code is single-use.
+    // Strict Mode runs effects twice in development; one sign-in is enough.
     if (started.current) return;
     started.current = true;
     (async () => {
@@ -30,6 +30,6 @@ export function RedeemLink({ code }: { code: string }) {
     })();
   }, [code, router]);
 
-  if (failed) return <SignedOut variant="expired" />;
+  if (failed) return <SignedOut variant="invalid" />;
   return <BrandMoment object={<GlossyObject tint="cobalt" size={160} />} headline={t.auth.signingIn} style={{ height: "100%" }} />;
 }

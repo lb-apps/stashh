@@ -318,7 +318,8 @@ export async function analyzeContent(
     throw new Error(`Model analysis failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  const text = completion.content;
+  // The client rejects an empty response; content is only null for tool calls, which this request cannot make.
+  const text = completion.content ?? "";
   const finishReason = completion.finishReason;
   if (finishReason && finishReason !== "stop") {
     log.warn({ finishReason, model: completion.model }, "model non-stop finish reason");

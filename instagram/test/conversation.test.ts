@@ -51,6 +51,23 @@ describe("extractInboundMessages", () => {
     expect(messages.map((m) => m.mid)).toEqual(["kept"]);
   });
 
+  it("keeps a quick-reply tap with its payload", () => {
+    const [message] = extractInboundMessages(envelope(event({}, { mid: "qr", text: "Mekânlarım", quick_reply: { payload: "MY_PLACES" } })));
+    expect(message).toMatchObject({ mid: "qr", text: "Mekânlarım", tapped: { title: "Mekânlarım", payload: "MY_PLACES" } });
+  });
+
+  it("reads a button postback as a message, with a stable id when Meta sends none", () => {
+    const postback = { sender: { id: "PERSON" }, recipient: { id: "ACCOUNT" }, timestamp: 1791979565000, postback: { title: "Nasıl çalışır?", payload: "HELP", mid: "pb-1" } };
+    const [withMid] = extractInboundMessages(envelope(postback));
+    expect(withMid).toMatchObject({ mid: "pb-1", text: "Nasıl çalışır?", attachments: [], tapped: { title: "Nasıl çalışır?", payload: "HELP" } });
+
+    const { mid: _dropped, ...bare } = postback.postback;
+    const [first] = extractInboundMessages(envelope({ ...postback, postback: bare }));
+    const [again] = extractInboundMessages(envelope({ ...postback, postback: bare }));
+    expect(first?.mid).toMatch(/^postback:PERSON:1791979565000:[0-9a-f]{16}$/);
+    expect(again?.mid).toBe(first?.mid);
+  });
+
   it("skips a malformed event without losing the rest of the delivery", () => {
     const messages = extractInboundMessages(envelope({ nonsense: true }, event({}, { mid: "kept" })));
     expect(messages.map((m) => m.mid)).toEqual(["kept"]);
@@ -97,8 +114,17 @@ describe("interpret", () => {
     expect(interpret({ text, attachments: [] })).toEqual({ kind: "link" });
   });
 
-  it("does not erase on a sentence that merely contains the word", () => {
-    expect(interpret({ text: "bunu sil lütfen", attachments: [] })).toEqual({ kind: "help" });
+  it("does not erase on a sentence that merely contains the word; the assistant reads it", () => {
+    expect(interpret({ text: "bunu sil lütfen", attachments: [] })).toEqual({ kind: "chat", text: "bunu sil lütfen", tapped: null });
+  });
+
+  it("hands typed messages and taps to the assistant, and the erase confirmation to erase", () => {
+    expect(interpret({ text: "listelerim neler", attachments: [] })).toEqual({ kind: "chat", text: "listelerim neler", tapped: null });
+    const tapped = { title: "Listeye koy", payload: "ADD_TO_LIST:r1" };
+    expect(interpret({ text: "Listeye koy", attachments: [], tapped })).toEqual({ kind: "chat", text: "Listeye koy", tapped });
+    expect(interpret({ text: null, attachments: [], tapped })).toEqual({ kind: "chat", text: "Listeye koy", tapped });
+    expect(interpret({ text: "Evet, sil", attachments: [], tapped: { title: "Evet, sil", payload: "ERASE_CONFIRM" } })).toEqual({ kind: "erase" });
+    expect(interpret({ text: "", attachments: [] })).toEqual({ kind: "help" });
   });
 
   it("recognizes a shared feed post from the media and caption it carries", () => {
@@ -147,6 +173,6 @@ describe("interpret", () => {
   });
 
   it("does not accept an Instagram story link", () => {
-    expect(interpret({ text: "https://www.instagram.com/stories/someone/123/", attachments: [] })).toEqual({ kind: "help" });
+    expect(interpret({ text: "https://www.instagram.com/stories/someone/123/", attachments: [] })).toMatchObject({ kind: "chat" });
   });
 });

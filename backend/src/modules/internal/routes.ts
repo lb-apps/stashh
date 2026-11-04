@@ -9,6 +9,7 @@ import {
   resolveChannelIdentityBodySchema,
   staleChannelIdentitiesQuerySchema,
 } from "../identities/types.js";
+import { assistantRouter } from "../assistant/routes.js";
 import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
@@ -26,6 +27,7 @@ import { redeemSignInLinkBodySchema } from "../sign-in-links/types.js";
 export const internalRouter = Router();
 
 internalRouter.use("/ops", opsRouter);
+internalRouter.use("/users/:userId/assistant", assistantRouter);
 
 const userParamsSchema = z.object({ userId: z.string().uuid("userId must be a UUID") });
 const userRecognitionParamsSchema = userParamsSchema.extend({
@@ -179,7 +181,7 @@ internalRouter.get("/users/:userId/recognitions/:id", async (req, res, next) => 
 
 // ── Web sign-in links ───────────────────────────────────────────────────────
 
-/** A personal, one-time link to the web app, for the channel to send to `userId`. */
+/** A personal link to the web app, for the channel to send to `userId`. */
 internalRouter.post("/users/:userId/sign-in-links", async (req, res, next) => {
   const params = userParamsSchema.safeParse(req.params);
   if (!params.success) {
@@ -194,7 +196,7 @@ internalRouter.post("/users/:userId/sign-in-links", async (req, res, next) => {
   }
 });
 
-/** Spends a link and returns the magic-link token the web app turns into a session. */
+/** Returns a magic-link token for a link's owner, which the web app turns into a session. */
 internalRouter.post("/sign-in-links/redeem", async (req, res, next) => {
   const body = redeemSignInLinkBodySchema.safeParse(req.body);
   if (!body.success) {
@@ -205,7 +207,7 @@ internalRouter.post("/sign-in-links/redeem", async (req, res, next) => {
   try {
     const redeemed = await createSignInLinkService().redeem(body.data.code);
     if (!redeemed) {
-      sendError(res, req, 410, "SIGN_IN_LINK_INVALID", "This sign-in link is invalid, used or expired");
+      sendError(res, req, 410, "SIGN_IN_LINK_INVALID", "This sign-in link is invalid");
       return;
     }
     sendSuccess(res, req, 200, redeemed);

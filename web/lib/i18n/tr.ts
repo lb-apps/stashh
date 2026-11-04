@@ -30,8 +30,8 @@ export const tr: Dictionary = {
   },
   auth: {
     signingIn: "Haritan açılıyor",
-    linkExpiredTitle: "Bu linkin süresi dolmuş",
-    linkExpiredBody: "Instagram’da @stashh.me’ye “harita” yaz, yenisini gönderelim.",
+    linkInvalidTitle: "Bu link çalışmıyor",
+    linkInvalidBody: "Instagram’da @stashh.me’ye “harita” yaz, yenisini gönderelim.",
     signedOutTitle: "Haritan DM’lerinde",
     signedOutBody: "Instagram’da @stashh.me’ye bir Reel gönder. Her cevapta haritanı açan bir link var.",
     openInstagram: "@stashh.me’ye yaz",

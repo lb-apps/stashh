@@ -7,7 +7,6 @@ export const redeemSignInLinkBodySchema = z.object({ code: signInCodeSchema });
 
 export interface MintedSignInLink {
   url: string;
-  expires_at: string;
 }
 
 /** What the web app turns into a session: `supabase.auth.verifyOtp({ token_hash, type })`. */

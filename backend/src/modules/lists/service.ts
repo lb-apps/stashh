@@ -209,4 +209,20 @@ export class ListsService {
     this.log.info({ listId, listPlaceId }, "place removed from list");
     return { list_place_id: listPlaceId, deleted: true };
   }
+
+  /** Removes a place from a list by its canonical place id (what the DM assistant holds). */
+  async removePlaceByPlaceId(ownerUserId: string, listId: string, placeId: string): Promise<{ place_id: string; deleted: boolean }> {
+    const list = await this.repo.getListForOwner(listId, ownerUserId);
+    if (!list) {
+      throw new AppHttpError(404, "List not found", "USER_LIST_NOT_FOUND");
+    }
+
+    const savedPlaceId = await this.placesService.resolveSavedPlaceId(placeId, ownerUserId);
+    const removed = await this.repo.deleteListPlaceBySavedPlaceId(savedPlaceId, listId, ownerUserId);
+    if (!removed) {
+      throw new AppHttpError(404, "Place is not in this list", "USER_LIST_PLACE_NOT_FOUND");
+    }
+    this.log.info({ listId, placeId }, "place removed from list");
+    return { place_id: placeId, deleted: true };
+  }
 }
