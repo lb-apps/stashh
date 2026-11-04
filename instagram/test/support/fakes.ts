@@ -1,5 +1,4 @@
-import type { InboundMessage } from "../../src/conversation/events.ts";
-import type { MessageStore, Settlement, StoredMessage } from "../../src/conversation/store.ts";
+import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
 import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader } from "../../src/meta/graph-client.ts";
 import type { Recognition, RecognitionSource, StashhApi } from "../../src/stashh/client.ts";
 
@@ -23,7 +22,7 @@ export class MemoryStore implements MessageStore {
     this.now = now;
   }
 
-  async insert(messages: InboundMessage[]): Promise<number> {
+  async insert(messages: QueuedMessage[]): Promise<number> {
     let stored = 0;
     for (const m of messages) {
       if (this.rows.has(m.mid)) continue;
@@ -34,6 +33,8 @@ export class MemoryStore implements MessageStore {
         sentAt: m.sentAt,
         text: m.text,
         attachments: m.attachments,
+        relayRouted: m.relayRouted ?? false,
+        relayCommand: m.relayCommand ?? null,
         status: "received",
         userId: null,
         recognitionId: null,

@@ -24,8 +24,12 @@ export type InstagramMessageRow = {
   next_attempt_at: string;
   locked_until: string | null;
   last_error: string | null;
-  intent: "recognize" | "help" | "unsupported" | "erase" | "link" | null;
+  intent: "recognize" | "help" | "unsupported" | "erase" | "link" | "env" | null;
   finished_at: string | null;
+  /** The instance that received it and the only one that claims it (`20261101140000_instagram_messages_relay.sql`). */
+  environment: "dev" | "prod";
+  relay_routed: boolean;
+  relay_command: Json | null;
   created_at: string;
   updated_at: string;
 };
@@ -55,7 +59,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       claim_instagram_messages: {
-        Args: { p_limit: number; p_lease_seconds: number };
+        Args: { p_limit: number; p_lease_seconds: number; p_environment: "dev" | "prod" };
         Returns: InstagramMessageRow[];
       };
       instagram_ops_stats: {
