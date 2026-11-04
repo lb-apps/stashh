@@ -34,9 +34,25 @@ quick replies that hand the follow-up to the agent.
 
 ## D. Verification
 - [x] `cd backend && npm run typecheck && npm test`; `cd instagram && npm run typecheck && npm test`
-- [ ] Migrations applied; `backend/scripts/assistant-turn.ts` scenarios (cached tokens > 0 on the second run)
-- [ ] Local end-to-end through the dev instance (`/env dev`), then merge → deploy → real DMs
+- [x] Migrations applied (2026-11-04, via the Supabase MCP); `npm run assistant:turn` scenarios: Turkish and English questions, list and place cards, a tap; 2–5 s, $0.0003–0.0007 per turn, 87 % cached from the second call
+- [x] Local end-to-end through the dev instance (`/env dev`): typed questions, a quick-reply tap, a button template with quick replies all accepted by the Send API; replies in 3–12 s
+- [ ] Merge PR #27 → home-server deploys develop → owner sends `/env prod` and re-tests
 - [x] Meta app: `messaging_postbacks` already arrives (real postback captures in `.captures/`; subscriptions are per account, none at app level)
 
-## Review
-(filled in when done)
+## Review (2026-11-04, during the live test)
+- Instagram accepts `quick_replies` on a button template, so the recognition summary keeps its map button and its quick replies in one message.
+- Haiku 5.5 anchors on the previous assistant turn: with the account block before the history it re-sent the last answer and cards on the next question. Fix that held: the live block goes right before the newest message with a "answer this one alone" note; a prompt rule alone did not do it.
+- The owner's voice call: Gen-Z friend, direct, emoji where they belong (📍 ✅ 🗺️ 😅), exclamation marks allowed when earned. `copy.tr.ts` (the deterministic recognition replies) still speaks the older, emoji-free voice — align it in a follow-up if wanted.
+- Presence: the channel now marks the message seen, shows typing while the assistant or a recognition works and renews it every 12 s.
+- Per turn: $0.0003–0.0013, 7–8k prompt tokens with ~87 % cached, 2–5 s for the model (plus the 2.5 s debounce).
+- Two empty "Deneme" lists on the dev test user are leftovers of the first (repeating) test runs; the delete was declined in auto mode, harmless.
+
+# Next: assistant settings and usage in the ops dashboard
+
+Asked by the owner on 2026-11-04 ("bu agent'in ayarlarını dashboard'da görüp düzenleyemiyor muyuz"). Branch `feature/ops-assistant` from `develop` once PR #27 is in.
+
+- [ ] `assistant_settings` singleton row (`id boolean pk default true check (id)`, `model`, `system_prompt text null` = shipped default, `max_steps`, `daily_turn_cap`, `enabled`, `updated_at` trigger `set_updated_at`); RLS on, service role only
+- [ ] Backend reads the row per turn (`factory.ts`: settings over config defaults; prompt = row or `ASSISTANT_PROMPT`); `GET/PUT /internal/v1/ops/assistant/settings`; `GET /internal/v1/ops/assistant?range=` with an `assistant_ops_stats(p_since, p_bucket)` RPC (turns by status per bucket, cost, tokens, cached share, typical and slowest-5 % duration, tool mix, top senders) + latest 60 turns; `GET /internal/v1/ops/assistant/turns/:id` (plan + messages); OpenAPI; tests
+- [ ] Ops: `/assistant` page (nav entry): KPIs (turns, cost, typical latency, cache share), charts (turns by status, cost per day, tool mix), latest turns table → detail Sheet (`?id=`) with the conversation and the plan; Settings panel: model `Select` (Haiku 5.5 / GPT-6 Luna, with prices and the forced-tool-choice note), prompt `Textarea` (`npx shadcn add textarea`) with "Reset to shipped default", caps, enabled switch; `sendJson` helper with the service token; route handlers
+- [ ] `instagram_ops_stats` counts the `chat` intent; `ops/README.md` and CLAUDE.md ("the one page that writes" → two)
+
