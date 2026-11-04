@@ -103,8 +103,12 @@ that the relay routed this sender here, so the message carries it.
 
 ## Rollout
 
-In this order. Each step can be checked before the next; nothing before step 9 changes what Meta
+In this order. Each step can be checked before the next; nothing before step 8 changes what Meta
 does.
+
+Meta's callback was `https://ig-dev.stashh.me/webhooks/instagram` before the relay, served by
+production through `stashh-prod`. So `ig-dev` moves to the dev Mac only **after** the callback has
+moved to the relay (step 10): moved first, it would send every production DM to the Mac.
 
 1. **Database.** Apply `supabase/migrations/20261101140000_instagram_messages_relay.sql` to the
    Supabase project **before** the code reaches `develop` (home-server deploys within a minute and
@@ -119,40 +123,42 @@ does.
    ```bash
    curl -i https://instagram.stashh.me/webhooks?relay=probe   # 204
    ```
-4. **Cloudflare resources** (the account that holds the stashh.me zone), in `workers/hooks/`:
-   ```bash
-   npm ci
-   npx wrangler kv namespace create stashh-hooks-routes    # put the id in wrangler.jsonc → env.production
-   npx wrangler queues create stashh-hooks-deliveries
-   npx wrangler queues create stashh-hooks-deliveries-dlq
-   ```
-   Commit the KV id (it is not a secret).
-5. **Worker secrets:**
-   ```bash
-   npx wrangler secret put INSTAGRAM_APP_SECRET --env production   # Meta → Instagram → API setup with Instagram login
-   npx wrangler secret put HOOKS_RELAY_SECRET   --env production   # the value from step 2
-   ```
-6. **Deploy the Worker:** `npm run hooks:deploy:prod`. `custom_domain: true` makes Cloudflare create
-   `hooks.stashh.me` and its certificate; there must be no other DNS record for that name.
-7. **Check the relay:**
+4. **Cloudflare resources**, in the account that holds the stashh.me zone (dashboard, or
+   `npx wrangler` in `workers/hooks/` when it is signed in to that account):
+   - Workers KV → create `stashh-hooks-routes`; put its id in `wrangler.jsonc` → `env.production`
+     and commit it (it is not a secret).
+   - Queues → create `stashh-hooks-deliveries` and `stashh-hooks-deliveries-dlq`.
+5. **Deploy the Worker** `stashh-hooks` (`npm run hooks:deploy:prod`, or Workers Builds on this
+   repo: root `workers/hooks`, build `npm ci`, deploy `npx wrangler deploy --env production`).
+   `custom_domain: true` makes Cloudflare create `hooks.stashh.me` and its certificate; there must
+   be no other DNS record for that name. Then its secrets (Settings → Variables and Secrets, or
+   `npx wrangler secret put <NAME> --env production`):
+   - `INSTAGRAM_APP_SECRET`: Meta → Instagram → API setup with Instagram login;
+   - `HOOKS_RELAY_SECRET`: the value from step 2.
+6. **Check the relay:**
    ```bash
    curl https://hooks.stashh.me/health                                          # ok
    curl "https://hooks.stashh.me/meta/instagram?hub.mode=subscribe&hub.verify_token=<WEBHOOK_VERIFY_TOKEN>&hub.challenge=42"   # 42, answered by prod
    ```
-8. **Dev tunnel** (the dev Mac; [below](#dev-tunnel)): `stashh-dev` tunnel, `ig-dev.stashh.me`, token
-   file, `npm run tunnel:install`, then `npm run tunnel:status` → probe 204 while `npm run dev` runs.
-9. **Switch Meta's callback.** Meta App Dashboard → Stashh → Instagram → API setup with Instagram
+7. **Watch production** before the switch: `npm run hooks:tail:prod` (or Workers → stashh-hooks →
+   Logs) and the newest `instagram_messages` rows.
+8. **Switch Meta's callback.** Meta App Dashboard → Stashh → Instagram → API setup with Instagram
    login → Configure webhooks: Callback URL `https://hooks.stashh.me/meta/instagram`, the same
    verify token. Meta's verification request goes through the relay to prod.
-10. **Verify**, from your own Instagram account, with `npm run hooks:tail:prod` open:
-    - Share a Reel: prod answers; the log shows `relayed` with `prod: 1`.
+9. **Verify prod through the relay**, from your own Instagram account: share a Reel; prod answers,
+   the log shows `relayed` with `prod: 1`, and a new `instagram_messages` row has
+   `environment = prod`. Only then go on.
+10. **Free `ig-dev` from production.** Remove the `ig-dev.stashh.me` rule from
+    `deploy/tunnel/config.yml` (home-server recreates the tunnel on deploy), then set up the dev
+    tunnel ([below](#dev-tunnel)): `stashh-dev`, `ig-dev.stashh.me` routed to it, token file,
+    `npm run tunnel:install`, then `npm run tunnel:status` → probe 204 while `npm run dev` runs.
+11. **Verify dev**, with the log open:
     - `/env dev`: dev answers "This account now routes to dev. Send /env prod to go back.";
       `env_set` in the log.
     - Share a Reel: dev answers (`direct_delivery` `delivered`); prod's ops view shows nothing new.
     - `/env prod`: prod answers "This account now routes to prod."
-    - `npx wrangler kv key list --binding ROUTES --env production --remote` lists only accounts
-      that are on dev.
-11. Later: remove the transitional `/webhooks/instagram` mount in `instagram/src/http/app.ts`; the
+    - Workers KV → `stashh-hooks-routes` lists only accounts that are on dev.
+12. Later: remove the transitional `/webhooks/instagram` mount in `instagram/src/http/app.ts`; the
     relay posts to `/webhooks`.
 
 ### Rollback
@@ -192,7 +198,7 @@ Once, on the dev Mac (named for the environment that runs it, like `stashh-prod`
 
 ```bash
 cloudflared tunnel create stashh-dev
-cloudflared tunnel route dns stashh-dev ig-dev.stashh.me   # if ig-dev still points at stashh-prod, move it first
+cloudflared tunnel route dns --overwrite-dns stashh-dev ig-dev.stashh.me   # only after rollout step 9
 cloudflared tunnel token stashh-dev > ~/.cloudflared/stashh-dev.token && chmod 600 ~/.cloudflared/stashh-dev.token
 ```
 
