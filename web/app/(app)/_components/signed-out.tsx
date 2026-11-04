@@ -12,15 +12,15 @@ const INSTAGRAM_DM = "https://ig.me/m/stashh.me";
  * No session: the map is reached from the DM, so this screen sends the reader
  * there. One object, one line, one action — brand mode throughout.
  */
-export function SignedOut({ variant }: { variant: "signed-out" | "expired" }) {
+export function SignedOut({ variant }: { variant: "signed-out" | "invalid" }) {
   const t = useT();
   const { inAppBrowser } = usePlatform();
 
   return (
     <BrandMoment
       object={<GlossyObject tint="cobalt" size={160} />}
-      headline={variant === "expired" ? t.auth.linkExpiredTitle : t.auth.signedOutTitle}
-      sub={variant === "expired" ? t.auth.linkExpiredBody : t.auth.signedOutBody}
+      headline={variant === "invalid" ? t.auth.linkInvalidTitle : t.auth.signedOutTitle}
+      sub={variant === "invalid" ? t.auth.linkInvalidBody : t.auth.signedOutBody}
       action={
         inAppBrowser === "instagram" ? null : (
           <ButtonLink href={INSTAGRAM_DM} variant="onBrand" size="lg">

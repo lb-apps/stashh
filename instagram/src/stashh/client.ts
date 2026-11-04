@@ -19,7 +19,7 @@ const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
 
-const signInLinkSchema = z.object({ url: z.string().url(), expires_at: z.string() });
+const signInLinkSchema = z.object({ url: z.string().url() });
 
 // ── The assistant's reply plan ──────────────────────────────────────────────
 // What the backend's assistant asks the channel to send, in order. Mirrors
@@ -125,7 +125,7 @@ export interface StashhApi {
   eraseInstagramUser(igsid: string): Promise<void>;
   createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }): Promise<{ recognitionId: string }>;
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
-  /** A personal, one-time link that signs the user in to the web app; for their DM only. */
+  /** A personal link that signs the user in to the web app, for good; for their DM only. */
   mintSignInLink(userId: string): Promise<{ url: string }>;
   /** One conversational turn for the user: the assistant answers and acts on their account. */
   assistantTurn(params: { userId: string; messages: TurnMessage[] }): Promise<ReplyPlan>;

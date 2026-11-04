@@ -2,35 +2,30 @@ import { describe, expect, it } from "vitest";
 import { AppHttpError } from "../src/errors/appHttpError.js";
 import type { MagicLinkIssuer } from "../src/modules/sign-in-links/magic-link-issuer.js";
 import type { SignInLinkRepository } from "../src/modules/sign-in-links/repository.js";
-import { SIGN_IN_LINK_TTL_MS, SignInLinkService, hashSignInCode } from "../src/modules/sign-in-links/service.js";
+import { SignInLinkService, hashSignInCode } from "../src/modules/sign-in-links/service.js";
 import { signInCodeSchema } from "../src/modules/sign-in-links/types.js";
 
 const USER = "4b6f3c1e-6f5d-5c3a-9f0e-2d1c0b9a8e7f";
 
 class InMemoryLinks {
-  rows: Array<{ id: string; userId: string; codeHash: string; expiresAt: Date; usedAt: Date | null }> = [];
+  rows: Array<{ userId: string; codeHash: string }> = [];
   knownUsers = new Set([USER]);
-  async insert(link: { userId: string; codeHash: string; expiresAt: Date }) {
+  async insert(link: { userId: string; codeHash: string }) {
     if (!this.knownUsers.has(link.userId)) throw Object.assign(new Error("fk"), { code: "23503" });
-    this.rows.push({ id: `link-${this.rows.length + 1}`, ...link, usedAt: null });
+    this.rows.push(link);
   }
-  async findRedeemable(codeHash: string, now: Date) {
-    const row = this.rows.find((r) => r.codeHash === codeHash && r.usedAt === null && r.expiresAt > now);
-    return row ? { id: row.id, userId: row.userId } : null;
-  }
-  async markUsed(id: string, now: Date) {
-    const row = this.rows.find((r) => r.id === id && r.usedAt === null && r.expiresAt > now);
-    if (!row) return false;
-    row.usedAt = now;
-    return true;
+  async findOwner(codeHash: string) {
+    return this.rows.find((r) => r.codeHash === codeHash)?.userId ?? null;
   }
 }
 
 class FakeIssuer implements MagicLinkIssuer {
   failNext = false;
+  gone = false;
   calls: string[] = [];
   async issue(userId: string) {
     this.calls.push(userId);
+    if (this.gone) return null;
     if (this.failNext) {
       this.failNext = false;
       throw new Error("auth down");
@@ -42,21 +37,19 @@ class FakeIssuer implements MagicLinkIssuer {
 function setup() {
   const links = new InMemoryLinks();
   const issuer = new FakeIssuer();
-  let now = new Date("2026-11-01T12:00:00Z");
-  const service = new SignInLinkService(links as unknown as SignInLinkRepository, issuer, "https://stashh.me/app", () => now);
-  return { links, issuer, service, advance: (ms: number) => (now = new Date(now.getTime() + ms)) };
+  const service = new SignInLinkService(links as unknown as SignInLinkRepository, issuer, "https://stashh.me/app");
+  return { links, issuer, service };
 }
 
 const codeOf = (url: string) => url.split("/a/")[1]!;
 
 describe("SignInLinkService.mint", () => {
-  it("returns a personal /a/<code> link valid for seven days, storing only the code's hash", async () => {
+  it("returns a personal /a/<code> link, storing only the code's hash", async () => {
     const { links, service } = setup();
     const link = await service.mint(USER);
 
     expect(link.url).toMatch(/^https:\/\/stashh\.me\/app\/a\/[A-Za-z0-9_-]{32}$/);
     expect(signInCodeSchema.safeParse(codeOf(link.url)).success).toBe(true);
-    expect(link.expires_at).toBe(new Date(Date.parse("2026-11-01T12:00:00Z") + SIGN_IN_LINK_TTL_MS).toISOString());
     expect(links.rows).toHaveLength(1);
     expect(links.rows[0]!.codeHash).toBe(hashSignInCode(codeOf(link.url)));
     expect(JSON.stringify(links.rows)).not.toContain(codeOf(link.url));
@@ -76,20 +69,36 @@ describe("SignInLinkService.mint", () => {
 });
 
 describe("SignInLinkService.redeem", () => {
-  it("returns a magic-link token for the link's owner, once", async () => {
-    const { service } = setup();
+  it("returns a magic-link token for the link's owner, every time it is opened", async () => {
+    const { issuer, service } = setup();
     const code = codeOf((await service.mint(USER)).url);
 
-    expect(await service.redeem(code)).toEqual({ user_id: USER, token_hash: `hashed-${USER}`, type: "magiclink" });
-    expect(await service.redeem(code)).toBeNull();
+    const token = { user_id: USER, token_hash: `hashed-${USER}`, type: "magiclink" };
+    expect(await service.redeem(code)).toEqual(token);
+    expect(await service.redeem(code)).toEqual(token);
+    expect(issuer.calls).toEqual([USER, USER]);
   });
 
-  it("refuses an unknown or expired code", async () => {
-    const { service, advance } = setup();
-    const code = codeOf((await service.mint(USER)).url);
+  it("keeps earlier links working after a new one is minted", async () => {
+    const { service } = setup();
+    const first = codeOf((await service.mint(USER)).url);
+    await service.mint(USER);
+
+    expect(await service.redeem(first)).toMatchObject({ user_id: USER });
+  });
+
+  it("refuses an unknown code", async () => {
+    const { service } = setup();
+    await service.mint(USER);
 
     expect(await service.redeem("x".repeat(32))).toBeNull();
-    advance(SIGN_IN_LINK_TTL_MS);
+  });
+
+  it("refuses a link whose owner is gone", async () => {
+    const { issuer, service } = setup();
+    const code = codeOf((await service.mint(USER)).url);
+
+    issuer.gone = true;
     expect(await service.redeem(code)).toBeNull();
   });
 
@@ -100,13 +109,5 @@ describe("SignInLinkService.redeem", () => {
     issuer.failNext = true;
     await expect(service.redeem(code)).rejects.toThrow("auth down");
     expect(await service.redeem(code)).toMatchObject({ user_id: USER });
-  });
-
-  it("gives a token to only one of two concurrent redeems", async () => {
-    const { service } = setup();
-    const code = codeOf((await service.mint(USER)).url);
-
-    const outcomes = await Promise.all([service.redeem(code), service.redeem(code)]);
-    expect(outcomes.filter(Boolean)).toHaveLength(1);
   });
 });

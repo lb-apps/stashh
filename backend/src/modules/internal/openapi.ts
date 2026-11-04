@@ -220,9 +220,9 @@ registry.registerPath({
   method: "post",
   path: "/users/{userId}/sign-in-links",
   summary: "Mint web sign-in link",
-  description: `A personal, one-time link that signs \`userId\` in to the web app: \`<WEB_APP_URL>/a/<code>\`. The channel sends it to that person only.
+  description: `A personal link that signs \`userId\` in to the web app: \`<WEB_APP_URL>/a/<code>\`. The channel sends it to that person only.
 
-The link works once, for seven days; minting another does not revoke earlier ones. Only the code's SHA-256 is stored. \`404\` when the user does not exist.`,
+The link never expires and works every time it is opened, until the user is erased; minting another does not revoke earlier ones. Only the code's SHA-256 is stored. \`404\` when the user does not exist.`,
   request: { params: userParams },
   responses: {
     201: {
@@ -230,7 +230,7 @@ The link works once, for seven days; minting another does not revoke earlier one
       content: {
         "application/json": {
           schema: successEnvelope(
-            z.object({ url: z.string().url(), expires_at: z.string().datetime() }).openapi("SignInLink"),
+            z.object({ url: z.string().url() }).openapi("SignInLink"),
             "MintSignInLink",
           ),
         },
@@ -245,9 +245,9 @@ registry.registerPath({
   method: "post",
   path: "/sign-in-links/redeem",
   summary: "Redeem web sign-in link",
-  description: `Spends a link's \`code\` and returns a Supabase magic-link token for its owner. The web app's server calls this; the browser then calls \`supabase.auth.verifyOtp({ token_hash, type: "magiclink" })\` and has a session. No PKCE, popup or mail involved, so it works inside Instagram's in-app browser.
+  description: `Returns a fresh Supabase magic-link token for the owner of a link's \`code\`. The web app's server calls this; the browser then calls \`supabase.auth.verifyOtp({ token_hash, type: "magiclink" })\` and has a session. No PKCE, popup or mail involved, so it works inside Instagram's in-app browser.
 
-Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as is an unknown or expired code. The token itself expires with Supabase's OTP lifetime (one hour by default), so exchange it right away.`,
+A code can be redeemed any number of times; an unknown code, or one whose owner was erased, is \`410 SIGN_IN_LINK_INVALID\`. The token itself expires with Supabase's OTP lifetime (one hour by default), so exchange it right away.`,
   request: { body: { content: { "application/json": { schema: redeemSignInLinkBodySchema.openapi("RedeemSignInLinkBody") } } } },
   responses: {
     200: {
@@ -263,7 +263,7 @@ Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as
         },
       },
     },
-    410: { description: "Code unknown, already used or expired" },
+    410: { description: "Code unknown, or its owner was erased" },
     ...commonErrorResponses,
   },
 });
