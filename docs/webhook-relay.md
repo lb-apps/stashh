@@ -177,6 +177,15 @@ already stored for dev stay dev's.
 - `npm run hooks:test` runs the relay end to end with fakes (`src/handle.test.ts`);
   `npm run hooks:typecheck` checks the Worker and the shared core.
 
+## Deploys
+
+The Worker `stashh-hooks` deploys itself: Cloudflare Workers Builds watches `develop` of
+`lb-apps/stashh` (root `workers/hooks`, build `npm ci`, deploy `npx wrangler deploy --env production`,
+`NODE_VERSION=24`, no preview builds). A merge to `develop` ships it, as home-server ships the
+services. Builds and their logs: Workers & Pages → stashh-hooks → Deployments.
+`npm run hooks:deploy:prod` still works from a machine whose wrangler is signed in to the stashh.me
+account.
+
 ## Logs
 
 `npm run hooks:tail:prod` (in `workers/hooks/`). One JSON line per event: `relayed`,
