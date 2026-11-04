@@ -2,7 +2,7 @@ import type { Logger } from "../lib/logger.ts";
 import { GraphApiError, type InstagramProfile, type Messenger, type OutboundMessage, type ProfileReader, type SenderAction } from "../meta/graph-client.ts";
 import { composeRecognitionReply, mapLinkMessage, renderPlan } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
-import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
+import { RECOGNITION_QUOTA, StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
 import { commandReply } from "../webhooks/core/commands.ts";
 import { interpret } from "./intent.ts";
 import { mayMessage, OUTBOUND_BLOCKED, type OutboundMode } from "./outbound.ts";
@@ -129,11 +129,15 @@ export class MessageProcessor {
       case "recognize": {
         const profile = await this.greet(message);
         const { userId } = await this.stashh.resolveInstagramUser(message.senderId, profile);
-        const { recognitionId } = await this.stashh.createRecognition({
-          userId,
-          source: intent.source,
-          idempotencyKey: message.mid,
-        });
+        let recognitionId: string;
+        try {
+          ({ recognitionId } = await this.stashh.createRecognition({ userId, source: intent.source, idempotencyKey: message.mid }));
+        } catch (error) {
+          if (error instanceof StashhApiError && error.code === RECOGNITION_QUOTA) {
+            return this.reply(message, [text(copy.dailyLimit)], "failed", "daily recognition cap reached");
+          }
+          throw error;
+        }
         const now = this.now();
         await this.settle(message, {
           status: "submitted",

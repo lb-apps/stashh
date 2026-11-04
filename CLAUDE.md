@@ -207,6 +207,17 @@ One Meta app, one Instagram account, no test app: Meta's Instagram callback is
 - **"Which endpoints power screen X?"** → [docs/api-screen-map.md](docs/api-screen-map.md).
 - **Envelope:** every response is `{ ok, data, meta, error }`. Auth is a Supabase JWT Bearer token on every request.
 
+## AI safety
+
+Two models read text strangers wrote (the recognition analyzer: posts; the DM assistant: DMs and
+post tips). The boundary is code after the model, not the prompt — [docs/security/ai-safety.md](docs/security/ai-safety.md).
+- An irreversible assistant tool gets a `reply.confirm` action and a real-tap check in code; the
+  model never writes `CONFIRM:` / `ERASE_CONFIRM` payloads.
+- Text not written by the sender goes through `cleanUntrustedText` (`backend/src/lib/untrusted-text.ts`)
+  and reaches the model under a key ending in `_untrusted`; model-written free text that Stashh
+  shows is bounded and checked with `findContactTokens`.
+- After any prompt or model change: `cd backend && npm run security:redteam`.
+
 ## Build / run / test
 
 - **iOS:** build in Xcode. Configs in `ios/Configurations/*.xcconfig`; runtime values (API base URL, Supabase keys) in `ios/Config/*.plist` per environment (Testing/Staging/Production).

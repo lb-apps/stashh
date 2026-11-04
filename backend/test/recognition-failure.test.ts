@@ -41,7 +41,7 @@ describe("buildUserText without media", () => {
   it("tells the model the caption is all it has", () => {
     const text = buildUserText({ platform: "instagram", mediaKind: null, slideCount: 0, caption: "📍Ali Ustanın Yeri : Üçkuyular İzmir" });
     expect(text).toContain("Its media could not be read");
-    expect(text).toContain("Post caption:\n📍Ali Ustanın Yeri : Üçkuyular İzmir");
+    expect(text).toMatch(/<<<CAPTION ([0-9a-f]{12})>>>\n📍Ali Ustanın Yeri : Üçkuyular İzmir\n<<<END CAPTION \1>>>/);
     expect(text).toContain("only if that @handle appears in this caption");
   });
 });
