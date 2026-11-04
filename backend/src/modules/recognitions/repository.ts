@@ -91,6 +91,17 @@ export class RecognitionRepository {
     return data;
   }
 
+  /** Recognitions the owner started since `since`, of any status. */
+  async countRecognitionsSince(ownerUserId: string, since: Date): Promise<number> {
+    const { count, error } = await this.supabaseClient
+      .from("recognition_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", ownerUserId)
+      .gte("created_at", since.toISOString());
+    if (error) throw error;
+    return count ?? 0;
+  }
+
   async getRecognitionByIdempotencyKey(
     ownerUserId: string,
     idempotencyKey: string,

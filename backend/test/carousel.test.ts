@@ -34,7 +34,7 @@ describe("buildUserText", () => {
     const text = buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 15, caption: "Kadıköy için 15 mekan" });
     expect(text).toContain("Instagram carousel post of 15 slides");
     expect(text).toContain("Read every slide");
-    expect(text).toContain("Post caption:\nKadıköy için 15 mekan");
+    expect(text).toMatch(/Post caption:\n<<<CAPTION [0-9a-f]{12}>>>\nKadıköy için 15 mekan\n<<<END CAPTION [0-9a-f]{12}>>>/);
     expect(text).toContain("on-screen for that venue in the slides");
   });
 

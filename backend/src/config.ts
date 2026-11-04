@@ -37,6 +37,8 @@ const envSchema = z.object({
   RECOGNITIONS_WORKER_CONCURRENCY: z.coerce.number().int().min(1).default(2),
   RECOGNITIONS_CLAIM_BATCH_SIZE: z.coerce.number().int().min(1).default(2),
   RECOGNITIONS_MAX_RETRIES: z.coerce.number().int().min(0).default(3),
+  /** Recognitions one user may start in 24 hours; each is a model call plus Google Places calls. */
+  RECOGNITIONS_DAILY_CAP: z.coerce.number().int().min(1).default(100),
   RECOGNITIONS_POLL_MIN_MS: z.coerce.number().int().min(500).default(1500),
   /** Max sleep when idle if Realtime wake is missed (fallback polling). */
   RECOGNITIONS_POLL_MAX_MS: z.coerce.number().int().min(1000).default(5000),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
+import { commonErrorResponses, recognitionQuotaResponse, registry, successEnvelope } from "../../lib/openapi.js";
 import {
   channelIdentityParamsSchema,
   channelProfileSchema,
@@ -123,6 +123,7 @@ Send the channel's event id as \`Idempotency-Key\`: a repeat with the same key f
   responses: {
     202: { description: "Recognition enqueued (or the original, for a repeated key)", content: { "application/json": { schema: successEnvelope(recognitionEnqueuedSchema, "InternalEnqueueRecognition") } } },
     ...commonErrorResponses,
+    ...recognitionQuotaResponse,
   },
 });
 
