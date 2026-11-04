@@ -8,21 +8,48 @@ import { z } from "zod";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export type ContentPart =
-  | { type: "text"; text: string }
+  | {
+      type: "text";
+      text: string;
+      /**
+       * Prompt-cache breakpoint: everything up to and including this part is cached by vendors
+       * that take explicit breakpoints (Anthropic); the others cache automatically and ignore it.
+       */
+      cache_control?: { type: "ephemeral" };
+    }
   /** `url` is a `data:video/mp4;base64,…` URL; Gemini on OpenRouter does not fetch video URLs. */
   | { type: "video_url"; video_url: { url: string } }
   | { type: "image_url"; image_url: { url: string } };
 
-export interface ChatMessage {
-  role: "system" | "user";
-  content: string | ContentPart[];
+/** A tool the model asked for, as OpenRouter normalises it (OpenAI function-calling shape). */
+export interface ToolCallRequest {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
 }
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string | ContentPart[] }
+  /** The model's earlier turn, replayed; `content` is null when it only called tools. */
+  | { role: "assistant"; content: string | null; tool_calls?: ToolCallRequest[] }
+  /** The result of one tool call, right after the assistant message that asked for it. */
+  | { role: "tool"; tool_call_id: string; content: string };
+
+/** A function the model may call, in the OpenAI shape OpenRouter forwards to every vendor. */
+export interface ToolDefinition {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+export type ToolChoice = "auto" | "required" | "none" | { type: "function"; function: { name: string } };
 
 export interface ChatCompletionRequest {
   model: string;
   messages: ChatMessage[];
   /** Strict JSON-schema output; providers that cannot honour it are skipped. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
+  tools?: ToolDefinition[];
+  toolChoice?: ToolChoice;
   maxTokens?: number;
   reasoningEffort?: "minimal" | "low" | "medium" | "high";
 }
@@ -37,9 +64,20 @@ export interface ModelUsage {
   cost_usd: number | null;
 }
 
+/** One tool call the model made, with its arguments parsed; `parseError` when they were not JSON. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: unknown;
+  rawArguments: string;
+  parseError?: string;
+}
+
 export interface ChatCompletion {
-  content: string;
-  /** Normalised by OpenRouter: "stop", "length", "content_filter", … */
+  /** The model's text; null when it only called tools. */
+  content: string | null;
+  toolCalls: ToolCall[];
+  /** Normalised by OpenRouter: "stop", "tool_calls", "length", "content_filter", … */
   finishReason: string | null;
   model: string;
   /** Upstream provider OpenRouter routed to (e.g. "Google AI Studio"). */
@@ -55,6 +93,12 @@ const usageSchema = z.object({
   cost: z.number().nullish(),
 });
 
+const toolCallSchema = z.object({
+  id: z.string(),
+  type: z.literal("function").optional(),
+  function: z.object({ name: z.string(), arguments: z.string().nullish() }),
+});
+
 const responseSchema = z.object({
   model: z.string(),
   provider: z.string().nullish(),
@@ -63,7 +107,7 @@ const responseSchema = z.object({
     .array(
       z.object({
         finish_reason: z.string().nullable().optional(),
-        message: z.object({ content: z.string().nullable().optional() }),
+        message: z.object({ content: z.string().nullable().optional(), tool_calls: z.array(toolCallSchema).nullish() }),
         error: z.object({ message: z.string() }).optional(),
       }),
     )
@@ -82,6 +126,15 @@ export class OpenRouterError extends Error {
   }
 }
 
+function parseToolCall(call: z.infer<typeof toolCallSchema>): ToolCall {
+  const rawArguments = call.function.arguments ?? "";
+  try {
+    return { id: call.id, name: call.function.name, arguments: rawArguments.trim() === "" ? {} : JSON.parse(rawArguments), rawArguments };
+  } catch (error) {
+    return { id: call.id, name: call.function.name, arguments: null, rawArguments, parseError: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export function createOpenRouterClient(options: { apiKey: string; timeoutMs?: number }) {
   const timeoutMs = options.timeoutMs ?? 180_000;
 
@@ -90,8 +143,12 @@ export function createOpenRouterClient(options: { apiKey: string; timeoutMs?: nu
       const body = {
         model: request.model,
         messages: request.messages,
+        // Token counts and cost on every response (https://openrouter.ai/docs/use-cases/usage-accounting).
+        usage: { include: true },
         ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
         ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort, exclude: true } } : {}),
+        ...(request.tools ? { tools: request.tools } : {}),
+        ...(request.toolChoice ? { tool_choice: request.toolChoice } : {}),
         ...(request.jsonSchema
           ? {
               response_format: {
@@ -136,11 +193,14 @@ export function createOpenRouterClient(options: { apiKey: string; timeoutMs?: nu
 
       const choice = parsed.data.choices[0]!;
       if (choice.error) throw new OpenRouterError(response.status, choice.error.message);
-      if (!choice.message.content) throw new OpenRouterError(response.status, "model returned an empty response");
+      const toolCalls = (choice.message.tool_calls ?? []).map(parseToolCall);
+      const content = choice.message.content || null;
+      if (!content && toolCalls.length === 0) throw new OpenRouterError(response.status, "model returned an empty response");
 
       const usage = parsed.data.usage;
       return {
-        content: choice.message.content,
+        content,
+        toolCalls,
         finishReason: choice.finish_reason ?? null,
         model: parsed.data.model,
         provider: parsed.data.provider ?? null,

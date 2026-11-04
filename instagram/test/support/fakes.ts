@@ -1,6 +1,6 @@
 import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
-import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader } from "../../src/meta/graph-client.ts";
-import type { Recognition, RecognitionSource, StashhApi } from "../../src/stashh/client.ts";
+import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply } from "../../src/meta/graph-client.ts";
+import type { Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
 
 interface Row extends StoredMessage {
   nextAttemptAt: Date;
@@ -33,6 +33,7 @@ export class MemoryStore implements MessageStore {
         sentAt: m.sentAt,
         text: m.text,
         attachments: m.attachments,
+        tapped: m.tapped ?? null,
         relayRouted: m.relayRouted ?? false,
         relayCommand: m.relayCommand ?? null,
         status: "received",
@@ -55,11 +56,28 @@ export class MemoryStore implements MessageStore {
 
   async claim(limit: number, leaseSeconds: number): Promise<StoredMessage[]> {
     const now = this.now();
+    const leased = (row: Row) => row.lockedUntil !== null && row.lockedUntil > now;
+    const senderLeased = (row: Row) => [...this.rows.values()].some((other) => other.mid !== row.mid && other.senderId === row.senderId && leased(other));
     const due = [...this.rows.values()]
       .filter((r) => (r.status === "received" || r.status === "submitted") && r.nextAttemptAt <= now)
+      .filter((r) => !leased(r))
+      .sort((a, b) => a.nextAttemptAt.getTime() - b.nextAttemptAt.getTime() || a.sentAt.getTime() - b.sentAt.getTime());
+    const claimed: Row[] = [];
+    for (const row of due) {
+      if (claimed.length >= limit) break;
+      if (senderLeased(row)) continue;
+      row.lockedUntil = new Date(now.getTime() + leaseSeconds * 1000);
+      claimed.push(row);
+    }
+    return claimed.map((r) => ({ ...r }));
+  }
+
+  async claimSender(senderId: string, leaseSeconds: number): Promise<StoredMessage[]> {
+    const now = this.now();
+    const due = [...this.rows.values()]
+      .filter((r) => r.senderId === senderId && r.status === "received" && r.nextAttemptAt <= now)
       .filter((r) => !r.lockedUntil || r.lockedUntil < now)
-      .sort((a, b) => a.nextAttemptAt.getTime() - b.nextAttemptAt.getTime())
-      .slice(0, limit);
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
     for (const r of due) r.lockedUntil = new Date(now.getTime() + leaseSeconds * 1000);
     return due.map((r) => ({ ...r }));
   }
@@ -115,6 +133,9 @@ export class FakeStashh implements StashhApi {
   eraseSteps: Array<Step<void>> = [];
   minted: string[] = [];
   mintSteps: Array<Step<{ url: string }>> = [];
+  /** Assistant turns asked for, with their messages. */
+  turns: Array<{ userId: string; messages: TurnMessage[] }> = [];
+  turnSteps: Array<Step<ReplyPlan>> = [];
 
   async resolveInstagramUser(igsid: string, profile?: InstagramProfile | null) {
     this.resolved.push(igsid);
@@ -163,6 +184,13 @@ export class FakeStashh implements StashhApi {
     if (step instanceof Error) throw step;
     return step;
   }
+
+  async assistantTurn(params: { userId: string; messages: TurnMessage[] }) {
+    const step = this.turnSteps.shift() ?? { messages: [{ kind: "text" as const, text: `assistant: ${params.messages.map((m) => m.text).join(" | ")}` }] };
+    if (step instanceof Error) throw step;
+    this.turns.push(params);
+    return step;
+  }
 }
 
 export class FakeMessenger implements Messenger {
@@ -186,9 +214,16 @@ export class FakeMessenger implements Messenger {
     return this.sent.flatMap(({ message }) => (message.kind === "text" || message.kind === "button" ? [message.text] : []));
   }
 
-  /** Every link button sent, as title → url. */
+  /** Every link button sent under a text, as title → url. */
   buttons(): Array<{ title: string; url: string }> {
-    return this.sent.flatMap(({ message }) => (message.kind === "button" ? message.buttons : []));
+    return this.sent.flatMap(({ message }) =>
+      message.kind === "button" ? message.buttons.flatMap((b) => (b.type === "postback" ? [] : [{ title: b.title, url: b.url }])) : [],
+    );
+  }
+
+  /** The quick replies on each sent message, in send order (empty where a message had none). */
+  quickReplies(): QuickReply[][] {
+    return this.sent.map(({ message }) => (message.kind === "carousel" ? [] : (message.quickReplies ?? [])));
   }
 }
 

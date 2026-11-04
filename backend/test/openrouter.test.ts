@@ -38,7 +38,7 @@ describe("OpenRouter client", () => {
 
     const completion = await client.complete(request);
 
-    expect(completion).toEqual({ content: '{"places":[]}', finishReason: "stop", model: "google/gemini-3.8-flash", provider: null, usage: null });
+    expect(completion).toEqual({ content: '{"places":[]}', toolCalls: [], finishReason: "stop", model: "google/gemini-3.8-flash", provider: null, usage: null });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-or-test");
@@ -92,5 +92,62 @@ describe("OpenRouter client", () => {
       throw new TypeError("fetch failed");
     }));
     await expect(client.complete(request)).rejects.toMatchObject({ status: 0 });
+  });
+});
+
+describe("OpenRouter client — tool calling", () => {
+  const toolRequest = {
+    model: "anthropic/claude-haiku-5.5",
+    messages: [
+      { role: "system" as const, content: [{ type: "text" as const, text: "stable", cache_control: { type: "ephemeral" as const } }] },
+      { role: "user" as const, content: "listelerim neler" },
+      { role: "assistant" as const, content: null, tool_calls: [{ id: "call_1", type: "function" as const, function: { name: "get_lists", arguments: "{}" } }] },
+      { role: "tool" as const, tool_call_id: "call_1", content: '{"lists":[]}' },
+    ],
+    tools: [{ type: "function" as const, function: { name: "reply", description: "Reply", parameters: { type: "object" } } }],
+    toolChoice: "required" as const,
+    maxTokens: 700,
+  };
+
+  it("sends tools, tool_choice and usage accounting, and replays assistant and tool messages untouched", async () => {
+    const fetchMock = stubFetch(200, {
+      model: "anthropic/claude-haiku-5.5",
+      choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "call_2", type: "function", function: { name: "reply", arguments: '{"text":"Hiç listen yok."}' } }] } }],
+    });
+
+    const completion = await client.complete(toolRequest);
+
+    expect(completion.content).toBeNull();
+    expect(completion.toolCalls).toEqual([{ id: "call_2", name: "reply", arguments: { text: "Hiç listen yok." }, rawArguments: '{"text":"Hiç listen yok."}' }]);
+    expect(completion.finishReason).toBe("tool_calls");
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ usage: { include: true }, tool_choice: "required", tools: toolRequest.tools });
+    expect(body.messages).toEqual(toolRequest.messages);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it("keeps a tool call whose arguments are not JSON, with the parse error", async () => {
+    stubFetch(200, {
+      model: "m",
+      choices: [{ finish_reason: "tool_calls", message: { content: "", tool_calls: [{ id: "c", type: "function", function: { name: "reply", arguments: "{oops" } }] } }],
+    });
+    const completion = await client.complete(toolRequest);
+    expect(completion.toolCalls[0]).toMatchObject({ name: "reply", arguments: null, rawArguments: "{oops" });
+    expect(completion.toolCalls[0]?.parseError).toBeTruthy();
+  });
+
+  it("treats empty arguments as an empty object", async () => {
+    stubFetch(200, {
+      model: "m",
+      choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "c", type: "function", function: { name: "get_map_link", arguments: "" } }] } }],
+    });
+    const completion = await client.complete(toolRequest);
+    expect(completion.toolCalls[0]?.arguments).toEqual({});
+  });
+
+  it("still rejects a response with neither text nor tool calls", async () => {
+    stubFetch(200, { model: "m", choices: [{ finish_reason: "stop", message: { content: null, tool_calls: [] } }] });
+    await expect(client.complete(toolRequest)).rejects.toThrow("empty response");
   });
 });

@@ -266,7 +266,8 @@ describe("relayed messages, stored and answered", () => {
   it("reads a /env that came straight from Meta as an ordinary message", async () => {
     await accept("prod", delivery(dm(OTHER, "/env dev", "direct")), null);
     await tick("live");
-    expect(store.row("direct")).toMatchObject({ intent: "help", relayCommand: null });
+    expect(store.row("direct")).toMatchObject({ intent: "chat", relayCommand: null });
+    expect(stashh.created).toEqual([]);
   });
 
   it("outside production, answers only routed senders and works on nobody else's message", async () => {

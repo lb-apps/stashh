@@ -51,6 +51,11 @@ export const copy = {
   mapLink: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
   /** The personal sign-in link to the web map. */
   openMyMap: "Haritanda aç",
+  /** Quick replies under a finished recognition; the assistant takes the tap from there. */
+  addToList: "Listeye koy",
+  openMyMapQuick: "Haritamı aç",
+  /** The assistant could not answer (backend down, model unavailable). */
+  assistantUnavailable: "Şu an cevap veremiyorum, birazdan tekrar yazar mısın?",
   /** A card's link to the place on Google Maps. */
   openInMaps: "Google Maps'te aç",
   instagram: "Instagram",

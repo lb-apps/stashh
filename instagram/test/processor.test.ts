@@ -1,7 +1,7 @@
 import { pino } from "pino";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { InboundMessage } from "../src/conversation/events.ts";
-import { MessageProcessor } from "../src/conversation/processor.ts";
+import { CHAT_DEBOUNCE_MS, MessageProcessor } from "../src/conversation/processor.ts";
 import { GraphApiError } from "../src/meta/graph-client.ts";
 import { StashhApiError, type Place, type Recognition } from "../src/stashh/client.ts";
 import { clock, FakeMessenger, FakeProfiles, FakeStashh, MemoryStore } from "./support/fakes.ts";
@@ -51,7 +51,7 @@ beforeEach(() => {
   processor = new MessageProcessor({ store, stashh, messenger, profiles, log: pino({ level: "silent" }), now: time.now });
 });
 
-async function deliver(message: Partial<Pick<InboundMessage, "text" | "attachments" | "sentAt">>): Promise<string> {
+async function deliver(message: Partial<Pick<InboundMessage, "text" | "attachments" | "sentAt" | "tapped">>): Promise<string> {
   const mid = `mid-${++seq}`;
   await store.insert([
     {
@@ -61,6 +61,7 @@ async function deliver(message: Partial<Pick<InboundMessage, "text" | "attachmen
       sentAt: message.sentAt ?? time.now(),
       text: message.text ?? null,
       attachments: message.attachments ?? [],
+      tapped: message.tapped ?? null,
       raw: {},
     },
   ]);
@@ -123,7 +124,10 @@ describe("recognizing a shared Reel", () => {
     expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var, hepsini haritana ekledik."]);
     expect(stashh.minted).toEqual(["00000000-0000-4000-8000-000000000001"]);
     expect(messenger.buttons()).toEqual([{ title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }]);
-    const carousel = messenger.sent[1]?.message;
+    // The summary comes last, so its quick replies stay visible; they hand the next step to the assistant.
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
+    expect(messenger.quickReplies().at(-1)).toEqual([{ title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` }]);
+    const carousel = messenger.sent[0]?.message;
     expect(carousel?.kind).toBe("carousel");
     if (carousel?.kind === "carousel") {
       expect(carousel.cards.map((c) => c.title)).toEqual(["Mekân 1", "Mekân 2"]);
@@ -244,7 +248,7 @@ describe("recognizing a shared Reel", () => {
     stashh.getSteps.push(recognition("completed", Array.from({ length: 12 }, (_, i) => place(i))));
     await next(mid);
 
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button", "carousel", "carousel"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "carousel", "button"]);
     expect(store.row(mid).repliesSent).toBe(3);
   });
 });
@@ -304,12 +308,12 @@ describe("failures and retries", () => {
     await next(mid);
 
     expect(store.row(mid)).toMatchObject({ status: "submitted", repliesSent: 1, attempts: 1 });
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel"]);
 
     stashh.getSteps.push(recognition("completed", [place(1)]));
     await next(mid);
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["button", "carousel"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
   });
 
   it("expires a message older than the 24-hour reply window without replying", async () => {
@@ -336,11 +340,10 @@ describe("other intents", () => {
     expect(store.rows.has(older)).toBe(false);
   });
 
-  it("explains what Stashh does for an ordinary message", async () => {
-    const mid = await deliver({ text: "merhaba" });
+  it("explains what Stashh does for an empty message", async () => {
+    const mid = await deliver({ text: "   " });
     await tick();
     expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
-    expect(store.row(mid).finishedAt).not.toBeNull();
     expect(messenger.texts()).toEqual([
       'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim ve haritana ekleyelim. Haritanı açmak için "harita", verilerini silmek için "sil" yaz.',
     ]);
@@ -359,7 +362,7 @@ describe("other intents", () => {
         message: {
           kind: "button",
           text: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
-          buttons: [{ title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }],
+          buttons: [{ type: "web_url", title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }],
         },
       },
     ]);
@@ -384,8 +387,12 @@ describe("other intents", () => {
     await next(mid);
 
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text", "carousel"]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
     expect(messenger.texts()).toEqual(["Bu Reel'de 1 mekân var, hepsini haritana ekledik."]);
+    expect(messenger.quickReplies().at(-1)).toEqual([
+      { title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` },
+      { title: "Haritamı aç", payload: "OPEN_MAP" },
+    ]);
   });
 
   it("sends no map link when nothing was found", async () => {
@@ -419,5 +426,126 @@ describe("other intents", () => {
     await reel();
     const stored = await store.insert([...store.rows.values()].map((r) => ({ ...r, raw: {} })));
     expect(stored).toBe(0);
+  });
+});
+
+describe("talking to the assistant", () => {
+  /** Lets the chat debounce pass, then runs one tick. */
+  async function settleChat(): Promise<void> {
+    time.advance(CHAT_DEBOUNCE_MS);
+    await tick();
+  }
+
+  it("waits for follow-ups, then asks the assistant once and sends its plan", async () => {
+    profiles.answers.set(SENDER, { username: "ayse.k", name: "Ayşe" });
+    const mid = await deliver({ text: "listelerim neler" });
+    await tick();
+    expect(store.row(mid)).toMatchObject({ status: "received", intent: "chat", lockedUntil: null });
+    expect(stashh.turns).toEqual([]);
+
+    stashh.turnSteps.push({
+      messages: [
+        { kind: "carousel", cards: [{ title: "🌊 İzmir", subtitle: "7 mekân", buttons: [{ type: "postback", title: "Mekânları gör", payload: "SHOW_LIST:l1" }] }] },
+        { kind: "text", text: "İki listen var.", quick_replies: [{ title: "Haritamı aç", payload: "OPEN_MAP" }] },
+      ],
+    });
+    await settleChat();
+
+    expect(messenger.typed).toEqual([SENDER]);
+    expect(stashh.resolvedProfiles).toEqual([{ username: "ayse.k", name: "Ayşe" }]);
+    expect(stashh.turns).toEqual([{ userId: "00000000-0000-4000-8000-000000000001", messages: [{ externalId: mid, text: "listelerim neler", tapped: null }] }]);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
+    expect(messenger.quickReplies()).toEqual([[], [{ title: "Haritamı aç", payload: "OPEN_MAP" }]]);
+    expect(store.row(mid)).toMatchObject({ status: "replied", intent: "chat", repliesSent: 2 });
+  });
+
+  it("folds quick follow-ups of the same sender into one turn, oldest first", async () => {
+    const first = await deliver({ text: "selam" });
+    time.advance(1_000);
+    const second = await deliver({ text: "listelerim neler" });
+    time.advance(500);
+    const third = await deliver({ text: "bir de haritamı aç" });
+    await tick();
+    expect(stashh.turns).toEqual([]);
+
+    await settleChat();
+    expect(stashh.turns).toHaveLength(1);
+    expect(stashh.turns[0]!.messages.map((m) => [m.externalId, m.text])).toEqual([
+      [first, "selam"],
+      [second, "listelerim neler"],
+      [third, "bir de haritamı aç"],
+    ]);
+    expect(messenger.texts()).toEqual(["assistant: selam | listelerim neler | bir de haritamı aç"]);
+    // One row carried the reply; the others were folded into it.
+    const rows = [first, second, third].map((mid) => store.row(mid));
+    expect(rows.every((row) => row.status === "replied" && row.intent === "chat")).toBe(true);
+    const carrier = rows.filter((row) => row.repliesSent === 1);
+    expect(carrier).toHaveLength(1);
+    for (const row of rows) if (row !== carrier[0]) expect(row).toMatchObject({ repliesSent: 0, lastError: `folded into ${carrier[0]!.mid}` });
+  });
+
+  it("leaves a share of the same sender to run on its own after the turn", async () => {
+    const chat = await deliver({ text: "merhaba" });
+    time.advance(100);
+    const share = await reel();
+    await settleChat();
+
+    expect(stashh.turns[0]!.messages.map((m) => m.externalId)).toEqual([chat]);
+    expect(store.row(share)).toMatchObject({ status: "received", lockedUntil: null });
+    await tick();
+    expect(store.row(share).status).toBe("submitted");
+  });
+
+  it("hands a tap to the assistant with its payload", async () => {
+    const mid = await deliver({ text: "Listeye koy", tapped: { title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` } });
+    await settleChat();
+    expect(stashh.turns[0]!.messages).toEqual([{ externalId: mid, text: "Listeye koy", tapped: { title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` } }]);
+  });
+
+  it("erases on the confirming tap without asking the assistant", async () => {
+    const mid = await deliver({ text: "Evet, sil", tapped: { title: "Evet, sil", payload: "ERASE_CONFIRM" } });
+    await tick();
+    expect(stashh.erased).toEqual([SENDER]);
+    expect(stashh.turns).toEqual([]);
+    expect(store.rows.has(mid)).toBe(false);
+  });
+
+  it("works on one sender's messages one at a time, in order", async () => {
+    const a = await deliver({ text: "bir" });
+    time.advance(CHAT_DEBOUNCE_MS + 100);
+    const claimed = await store.claim(10, 60);
+    expect(claimed.map((m) => m.mid)).toEqual([a]);
+    const b = await deliver({ text: "iki" });
+    time.advance(CHAT_DEBOUNCE_MS + 100);
+    // `a` is still leased, so `b` waits even though it is due.
+    expect((await store.claim(10, 60)).map((m) => m.mid)).toEqual([]);
+    await store.settle(a, { status: "replied" });
+    expect((await store.claim(10, 60)).map((m) => m.mid)).toEqual([b]);
+  });
+
+  it("retries a failed turn a little, then apologises in the assistant's words", async () => {
+    const mid = await deliver({ text: "merhaba" });
+    stashh.turnSteps.push(new StashhApiError(503, null, "down"), new StashhApiError(503, null, "down"), new StashhApiError(503, null, "down"));
+    await settleChat();
+    expect(store.row(mid)).toMatchObject({ status: "received", attempts: 1 });
+    await next(mid);
+    expect(store.row(mid)).toMatchObject({ status: "received", attempts: 2 });
+    await next(mid);
+    expect(store.row(mid)).toMatchObject({ status: "failed", attempts: 3 });
+    expect(messenger.texts()).toEqual(["Şu an cevap veremiyorum, birazdan tekrar yazar mısın?"]);
+  });
+
+  it("resumes a half-sent plan without repeating what was delivered", async () => {
+    const mid = await deliver({ text: "merhaba" });
+    stashh.turnSteps.push({ messages: [{ kind: "carousel", cards: [{ title: "A", buttons: [] }] }, { kind: "text", text: "Son." }] });
+    messenger.sendSteps.push(undefined, new GraphApiError(500, 2, "temporarily unavailable"));
+    await settleChat();
+    expect(store.row(mid)).toMatchObject({ status: "received", repliesSent: 1, attempts: 1 });
+
+    // The backend replays the same plan for the same message.
+    stashh.turnSteps.push({ messages: [{ kind: "carousel", cards: [{ title: "A", buttons: [] }] }, { kind: "text", text: "Son." }] });
+    await next(mid);
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
+    expect(store.row(mid).status).toBe("replied");
   });
 });

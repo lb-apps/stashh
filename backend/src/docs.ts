@@ -10,6 +10,7 @@ import "./modules/library/openapi.js";
 import "./modules/recognitions/openapi.js";
 import "./modules/me/openapi.js";
 import "./modules/internal/openapi.js";
+import "./modules/assistant/openapi.js";
 
 export async function mountDocs(app: Express): Promise<void> {
   app.get("/openapi.json", (_req, res) => {

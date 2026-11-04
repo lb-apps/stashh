@@ -213,6 +213,47 @@ export class PlacesRepository {
     return (data ?? []).map(requireSavedPlaceRecord);
   }
 
+  /** Saved places by canonical `places.id`, in no particular order; ids the owner has not saved are left out. */
+  async getSavedPlacesByPlaceIds(placeIds: string[], ownerUserId: string): Promise<SavedPlaceRecord[]> {
+    if (placeIds.length === 0) return [];
+    const { data, error } = await this.userSupabase
+      .from("saved_places")
+      .select(SAVED_PLACE_SELECT)
+      .eq("owner_user_id", ownerUserId)
+      .in("place_id", placeIds);
+    if (error) throw error;
+    return (data ?? []).map(requireSavedPlaceRecord);
+  }
+
+  /**
+   * The owner's saved places whose name, address, district or city contains `query`
+   * (case-insensitive), newest save first. Characters PostgREST reserves in a filter are
+   * dropped from the query, so a stray comma or bracket cannot change the filter.
+   */
+  async searchSavedPlaces(ownerUserId: string, query: string, limit: number): Promise<SavedPlaceRecord[]> {
+    const needle = query.replace(/[,()*%\\"]/g, " ").trim();
+    if (!needle) return [];
+    const pattern = `*${needle}*`;
+    const { data, error } = await this.userSupabase
+      .from("saved_places")
+      .select(SAVED_PLACE_SELECT)
+      .eq("owner_user_id", ownerUserId)
+      // The `places!inner` embed drops saved places whose place fails the filter.
+      .or(`name.ilike.${pattern},address.ilike.${pattern},district.ilike.${pattern},city.ilike.${pattern}`, { referencedTable: "places" })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map(requireSavedPlaceRecord);
+  }
+
+  /** Canonical places by Google place id, in no particular order. */
+  async getPlacesByGoogleIds(googlePlaceIds: string[]): Promise<PlaceRow[]> {
+    if (googlePlaceIds.length === 0) return [];
+    const { data, error } = await this.userSupabase.from("places").select("*").in("google_place_id", googlePlaceIds);
+    if (error) throw error;
+    return data ?? [];
+  }
+
   /** Saved places by their `saved_places.id`, in no particular order. */
   async getSavedPlacesByIds(savedPlaceIds: string[], ownerUserId: string): Promise<SavedPlaceRecord[]> {
     if (savedPlaceIds.length === 0) return [];

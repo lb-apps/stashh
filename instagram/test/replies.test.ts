@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS, toGraphMessage } from "../src/meta/graph-client.ts";
 import { truncateGraphemes, truncateUtf8 } from "../src/meta/text.ts";
-import { composeRecognitionReply, toCard } from "../src/replies/compose.ts";
+import { composeRecognitionReply, renderPlan, toCard } from "../src/replies/compose.ts";
 import { sourceKindOf } from "../src/replies/copy.tr.ts";
 import type { Place } from "../src/stashh/client.ts";
 
@@ -85,8 +85,8 @@ describe("composeRecognitionReply", () => {
       imageUrl: "https://cdn.example/forno.jpg",
       url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc",
       buttons: [
-        { title: "Google Maps'te aç", url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc" },
-        { title: "Instagram", url: "https://www.instagram.com/fornodiromatr/" },
+        { type: "web_url", title: "Google Maps'te aç", url: "https://www.google.com/maps/search/?api=1&query=Forno+Di+Roma&query_place_id=ChIJabc" },
+        { type: "web_url", title: "Instagram", url: "https://www.instagram.com/fornodiromatr/" },
       ],
     });
   });
@@ -104,14 +104,68 @@ describe("composeRecognitionReply", () => {
     expect(sourceKindOf({ kind: "url", url: "https://vm.tiktok.com/X/" })).toBe("video");
     expect(sourceKindOf({ kind: "instagram_media", format: "post", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("post");
     expect(sourceKindOf({ kind: "instagram_media", format: "story", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("story");
-    expect(composeRecognitionReply([place], "post")[0]).toEqual({ kind: "text", text: "Bu gönderide 1 mekân var, hepsini haritana ekledik." });
+    expect(composeRecognitionReply([place], "post").at(-1)).toEqual({
+      kind: "text",
+      text: "Bu gönderide 1 mekân var, hepsini haritana ekledik.",
+      quickReplies: [{ title: "Haritamı aç", payload: "OPEN_MAP" }],
+    });
   });
 
-  it("puts the person's map link under the summary when there is one", () => {
-    expect(composeRecognitionReply([place], "reel", "https://stashh.me/app/a/abc")[0]).toEqual({
+  it("sends the cards first and the summary last, with the map link and the quick replies on it", () => {
+    const messages = composeRecognitionReply([place], "reel", "https://stashh.me/app/a/abc", "00000000-0000-4000-8000-0000000000aa");
+    expect(messages.map((m) => m.kind)).toEqual(["carousel", "button"]);
+    expect(messages.at(-1)).toEqual({
       kind: "button",
       text: "Bu Reel'de 1 mekân var, hepsini haritana ekledik.",
-      buttons: [{ title: "Haritanda aç", url: "https://stashh.me/app/a/abc" }],
+      buttons: [{ type: "web_url", title: "Haritanda aç", url: "https://stashh.me/app/a/abc" }],
+      quickReplies: [{ title: "Listeye koy", payload: "ADD_TO_LIST:00000000-0000-4000-8000-0000000000aa" }],
     });
+  });
+
+  it("offers the map as a quick reply when no link could be minted", () => {
+    expect(composeRecognitionReply([place], "reel", null, "00000000-0000-4000-8000-0000000000aa").at(-1)).toMatchObject({
+      kind: "text",
+      quickReplies: [
+        { title: "Listeye koy", payload: "ADD_TO_LIST:00000000-0000-4000-8000-0000000000aa" },
+        { title: "Haritamı aç", payload: "OPEN_MAP" },
+      ],
+    });
+  });
+});
+
+describe("renderPlan", () => {
+  it("maps the assistant's plan onto outbound messages, keeping postback buttons and quick replies", () => {
+    const messages = renderPlan({
+      messages: [
+        { kind: "carousel", cards: [{ title: "🌊 İzmir", subtitle: "7 mekân", buttons: [{ type: "postback", title: "Mekânları gör", payload: "SHOW_LIST:l1" }] }] },
+        { kind: "button", text: "Haritan:", buttons: [{ type: "web_url", title: "stashh.me", url: "https://stashh.me/app/a/x" }], quick_replies: [{ title: "Tamam", payload: "ok" }] },
+        { kind: "text", text: "Başka?" },
+      ],
+    });
+    expect(messages).toEqual([
+      { kind: "carousel", cards: [{ title: "🌊 İzmir", subtitle: "7 mekân", buttons: [{ type: "postback", title: "Mekânları gör", payload: "SHOW_LIST:l1" }] }] },
+      { kind: "button", text: "Haritan:", buttons: [{ type: "web_url", title: "stashh.me", url: "https://stashh.me/app/a/x" }], quickReplies: [{ title: "Tamam", payload: "ok" }] },
+      { kind: "text", text: "Başka?" },
+    ]);
+  });
+});
+
+describe("toGraphMessage with taps", () => {
+  it("sends quick replies as text quick replies within their limits and postback buttons as postbacks", () => {
+    const body = toGraphMessage({
+      kind: "text",
+      text: "Hangisi?",
+      quickReplies: Array.from({ length: 15 }, (_, i) => ({ title: `Seçenek numarası ${i} uzun`, payload: `p${i}` })),
+    }) as { text: string; quick_replies: Array<{ content_type: string; title: string; payload: string }> };
+    expect(body.quick_replies).toHaveLength(LIMITS.quickReplies);
+    expect(body.quick_replies[0]).toMatchObject({ content_type: "text", payload: "p0" });
+    expect(body.quick_replies[0]!.title.endsWith("…")).toBe(true);
+    expect([...body.quick_replies[0]!.title].length).toBeLessThanOrEqual(LIMITS.quickReplyTitleChars);
+
+    const carousel = toGraphMessage({ kind: "carousel", cards: [{ title: "İzmir", buttons: [{ type: "postback", title: "Gör", payload: "SHOW_LIST:l1" }] }] }) as {
+      attachment: { payload: { elements: Array<{ buttons: unknown[] }> } };
+    };
+    expect(carousel.attachment.payload.elements[0]!.buttons).toEqual([{ type: "postback", title: "Gör", payload: "SHOW_LIST:l1" }]);
+    expect(toGraphMessage({ kind: "text", text: "x" })).not.toHaveProperty("quick_replies");
   });
 });
