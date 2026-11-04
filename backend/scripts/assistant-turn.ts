@@ -38,7 +38,7 @@ const messages: InboundTurnMessage[] = tapped
 if (messages.length === 0) throw new Error("say something: npm run assistant:turn -- \"listelerim neler\"");
 
 const startedAt = Date.now();
-const plan = await createAssistantService().turn({ userId, channel: "instagram", messages });
+const plan = await (await createAssistantService()).turn({ userId, channel: "instagram", messages });
 console.log(JSON.stringify(plan, null, 2));
 console.log(`\nturn took ${Date.now() - startedAt} ms; usage is in assistant_turns (newest row for user ${userId})`);
 process.exit(0);

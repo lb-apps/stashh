@@ -162,7 +162,10 @@ table. Tokens and URLs live in `ops/.env.local` and stay server-side.
   horizontal bar) in `ops/components/ops/charts/`. They do not animate: data refreshes every 5 s
   and a replayed entrance would hide value labels.
 - Only the detail sheet reads `?id=` (inside its own Suspense); pages must hydrate with the layout.
-- **Recognize a link** (`/recognize`) is the one page that writes: one recognition at a time through the
+- **Assistant** (`/assistant`) is the DM assistant's page: usage and cost from `assistant_turns` through
+  `assistant_ops_stats/_list/_detail`, and its settings (model, system prompt, caps, switches) in the one
+  `assistant_settings` row the backend reads on every turn; a save applies without a deploy.
+- **Recognize a link** (`/recognize`) is the other page that writes: one recognition at a time through the
   backend's public API as its test user (`GET /internal/v1/ops/test-user-token`, behind the dashboard's
   service token), polled until it settles, nothing persisted. It replaced the backend's old test page; the
   backend serves no HTML of its own.

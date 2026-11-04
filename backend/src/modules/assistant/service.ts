@@ -19,6 +19,8 @@ const RECENT_SHARES = 3;
 
 /** Said when the sender hit the daily cap; Turkish, the channel's default language. */
 export const CAPPED_REPLY: ReplyInput = { text: "Bugünlük sohbet hakkın doldu, yarın devam edelim. Reel ve gönderi paylaşmaya devam edebilirsin." };
+/** Said while the owner has switched the assistant off; shares still work, so they are the thing to offer. */
+export const DISABLED_REPLY: ReplyInput = { text: "Şu an sohbete ara verdim, birazdan buradayım. Bir Reel ya da gönderi atarsan içindeki mekânları yine kaydederim 📍" };
 
 export interface AssistantServiceDeps {
   repo: AssistantRepository;
@@ -29,8 +31,10 @@ export interface AssistantServiceDeps {
   identities: Pick<ChannelIdentityRepository, "findProfileByUserId">;
   maxSteps: number;
   dailyTurnCap: number;
-  /** Next-step quick replies under answers (`ASSISTANT_SUGGESTED_REPLIES`). */
+  /** Next-step quick replies under answers. */
   suggestedReplies: boolean;
+  /** Off: a fixed line instead of a model call, recorded as a fallback turn. */
+  enabled?: boolean;
   log: Logger;
   now?: () => Date;
 }
@@ -76,6 +80,14 @@ export class AssistantService {
       external_message_id: message.external_id,
       created_at: new Date(startedAt.getTime() + index).toISOString(),
     }));
+
+    if (this.deps.enabled === false) {
+      const plan = renderReply({ reply: DISABLED_REPLY, places: [], lists: [], mapUrl: null });
+      const turn = await repo.insertTurn({ user_id: input.userId, channel: input.channel, status: "fallback", error: "assistant disabled", plan });
+      await repo.insertMessages(userRows.map((row) => ({ ...row, turn_id: turn.id })));
+      log.info({ userId: input.userId }, "assistant disabled; fixed reply sent");
+      return plan;
+    }
 
     const turnsToday = await repo.countTurnsSince(input.userId, input.channel, new Date(startedAt.getTime() - CAP_WINDOW_MS));
     if (turnsToday >= this.deps.dailyTurnCap) {

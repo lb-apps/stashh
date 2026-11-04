@@ -32,11 +32,21 @@ it settles and shows the places.
 One recognition at a time; nothing is kept — a reload forgets the run. It replaced the test
 page the backend used to serve at `localhost:3000/`.
 
+## Assistant
+
+`/assistant` shows the DM assistant (turns by outcome, cost, typical and slowest-5 % times, cache
+share, tool mix, the latest turns with their whole thread) and holds its settings: the model, the
+system prompt, the caps and the switches. Settings live in one row (`assistant_settings`) the
+backend reads on every turn, so a save applies within seconds and needs no deploy; "Back to the
+shipped prompt" returns to the prompt in the backend's repo (`backend/src/modules/assistant/prompt.md`).
+
 ## Where the numbers come from
 
 - Backend `GET /internal/v1/ops/recognitions` → `recognition_ops_stats()` plus the live queue
   and the latest runs. Run figures start on 2026-10-14, when `recognition_runs` was added.
 - Instagram `GET /ops/stats` → `instagram_ops_stats()` plus in-process state and token health.
   Messages are purged after 30 days.
+- Backend `GET /internal/v1/ops/assistant` → `assistant_ops_stats()` and `assistant_ops_list()`;
+  `/ops/assistant/turns/:id` → `assistant_ops_detail()`; `/ops/assistant/settings` (GET, PUT) → `assistant_settings`.
 
 Stack and design rules: see the root `CLAUDE.md` (Ops dashboard section).

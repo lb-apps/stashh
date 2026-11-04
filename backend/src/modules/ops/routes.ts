@@ -7,6 +7,14 @@ import { config } from "../../config.js";
 import { apiMetrics } from "../../lib/api-metrics.js";
 import { opsQuerySchema, resolveOpsRange } from "./types.js";
 import { sendTestUserToken } from "./test-user-token.js";
+import { ASSISTANT_PROMPT } from "../assistant/prompt.js";
+import {
+  AssistantSettingsRepository,
+  assistantSettingsPatchSchema,
+  defaultAssistantSettings,
+  forgetAssistantSettings,
+  type AssistantSettings,
+} from "../assistant/settings.js";
 
 const startedAt = new Date();
 
@@ -75,3 +83,86 @@ opsRouter.get("/recognitions/:id", async (req, res, next) => {
 
 /** The test user's token, so the ops dashboard's link tester calls the public API as the app does. */
 opsRouter.get("/test-user-token", sendTestUserToken);
+
+// ── The DM assistant ────────────────────────────────────────────────────────
+
+opsRouter.get("/assistant", async (req, res, next) => {
+  const query = opsQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid range", query.error.flatten().fieldErrors);
+    return;
+  }
+
+  try {
+    const range = resolveOpsRange(query.data.range);
+    const repository = new OpsRepository(createSupabaseServiceClient());
+    const [stats, turns] = await Promise.all([repository.assistantStats(range), repository.recentAssistantTurns()]);
+    sendSuccess(res, req, 200, {
+      range: range.range,
+      since: range.since.toISOString(),
+      bucket: range.bucket,
+      generated_at: new Date().toISOString(),
+      stats,
+      turns,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+opsRouter.get("/assistant/turns/:id", async (req, res, next) => {
+  const params = z.object({ id: z.string().uuid() }).safeParse(req.params);
+  if (!params.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Turn id must be a UUID");
+    return;
+  }
+  try {
+    const detail = await new OpsRepository(createSupabaseServiceClient()).assistantTurnDetail(params.data.id);
+    if (!detail) {
+      sendError(res, req, 404, "NOT_FOUND", "Assistant turn not found");
+      return;
+    }
+    sendSuccess(res, req, 200, detail);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** The settings as the dashboard shows them, with the shipped prompt beside the owner's. */
+function presentSettings(settings: AssistantSettings) {
+  return {
+    model: settings.model,
+    system_prompt: settings.systemPrompt,
+    default_prompt: ASSISTANT_PROMPT,
+    max_steps: settings.maxSteps,
+    daily_turn_cap: settings.dailyTurnCap,
+    suggested_replies: settings.suggestedReplies,
+    enabled: settings.enabled,
+    updated_at: settings.updatedAt,
+  };
+}
+
+opsRouter.get("/assistant/settings", async (req, res, next) => {
+  try {
+    const settings = (await new AssistantSettingsRepository(createSupabaseServiceClient()).get()) ?? defaultAssistantSettings();
+    sendSuccess(res, req, 200, presentSettings(settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Changes one or more settings; the next turn runs with them. */
+opsRouter.put("/assistant/settings", async (req, res, next) => {
+  const body = assistantSettingsPatchSchema.safeParse(req.body);
+  if (!body.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid settings", body.error.flatten().fieldErrors);
+    return;
+  }
+  try {
+    const settings = await new AssistantSettingsRepository(createSupabaseServiceClient()).update(body.data);
+    forgetAssistantSettings();
+    sendSuccess(res, req, 200, presentSettings(settings));
+  } catch (error) {
+    next(error);
+  }
+});

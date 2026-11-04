@@ -202,6 +202,21 @@ describe("AssistantService.turn", () => {
   });
 });
 
+describe("AssistantService.turn when switched off", () => {
+  it("sends the fixed line, records a fallback turn and never calls the model", async () => {
+    const repo = new MemoryRepo();
+    const model = scriptedModel([]);
+    const svc = new AssistantService({
+      repo: repo as unknown as AssistantRepository, model, modelId: "test/model", systemPrompt: "S", tools: tools(),
+      identities: { findProfileByUserId: async () => null }, maxSteps: 4, dailyTurnCap: 60, suggestedReplies: false, enabled: false, log: rootLogger,
+    });
+    const plan = await svc.turn({ userId: USER, channel: "instagram", messages: [{ external_id: "off-1", text: "selam" }] });
+    expect(plan.messages[0]).toMatchObject({ kind: "text" });
+    expect(model.requests).toHaveLength(0);
+    expect(repo.turns[0]).toMatchObject({ status: "fallback", error: "assistant disabled" });
+  });
+});
+
 describe("formatInbound", () => {
   it("adds the tapped title and payload to the text", () => {
     expect(formatInbound({ external_id: "m", text: "Listeye koy", tapped: { title: "Listeye koy", payload: "ADD_TO_LIST:r1" } })).toBe('Listeye koy\n[tapped "Listeye koy" · payload ADD_TO_LIST:r1]');
