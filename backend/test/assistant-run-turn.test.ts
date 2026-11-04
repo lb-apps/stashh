@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChatCompletion, ChatCompletionRequest } from "../src/lib/openrouter.js";
 import { rootLogger } from "../src/lib/logger.js";
-import { FALLBACK_REPLY, runTurn, type TurnModel } from "../src/modules/assistant/run-turn.js";
+import { FALLBACK_REPLY, NEWEST_MESSAGE_NOTE, runTurn, type TurnModel } from "../src/modules/assistant/run-turn.js";
 import { toolDefinitions } from "../src/modules/assistant/tools.js";
 
 type Call = { name: string; args: unknown; id?: string };
@@ -58,7 +58,8 @@ describe("runTurn", () => {
     expect(request.toolChoice).toBe("required");
     expect(request.tools?.map((tool) => tool.function.name)).toContain("reply");
     expect(request.messages[0]).toEqual({ role: "system", content: [{ type: "text", text: "SYSTEM", cache_control: { type: "ephemeral" } }] });
-    expect(request.messages[1]).toEqual({ role: "system", content: "CONTEXT" });
+    expect(request.messages[1]).toEqual({ role: "user", content: "earlier" });
+    expect(request.messages.at(-2)).toEqual({ role: "system", content: `CONTEXT\n\n${NEWEST_MESSAGE_NOTE}` });
     expect(request.messages.at(-1)).toEqual({ role: "user", content: "listelerim neler" });
   });
 

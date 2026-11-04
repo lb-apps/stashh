@@ -46,6 +46,10 @@ export interface RunTurnResult {
 /** Said when the model used every step without replying; Turkish, the channel's default language. */
 export const FALLBACK_REPLY: ReplyInput = { text: "Buna şu an cevap veremedim. Bir daha dener misin?" };
 
+/** Closes the live block: what came before is done, the next user message is the one to answer. */
+export const NEWEST_MESSAGE_NOTE =
+  "## Next\nThe person's newest message follows. Answer that message alone: your earlier replies above are already delivered, so do not send their text or their cards again.";
+
 /** The most a tool result may be, as text, before it is cut; keeps one big list from eating the turn. */
 const TOOL_RESULT_MAX_CHARS = 12_000;
 
@@ -71,10 +75,14 @@ function toolResultContent(result: unknown): string {
  * repair it in the next step. After `maxSteps` calls without a valid reply, the fallback is used.
  */
 export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
+  // The cached document first; the live account block sits right before the newest message, after
+  // the history, so the model reads it as "now" rather than as part of what was already answered.
   const messages: ChatMessage[] = [
     { role: "system", content: [{ type: "text", text: input.systemPrompt, cache_control: { type: "ephemeral" } }] },
-    { role: "system", content: input.contextBlock },
     ...input.history,
+    { role: "system", content: `${input.contextBlock}
+
+${NEWEST_MESSAGE_NOTE}` },
     { role: "user", content: input.userMessage },
   ];
   let usage: TurnUsage = { prompt_tokens: 0, completion_tokens: 0, cached_tokens: 0, cost_usd: null };

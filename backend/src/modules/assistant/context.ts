@@ -31,7 +31,7 @@ function relativeTime(at: string, now: Date): string {
 }
 
 export function buildContextBlock(context: AccountContext): string {
-  const lines: string[] = ["## This person's account (live, this turn)"];
+  const lines: string[] = ["## This person's account (live, this turn; reference for your tools, not things to mention unasked)"];
   const who = [context.profile?.displayName, context.profile?.username ? `@${context.profile.username}` : null].filter(Boolean).join(" ");
   lines.push(`- Instagram: ${who || "profile not read yet"}`);
   lines.push(`- Saved places: ${context.savedCount}`);
@@ -49,7 +49,7 @@ export function buildContextBlock(context: AccountContext): string {
   if (context.recentRecognitions.length === 0) {
     lines.push("- Recent shares: none yet");
   } else {
-    lines.push("- Recent shares (newest first; places already saved):");
+    lines.push("- Recent shares (newest first; a place without a place_id is not in the library):");
     for (const recognition of context.recentRecognitions) {
       const noun = SOURCE_NOUN[recognition.source_type ?? ""] ?? "share";
       const by = recognition.author_username ? ` by @${recognition.author_username}` : "";

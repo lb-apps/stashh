@@ -126,7 +126,7 @@ describe("AssistantService.turn", () => {
 
     const request = model.requests[0]!;
     expect(request.messages[0]).toMatchObject({ role: "system", content: [{ text: "SYSTEM PROMPT", cache_control: { type: "ephemeral" } }] });
-    expect((request.messages[1] as { content: string }).content).toContain(`🌊 İzmir · 2 places · list_id ${LIST}`);
+    expect((request.messages.at(-2) as { content: string }).content).toContain(`🌊 İzmir · 2 places · list_id ${LIST}`);
     expect(request.messages.at(-1)).toEqual({ role: "user", content: "listelerim neler" });
   });
 
@@ -152,11 +152,11 @@ describe("AssistantService.turn", () => {
     await svc.turn({ userId: USER, channel: "instagram", messages: [{ external_id: "mid-2", text: "ok", tapped: { title: "Gör", payload: `SHOW_LIST:${LIST}` } }] });
 
     const second = model.requests[1]!.messages;
-    expect(second.slice(2)).toEqual([
+    expect(second.slice(1, 3)).toEqual([
       { role: "user", content: "listelerim" },
       { role: "assistant", content: "Listelerin:\n[you sent cards: 🌊 İzmir]" },
-      { role: "user", content: `ok\n[tapped "Gör" · payload SHOW_LIST:${LIST}]` },
     ]);
+    expect(second.at(-1)).toEqual({ role: "user", content: `ok\n[tapped "Gör" · payload SHOW_LIST:${LIST}]` });
   });
 
   it("answers with the cap line and no model call once the daily cap is reached", async () => {
