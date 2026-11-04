@@ -4,9 +4,6 @@ import type { MagicLinkIssuer } from "./magic-link-issuer.js";
 import type { SignInLinkRepository } from "./repository.js";
 import type { MintedSignInLink, RedeemedSignInLink } from "./types.js";
 
-/** How long a DM sign-in link works. */
-export const SIGN_IN_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 const FOREIGN_KEY_VIOLATION = "23503";
 
 export function hashSignInCode(code: string): string {
@@ -14,49 +11,42 @@ export function hashSignInCode(code: string): string {
 }
 
 /**
- * Personal, one-time links that sign a person in to the web app.
+ * Personal links that sign a person in to the web app.
  *
  * Minted for the DM channel, which sends the link to the person it belongs to. Redeemed by
  * the web app's server: the link becomes a Supabase magic-link token the browser exchanges
- * for a session (`verifyOtp`), so no password, OAuth or mailbox is involved. The code is
- * random (24 bytes) and stored only as its SHA-256.
+ * for a session (`verifyOtp`), so no password, OAuth or mailbox is involved. A link works
+ * every time it is opened, until its owner is erased. The code is random (24 bytes) and
+ * stored only as its SHA-256.
  */
 export class SignInLinkService {
   constructor(
     private readonly links: SignInLinkRepository,
     private readonly issuer: MagicLinkIssuer,
     private readonly webAppUrl: string,
-    private readonly now: () => Date = () => new Date(),
   ) {}
 
   async mint(userId: string): Promise<MintedSignInLink> {
     const code = randomBytes(24).toString("base64url");
-    const expiresAt = new Date(this.now().getTime() + SIGN_IN_LINK_TTL_MS);
     try {
-      await this.links.insert({ userId, codeHash: hashSignInCode(code), expiresAt });
+      await this.links.insert({ userId, codeHash: hashSignInCode(code) });
     } catch (error) {
       if ((error as { code?: unknown } | null)?.code === FOREIGN_KEY_VIOLATION) {
         throw new AppHttpError(404, "User not found", "USER_NOT_FOUND");
       }
       throw error;
     }
-    return { url: `${this.webAppUrl}/a/${code}`, expires_at: expiresAt.toISOString() };
+    return { url: `${this.webAppUrl}/a/${code}` };
   }
 
-  /**
-   * Spends the link and returns a magic-link token for its owner; null when the code is
-   * unknown, used or expired. The token is issued before the link is spent, so a failing
-   * Auth call leaves the link usable; of two concurrent redeems, only one gets a token.
-   */
+  /** A fresh magic-link token for the link's owner; null when the code is unknown or its owner is gone. */
   async redeem(code: string): Promise<RedeemedSignInLink | null> {
-    const now = this.now();
-    const link = await this.links.findRedeemable(hashSignInCode(code), now);
-    if (!link) return null;
+    const userId = await this.links.findOwner(hashSignInCode(code));
+    if (!userId) return null;
 
-    const tokenHash = await this.issuer.issue(link.userId);
+    const tokenHash = await this.issuer.issue(userId);
     if (!tokenHash) return null;
-    if (!(await this.links.markUsed(link.id, now))) return null;
 
-    return { user_id: link.userId, token_hash: tokenHash, type: "magiclink" };
+    return { user_id: userId, token_hash: tokenHash, type: "magiclink" };
   }
 }

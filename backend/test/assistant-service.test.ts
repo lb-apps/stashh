@@ -89,7 +89,7 @@ function tools(): ToolServices {
     places: { getSavedPlace: unexpected, deleteSavedPlace: unexpected, markVisited: unexpected, clearVisited: unexpected, listSavedPlaces: unexpected },
     placesRepo: { searchSavedPlaces: unexpected, getSavedPlacesByPlaceIds: async () => [], getPlacesByGoogleIds: async () => [], countSavedPlaces: async () => 2 },
     recognitions: { listRecentRecognitionsWithPlaces: async () => [] },
-    signInLinks: { mint: async () => ({ url: "https://stashh.me/app/a/code", expires_at: "later" }) },
+    signInLinks: { mint: async () => ({ url: "https://stashh.me/app/a/code" }) },
   };
 }
 

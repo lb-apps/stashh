@@ -26,7 +26,7 @@ export function useSession(): SessionState {
   return React.use(SessionContext);
 }
 
-/** Exchanges the one-time `token_hash` from a DM link for a session. */
+/** Exchanges the single-use `token_hash` redeemed from a DM link for a session. */
 export async function signInWithTokenHash(tokenHash: string): Promise<boolean> {
   const { error } = await supabase().auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
   return !error;
