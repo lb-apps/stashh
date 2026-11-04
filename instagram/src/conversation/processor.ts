@@ -164,9 +164,12 @@ export class MessageProcessor {
 
   /** A presence signal; cosmetic, never worth failing the message over. */
   private async presence(message: StoredMessage, action: SenderAction): Promise<void> {
-    await this.messenger.senderAction(message.senderId, action).catch((error: unknown) => {
-      this.log.debug({ err: error, mid: message.mid, action }, "sender action not sent");
-    });
+    try {
+      await this.messenger.senderAction(message.senderId, action);
+      this.log.info({ mid: message.mid, action }, "sender action sent");
+    } catch (error) {
+      this.log.warn({ err: error, mid: message.mid, action }, "sender action not sent");
+    }
   }
 
   /** Keeps the typing bubble up while `work` runs longer than Instagram shows it for. */
