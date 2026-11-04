@@ -1,5 +1,5 @@
 import type { CommandOutcome } from "../webhooks/core/commands.ts";
-import type { InboundAttachment, InboundMessage } from "./events.ts";
+import type { InboundAttachment, InboundMessage, Tapped } from "./events.ts";
 
 /**
  * Where a message is in its life:
@@ -23,6 +23,8 @@ export interface StoredMessage {
   sentAt: Date;
   text: string | null;
   attachments: InboundAttachment[];
+  /** The quick reply or button the person tapped; null for a typed message or a share. */
+  tapped: Tapped | null;
   /** The hooks relay routed it here: outside production, the only messages that may be answered. */
   relayRouted: boolean;
   /** The `/env` command it is, answered with the relay's outcome; null for an ordinary message. */
@@ -39,7 +41,7 @@ export interface StoredMessage {
 }
 
 /** What a message was read as; recorded so the ops stats can say what people ask for. */
-export type MessageIntent = "recognize" | "help" | "unsupported" | "erase" | "link" | "env";
+export type MessageIntent = "recognize" | "help" | "unsupported" | "erase" | "link" | "env" | "chat";
 
 /**
  * The outcome of one processing step. Settling always releases the claim, and a final
@@ -65,8 +67,13 @@ export interface Settlement {
 export interface MessageStore {
   /** Stores new messages; a mid seen before is ignored. Resolves to the number stored. */
   insert(messages: QueuedMessage[]): Promise<number>;
-  /** Leases up to `limit` due open messages of this environment for `leaseSeconds`. */
+  /**
+   * Leases up to `limit` due open messages of this environment for `leaseSeconds`. One sender
+   * at a time: a message is skipped while another of the same sender is leased.
+   */
   claim(limit: number, leaseSeconds: number): Promise<StoredMessage[]>;
+  /** Leases every other due, unleased `received` message of one sender, oldest first, to fold into one turn. */
+  claimSender(senderId: string, leaseSeconds: number): Promise<StoredMessage[]>;
   /** Records delivery progress without releasing the claim. */
   recordRepliesSent(mid: string, repliesSent: number): Promise<void>;
   settle(mid: string, settlement: Settlement): Promise<void>;

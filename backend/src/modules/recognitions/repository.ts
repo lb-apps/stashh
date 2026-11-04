@@ -60,6 +60,16 @@ export interface RecognitionSummaryRow {
   };
 }
 
+/** One of the owner's finished recognitions with the places its result holds. */
+export interface RecentRecognitionRow {
+  id: string;
+  status: string;
+  source_url: string;
+  created_at: string;
+  finished_at: string | null;
+  result: null | { source_type: string | null; author_username: string | null; places: Json };
+}
+
 /** A finished recognition as the API presents it: the task and what its result says. */
 export interface RecognitionWithResult {
   task: RecognitionTaskRow;
@@ -249,6 +259,30 @@ export class RecognitionRepository {
         author_username: result.author_username,
         place_count: Array.isArray(result.places) ? result.places.length : 0,
       },
+    }));
+  }
+
+  /**
+   * The owner's latest finished recognitions with their places, newest first: what the DM
+   * assistant answers "the places in the reel I just sent" from.
+   */
+  async listRecentRecognitionsWithPlaces(ownerUserId: string, limit: number): Promise<RecentRecognitionRow[]> {
+    const { data, error } = await this.supabaseClient
+      .from("recognition_tasks")
+      .select("id, status, source_url, created_at, finished_at, recognition_results (source_type, author_username, places)")
+      .eq("owner_user_id", ownerUserId)
+      .in("status", ["completed", "committed"])
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+
+    type Row = Omit<RecentRecognitionRow, "result"> & {
+      recognition_results: null | { source_type: string | null; author_username: string | null; places: Json };
+    };
+    return (data as unknown as Row[]).map(({ recognition_results: result, ...task }) => ({
+      ...task,
+      result: result && { source_type: result.source_type, author_username: result.author_username, places: result.places },
     }));
   }
 

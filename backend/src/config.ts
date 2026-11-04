@@ -6,6 +6,22 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   /** Video-capable model with structured output support, as an OpenRouter model id. */
   OPENROUTER_MODEL: z.string().min(1).default("google/gemini-3.8-flash"),
+  /**
+   * The DM assistant's model, as an OpenRouter model id. Needs tool calling with a forced
+   * tool choice (`tool_choice: required`): Haiku 5.5 and GPT-6 Luna take it; Opus 5.5 and
+   * Sonnet 5.5 reject forced tool use.
+   */
+  ASSISTANT_MODEL: z.string().min(1).default("anthropic/claude-haiku-5.5"),
+  /** Most model calls in one assistant turn before a fixed fallback reply is sent. */
+  ASSISTANT_MAX_STEPS: z.coerce.number().int().min(1).max(12).default(6),
+  /** Assistant turns one sender gets per rolling 24 hours; above it a fixed line, no model call. */
+  ASSISTANT_DAILY_TURN_CAP: z.coerce.number().int().min(1).default(60),
+  /**
+   * Whether the assistant offers next-step quick replies under its answers ("Haritamı aç",
+   * list names). Off by the owner's call (2026-11-04): people write what they want. Confirm /
+   * cancel chips before something irreversible stay either way.
+   */
+  ASSISTANT_SUGGESTED_REPLIES: z.enum(["on", "off"]).default("off"),
   GOOGLE_PLACES_API_KEY: z.string().min(1, "GOOGLE_PLACES_API_KEY is required"),
   PORT: z.coerce.number().default(3000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

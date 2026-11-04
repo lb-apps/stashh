@@ -46,7 +46,9 @@ export const INTENT: Record<string, string> = {
   help: "Help",
   unsupported: "Unsupported",
   erase: "Delete data",
+  link: "Map link",
   env: "Relay command",
+  chat: "Assistant",
 };
 
 export const intentLabel = (intent: string | null) => (intent ? (INTENT[intent] ?? intent) : "Unknown");

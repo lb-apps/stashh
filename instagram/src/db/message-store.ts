@@ -1,4 +1,4 @@
-import { inboundAttachmentsSchema } from "../conversation/events.ts";
+import { inboundAttachmentsSchema, type Tapped } from "../conversation/events.ts";
 import type { MessageStatus, MessageStore, QueuedMessage, Settlement, StoredMessage } from "../conversation/store.ts";
 import { commandOutcomeOf } from "../webhooks/core/commands.ts";
 import type { Environment } from "../webhooks/core/environments.ts";
@@ -30,6 +30,7 @@ export class SupabaseMessageStore implements MessageStore {
           sent_at: m.sentAt.toISOString(),
           text: m.text,
           attachments: m.attachments as Json,
+          tapped: (m.tapped ?? null) as Json,
           payload: m.raw as Json,
           environment: this.environment,
           relay_routed: m.relayRouted ?? false,
@@ -50,6 +51,16 @@ export class SupabaseMessageStore implements MessageStore {
       p_environment: this.environment,
     });
     if (error) throw new Error(`claim_instagram_messages failed: ${error.message}`);
+    return data.map(toStoredMessage);
+  }
+
+  async claimSender(senderId: string, leaseSeconds: number): Promise<StoredMessage[]> {
+    const { data, error } = await this.db.rpc("claim_instagram_sender_messages", {
+      p_sender_id: senderId,
+      p_lease_seconds: leaseSeconds,
+      p_environment: this.environment,
+    });
+    if (error) throw new Error(`claim_instagram_sender_messages failed: ${error.message}`);
     return data.map(toStoredMessage);
   }
 
@@ -94,6 +105,12 @@ export class SupabaseMessageStore implements MessageStore {
   }
 }
 
+function tappedOf(value: Json | null): Tapped | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { title, payload } = value as { title?: unknown; payload?: unknown };
+  return typeof title === "string" && typeof payload === "string" ? { title, payload } : null;
+}
+
 function toStoredMessage(row: InstagramMessageRow): StoredMessage {
   if (row.status !== "received" && row.status !== "submitted") {
     throw new Error(`claimed message ${row.mid} is not open (status ${row.status})`);
@@ -105,6 +122,7 @@ function toStoredMessage(row: InstagramMessageRow): StoredMessage {
     sentAt: new Date(row.sent_at),
     text: row.text,
     attachments: inboundAttachmentsSchema.parse(row.attachments),
+    tapped: tappedOf(row.tapped),
     relayRouted: row.relay_routed,
     relayCommand: commandOutcomeOf(row.relay_command),
     status: row.status,

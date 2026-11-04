@@ -24,7 +24,9 @@ export type InstagramMessageRow = {
   next_attempt_at: string;
   locked_until: string | null;
   last_error: string | null;
-  intent: "recognize" | "help" | "unsupported" | "erase" | "link" | "env" | null;
+  intent: "recognize" | "help" | "unsupported" | "erase" | "link" | "env" | "chat" | null;
+  /** The quick reply or button the person tapped ({title, payload}); null for a typed message. */
+  tapped: Json | null;
   finished_at: string | null;
   /** The instance that received it and the only one that claims it (`20261101140000_instagram_messages_relay.sql`). */
   environment: "dev" | "prod";
@@ -60,6 +62,10 @@ export type Database = {
     Functions: {
       claim_instagram_messages: {
         Args: { p_limit: number; p_lease_seconds: number; p_environment: "dev" | "prod" };
+        Returns: InstagramMessageRow[];
+      };
+      claim_instagram_sender_messages: {
+        Args: { p_sender_id: string; p_lease_seconds: number; p_environment: "dev" | "prod" };
         Returns: InstagramMessageRow[];
       };
       instagram_ops_stats: {

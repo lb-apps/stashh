@@ -11,6 +11,8 @@
     "start:worker": "node dist/modules/recognitions/worker.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "assistant:prompt:build": "tsx scripts/assistant-prompt-build.ts",
+    "assistant:turn": "tsx scripts/assistant-turn.ts",
     "db:types": "sh -c 'supabase gen types typescript --project-id \"${SUPABASE_PROJECT_REF}\" --schema public > src/types/database.ts'",
     "test": "vitest run",
     "test:watch": "vitest"

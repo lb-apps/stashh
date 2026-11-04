@@ -9,6 +9,7 @@ import {
   resolveChannelIdentityBodySchema,
   staleChannelIdentitiesQuerySchema,
 } from "../identities/types.js";
+import { assistantRouter } from "../assistant/routes.js";
 import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
@@ -26,6 +27,7 @@ import { redeemSignInLinkBodySchema } from "../sign-in-links/types.js";
 export const internalRouter = Router();
 
 internalRouter.use("/ops", opsRouter);
+internalRouter.use("/users/:userId/assistant", assistantRouter);
 
 const userParamsSchema = z.object({ userId: z.string().uuid("userId must be a UUID") });
 const userRecognitionParamsSchema = userParamsSchema.extend({
