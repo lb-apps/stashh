@@ -9,7 +9,7 @@ Production is two services and a tunnel, run as containers from the root [`compo
 | `tunnel` | `cloudflare/cloudflared` | — | Cloudflare tunnel connector (`stashh-prod`), routed by `deploy/tunnel/config.yml`: `https://instagram.stashh.me` → `instagram:3002` (Meta's webhook), `https://api.stashh.me` → `backend:3000` (the web app; of `/internal` only the sign-in-link redeem is public) |
 
 Meta's Instagram callback goes through the hooks relay (`hooks.stashh.me`, a Cloudflare Worker in
-`workers/hooks/`, deployed separately), which forwards each sender to `instagram.stashh.me` or to
+`workers/hooks/`, deployed by Cloudflare Workers Builds from `develop`), which forwards each sender to `instagram.stashh.me` or to
 the dev Mac: [webhook-relay.md](webhook-relay.md). `instagram.env` needs `HOOKS_RELAY_SECRET` for it.
 
 Supabase holds every byte of state; the containers are stateless and can be replaced at any
