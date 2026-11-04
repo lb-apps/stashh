@@ -56,6 +56,11 @@
   --pin-bar: #7A2FF2;
   --pin-rooftop: #0EA5E9;
   --pin-sweets: #FF2D9B;
+  --pin-bakery: #C98A00;
+  --pin-wine: #8E2A4A;
+  --pin-park: #2E9E5B;
+  --pin-view: #4B7BA8;
+  --pin-market: #6E7B2E;
   --pin-default: var(--cobalt-500);
 
   /* --- semantic aliases: use these in components --- */
