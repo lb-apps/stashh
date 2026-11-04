@@ -184,7 +184,8 @@ describe("the webhook behind the relay", () => {
     const probe = await fetch(`${withRelay}/webhooks?relay=probe`);
     expect(probe.status).toBe(204);
     expect(await probe.text()).toBe("");
-    expect((await fetch(`${withRelay}/webhooks/instagram?relay=probe`)).status).toBe(204);
+    // The pre-relay path (Meta's old callback) is gone.
+    expect((await fetch(`${withRelay}/webhooks/instagram?relay=probe`)).status).toBe(404);
     expect((await fetch(`${withRelay}/webhooks?relay=probe&hub.mode=subscribe`)).status).toBe(403);
     expect((await fetch(`${withoutRelay}/webhooks?relay=probe`)).status).toBe(403);
     // The handshake is untouched.

@@ -158,8 +158,8 @@ moved to the relay (step 10): moved first, it would send every production DM to 
     - Share a Reel: dev answers (`direct_delivery` `delivered`); prod's ops view shows nothing new.
     - `/env prod`: prod answers "This account now routes to prod."
     - Workers KV → `stashh-hooks-routes` lists only accounts that are on dev.
-12. Later: remove the transitional `/webhooks/instagram` mount in `instagram/src/http/app.ts`; the
-    relay posts to `/webhooks`.
+12. The transitional `/webhooks/instagram` mount is removed (2026-11-04); the relay posts to
+    `/webhooks`.
 
 ### Rollback
 
