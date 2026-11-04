@@ -59,8 +59,7 @@ describe("runTurn", () => {
     expect(request.tools?.map((tool) => tool.function.name)).toContain("reply");
     expect(request.messages[0]).toEqual({ role: "system", content: [{ type: "text", text: "SYSTEM", cache_control: { type: "ephemeral" } }] });
     expect(request.messages[1]).toEqual({ role: "user", content: "earlier" });
-    expect(request.messages.at(-2)).toEqual({ role: "system", content: `CONTEXT\n\n${NEWEST_MESSAGE_NOTE}` });
-    expect(request.messages.at(-1)).toEqual({ role: "user", content: "listelerim neler" });
+    expect(request.messages.at(-1)).toEqual({ role: "user", content: ["CONTEXT", "", NEWEST_MESSAGE_NOTE, "listelerim neler"].join("\n") });
   });
 
   it("runs data tools, feeds their results back and then takes the reply", async () => {

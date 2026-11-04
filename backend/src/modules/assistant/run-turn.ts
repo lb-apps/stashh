@@ -46,9 +46,9 @@ export interface RunTurnResult {
 /** Said when the model used every step without replying; Turkish, the channel's default language. */
 export const FALLBACK_REPLY: ReplyInput = { text: "Buna şu an cevap veremedim. Bir daha dener misin?" };
 
-/** Closes the live block: what came before is done, the next user message is the one to answer. */
+/** Heads the newest message inside the final user turn: the one thing to answer, apart from everything above it. */
 export const NEWEST_MESSAGE_NOTE =
-  "## Next\nThe person's newest message follows. Answer that message alone: your earlier replies above are already delivered, so do not send their text or their cards again.";
+  "## Their newest message (answer this one alone; your earlier replies above are delivered, do not send their text or cards again)";
 
 /** The most a tool result may be, as text, before it is cut; keeps one big list from eating the turn. */
 const TOOL_RESULT_MAX_CHARS = 12_000;
@@ -75,15 +75,13 @@ function toolResultContent(result: unknown): string {
  * repair it in the next step. After `maxSteps` calls without a valid reply, the fallback is used.
  */
 export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
-  // The cached document first; the live account block sits right before the newest message, after
-  // the history, so the model reads it as "now" rather than as part of what was already answered.
+  // The cached document first, then the history as it was, then one user message that carries the
+  // live account block and, clearly marked, the newest message: the model reads the block as "now"
+  // and the message as the one thing to answer, not as a continuation of what it already said.
   const messages: ChatMessage[] = [
     { role: "system", content: [{ type: "text", text: input.systemPrompt, cache_control: { type: "ephemeral" } }] },
     ...input.history,
-    { role: "system", content: `${input.contextBlock}
-
-${NEWEST_MESSAGE_NOTE}` },
-    { role: "user", content: input.userMessage },
+    { role: "user", content: [input.contextBlock, "", NEWEST_MESSAGE_NOTE, input.userMessage].join("\n") },
   ];
   let usage: TurnUsage = { prompt_tokens: 0, completion_tokens: 0, cached_tokens: 0, cost_usd: null };
   const toolNames: string[] = [];
