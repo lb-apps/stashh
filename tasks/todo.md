@@ -36,7 +36,7 @@ quick replies that hand the follow-up to the agent.
 - [x] `cd backend && npm run typecheck && npm test`; `cd instagram && npm run typecheck && npm test`
 - [x] Migrations applied (2026-11-04, via the Supabase MCP); `npm run assistant:turn` scenarios: Turkish and English questions, list and place cards, a tap; 2–5 s, $0.0003–0.0007 per turn, 87 % cached from the second call
 - [x] Local end-to-end through the dev instance (`/env dev`): typed questions, a quick-reply tap, a button template with quick replies all accepted by the Send API; replies in 3–12 s
-- [ ] Merge PR #27 → home-server deploys develop → owner sends `/env prod` and re-tests
+- [x] PR #27 merged (7de50a5); home-server deploy triggered; owner sends `/env prod` and re-tests
 - [x] Meta app: `messaging_postbacks` already arrives (real postback captures in `.captures/`; subscriptions are per account, none at app level)
 
 ## Review (2026-11-04, during the live test)
