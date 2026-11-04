@@ -1,5 +1,5 @@
 import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
-import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply } from "../../src/meta/graph-client.ts";
+import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply, SenderAction } from "../../src/meta/graph-client.ts";
 import type { Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
 
 interface Row extends StoredMessage {
@@ -195,7 +195,8 @@ export class FakeStashh implements StashhApi {
 
 export class FakeMessenger implements Messenger {
   sent: Array<{ to: string; message: OutboundMessage }> = [];
-  typed: string[] = [];
+  /** Every presence signal sent, in order. */
+  actions: Array<{ to: string; action: SenderAction }> = [];
   /** Errors to throw on upcoming sends, in order; `undefined` lets that send succeed. */
   sendSteps: Array<Error | undefined> = [];
 
@@ -205,8 +206,13 @@ export class FakeMessenger implements Messenger {
     this.sent.push({ to: recipientId, message });
   }
 
-  async typing(recipientId: string): Promise<void> {
-    this.typed.push(recipientId);
+  async senderAction(recipientId: string, action: SenderAction): Promise<void> {
+    this.actions.push({ to: recipientId, action });
+  }
+
+  /** Who got the typing bubble, once per signal. */
+  get typed(): string[] {
+    return this.actions.filter((a) => a.action === "typing_on").map((a) => a.to);
   }
 
   /** What was said in words: text messages and the text above a button message. */

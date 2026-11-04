@@ -1,5 +1,5 @@
 import type { Logger } from "../lib/logger.ts";
-import { GraphApiError, type InstagramProfile, type Messenger, type OutboundMessage, type ProfileReader } from "../meta/graph-client.ts";
+import { GraphApiError, type InstagramProfile, type Messenger, type OutboundMessage, type ProfileReader, type SenderAction } from "../meta/graph-client.ts";
 import { composeRecognitionReply, mapLinkMessage, renderPlan } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
 import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
@@ -24,6 +24,8 @@ const CHAT_LEASE_SECONDS = 120;
  * short lines in a row gets one answer to all three (`claimSender` folds the later ones in).
  */
 export const CHAT_DEBOUNCE_MS = 2_500;
+/** Instagram drops the typing bubble after about 20 s; a long turn renews it before that. */
+const TYPING_REFRESH_MS = 12_000;
 
 export interface ProcessorDeps {
   store: MessageStore;
@@ -143,13 +145,10 @@ export class MessageProcessor {
     }
   }
 
-  /** Typing indicator and the sender's profile, both best-effort, before the slow part of a step. */
+  /** "Seen", the typing bubble and the sender's profile, all best-effort, before the slow part of a step. */
   private async greet(message: StoredMessage): Promise<InstagramProfile | null> {
     const [, profile] = await Promise.all([
-      // Cosmetic; never worth failing the message over.
-      this.messenger.typing(message.senderId).catch((error: unknown) => {
-        this.log.debug({ err: error, mid: message.mid }, "typing indicator not sent");
-      }),
+      this.presence(message, "mark_seen").then(() => this.presence(message, "typing_on")),
       // Names the user; the daily profile sweep fills in whatever this misses.
       this.profiles.profile(message.senderId).catch((error: unknown) => {
         this.log.warn({ err: error, mid: message.mid }, "sender profile not read");
@@ -157,6 +156,23 @@ export class MessageProcessor {
       }),
     ]);
     return profile;
+  }
+
+  /** A presence signal; cosmetic, never worth failing the message over. */
+  private async presence(message: StoredMessage, action: SenderAction): Promise<void> {
+    await this.messenger.senderAction(message.senderId, action).catch((error: unknown) => {
+      this.log.debug({ err: error, mid: message.mid, action }, "sender action not sent");
+    });
+  }
+
+  /** Keeps the typing bubble up while `work` runs longer than Instagram shows it for. */
+  private async whileTyping<T>(message: StoredMessage, work: () => Promise<T>): Promise<T> {
+    const refresh = setInterval(() => void this.presence(message, "typing_on"), TYPING_REFRESH_MS);
+    try {
+      return await work();
+    } finally {
+      clearInterval(refresh);
+    }
   }
 
   /**
@@ -194,7 +210,7 @@ export class MessageProcessor {
 
     const profile = await this.greet(message);
     const { userId } = await this.stashh.resolveInstagramUser(message.senderId, profile);
-    const plan = await this.stashh.assistantTurn({ userId, messages: turn.map(toTurnMessage) });
+    const plan = await this.whileTyping(message, () => this.stashh.assistantTurn({ userId, messages: turn.map(toTurnMessage) }));
     return this.reply(message, renderPlan(plan));
   }
 
@@ -224,6 +240,8 @@ export class MessageProcessor {
     if (elapsed > RECOGNITION_TIMEOUT_MS) {
       return this.reply(message, [text(copy.failed(kind))], "failed", `recognition timed out after ${Math.round(elapsed / 1000)}s`);
     }
+    // Still working: the typing bubble stays up for as long as the recognition takes.
+    await this.presence(message, "typing_on");
     await this.settle(message, { nextAttemptAt: new Date(now.getTime() + pollDelayMs(elapsed)) });
   }
 

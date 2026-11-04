@@ -69,9 +69,16 @@ export class GraphApiError extends Error {
   }
 }
 
+/**
+ * Presence signals (https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/messaging-api/sender-actions):
+ * `mark_seen` puts "Seen" under the person's last message, `typing_on` shows the typing
+ * bubble for about 20 seconds or until we send something, `typing_off` hides it.
+ */
+export type SenderAction = "mark_seen" | "typing_on" | "typing_off";
+
 export interface Messenger {
   send(recipientId: string, message: OutboundMessage): Promise<void>;
-  typing(recipientId: string): Promise<void>;
+  senderAction(recipientId: string, action: SenderAction): Promise<void>;
 }
 
 export interface AccessTokenSource {
@@ -92,8 +99,8 @@ export class InstagramMessenger implements Messenger {
     await this.post({ recipient: { id: recipientId }, message: toGraphMessage(message) });
   }
 
-  async typing(recipientId: string): Promise<void> {
-    await this.post({ recipient: { id: recipientId }, sender_action: "typing_on" });
+  async senderAction(recipientId: string, action: SenderAction): Promise<void> {
+    await this.post({ recipient: { id: recipientId }, sender_action: action });
   }
 
   private async post(body: unknown): Promise<void> {
