@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 import type { ChatCompletion, ChatCompletionRequest, ChatMessage, ModelUsage, ToolCall, ToolDefinition } from "../../lib/openrouter.js";
 import type { Logger } from "../../lib/logger.js";
+import { languageHintLine } from "./language.js";
 import { REPLY_TOOL, replySchema, type ReplyInput } from "./tools.js";
 
 /** The slice of the OpenRouter client a turn needs; tests pass a scripted one. */
@@ -81,7 +82,7 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const messages: ChatMessage[] = [
     { role: "system", content: [{ type: "text", text: input.systemPrompt, cache_control: { type: "ephemeral" } }] },
     ...input.history,
-    { role: "user", content: [input.contextBlock, "", NEWEST_MESSAGE_NOTE, input.userMessage].join("\n") },
+    { role: "user", content: [input.contextBlock, "", NEWEST_MESSAGE_NOTE, ...(languageHintLine(input.userMessage) ? [languageHintLine(input.userMessage)] : []), input.userMessage].join("\n") },
   ];
   let usage: TurnUsage = { prompt_tokens: 0, completion_tokens: 0, cached_tokens: 0, cost_usd: null };
   const toolNames: string[] = [];

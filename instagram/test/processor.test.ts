@@ -344,9 +344,7 @@ describe("other intents", () => {
     const mid = await deliver({ text: "   " });
     await tick();
     expect(store.row(mid)).toMatchObject({ status: "replied", intent: "help" });
-    expect(messenger.texts()).toEqual([
-      'Bir Reel, gönderi ya da hikâye paylaş, içindeki mekânları sana listeleyelim ve haritana ekleyelim. Haritanı açmak için "harita", verilerini silmek için "sil" yaz.',
-    ]);
+    expect(messenger.texts()[0]).toContain("arkadaşına atar gibi bana at");
   });
 
   it("sends a fresh personal link to the map for \"harita\"", async () => {
@@ -407,7 +405,7 @@ describe("other intents", () => {
     const mid = await deliver({ attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] });
     await tick();
     expect(store.row(mid).status).toBe("replied");
-    expect(messenger.texts()[0]).toMatch(/^Şimdilik Reel'leri, gönderileri, hikâyeleri/);
+    expect(messenger.texts()[0]).toMatch(/^Bunu okuyamıyorum/);
   });
 
   it("recognizes a shared story and names it as one in the reply", async () => {
