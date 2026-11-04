@@ -24,7 +24,7 @@ assistantRouter.post("/turns", async (req, res, next) => {
   }
 
   try {
-    const plan = await createAssistantService().turn({ userId: params.data.userId, channel: body.data.channel, messages: body.data.messages });
+    const plan = await (await createAssistantService()).turn({ userId: params.data.userId, channel: body.data.channel, messages: body.data.messages });
     sendSuccess(res, req, 200, plan);
   } catch (error) {
     next(error);

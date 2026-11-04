@@ -267,3 +267,104 @@ Single use: a second redeem of the same code is \`410 SIGN_IN_LINK_INVALID\`, as
     ...commonErrorResponses,
   },
 });
+
+// ── Ops: the DM assistant ───────────────────────────────────────────────────
+
+const assistantSettingsSchema = z
+  .object({
+    model: z.string(),
+    system_prompt: z.string().nullable(),
+    default_prompt: z.string(),
+    max_steps: z.number().int(),
+    daily_turn_cap: z.number().int(),
+    suggested_replies: z.boolean(),
+    enabled: z.boolean(),
+    updated_at: z.string().nullable(),
+  })
+  .openapi("AssistantSettings");
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant",
+  summary: "Assistant ops stats",
+  description: `What the DM assistant has been doing, for the local ops dashboard: \`stats\` (\`assistant_ops_stats()\`: turns by status per bucket, cost, tokens and cache share, typical and slowest-5 % durations, tool and model mix, the previous window for trends) and \`turns\` (\`assistant_ops_list()\`: the latest 60 turns with who asked, what, and the answer).`,
+  request: { query: opsQuerySchema },
+  responses: {
+    200: {
+      description: "Assistant stats and latest turns",
+      content: {
+        "application/json": {
+          schema: successEnvelope(
+            z.object({
+              range: z.enum(OPS_RANGES),
+              since: z.string().datetime(),
+              bucket: z.enum(["hour", "day"]),
+              generated_at: z.string().datetime(),
+              stats: z.record(z.unknown()),
+              turns: z.array(z.record(z.unknown())),
+            }),
+            "InternalOpsAssistant",
+          ),
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant/turns/{id}",
+  summary: "Assistant turn detail",
+  description: "One assistant turn in full: usage, cost, the plan it sent, and the messages around it (the turn's own and the ten before). For the ops dashboard's detail view.",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "The turn", content: { "application/json": { schema: successEnvelope(z.record(z.unknown()), "InternalOpsAssistantTurn") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/ops/assistant/settings",
+  summary: "Assistant settings",
+  description: "The assistant's settings as the owner set them, with the shipped default prompt beside the owner's (`system_prompt` null means the default is in use).",
+  responses: {
+    200: { description: "Settings", content: { "application/json": { schema: successEnvelope(assistantSettingsSchema, "InternalOpsAssistantSettings") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  ...internal(),
+  method: "put",
+  path: "/ops/assistant/settings",
+  summary: "Change assistant settings",
+  description: "Changes one or more settings; the next turn runs with them (within 15 seconds on an instance that already read them). `system_prompt: null` returns to the shipped prompt.",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z
+            .object({
+              model: z.string().min(1).max(200).optional(),
+              system_prompt: z.string().min(1).max(60_000).nullable().optional(),
+              max_steps: z.number().int().min(1).max(12).optional(),
+              daily_turn_cap: z.number().int().min(1).max(10_000).optional(),
+              suggested_replies: z.boolean().optional(),
+              enabled: z.boolean().optional(),
+            })
+            .openapi("AssistantSettingsPatch"),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Settings after the change", content: { "application/json": { schema: successEnvelope(assistantSettingsSchema, "UpdateInternalOpsAssistantSettings") } } },
+    ...commonErrorResponses,
+  },
+});

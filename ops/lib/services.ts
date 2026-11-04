@@ -53,6 +53,64 @@ export async function fetchRecognitionOps(range: OpsRange): Promise<unknown> {
   return body.data;
 }
 
+/** Backend: the DM assistant's stats and latest turns (envelope `{ ok, data }`). */
+export async function fetchAssistantOps(range: OpsRange): Promise<unknown> {
+  const body = (await getJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), `/internal/v1/ops/assistant?range=${range}`)) as { data: unknown };
+  return body.data;
+}
+
+/** Backend: one assistant turn in full; null when the backend has no such turn. */
+export async function fetchAssistantTurn(id: string): Promise<unknown | null> {
+  const config = service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN");
+  let response: Response;
+  try {
+    response = await fetch(`${config.url}/internal/v1/ops/assistant/turns/${encodeURIComponent(id)}`, {
+      headers: { authorization: `Bearer ${config.token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    throw new ServiceUnavailableError(config.name, `${config.name} is unreachable at ${config.url} (${(error as Error).message})`);
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) throw new ServiceUnavailableError(config.name, `${config.name} answered ${response.status}`);
+  return ((await response.json()) as { data: unknown }).data;
+}
+
+/** Backend: the assistant's settings as the owner set them. */
+export async function fetchAssistantSettings(): Promise<unknown> {
+  const body = (await getJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "/internal/v1/ops/assistant/settings")) as { data: unknown };
+  return body.data;
+}
+
+/** Backend: change the assistant's settings; the backend's own refusal (a bad value) is passed through. */
+export async function updateAssistantSettings(patch: unknown): Promise<unknown> {
+  return sendJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "PUT", "/internal/v1/ops/assistant/settings", patch);
+}
+
+/** A write with the service token: the backend's envelope unwrapped, its refusals kept with their status. */
+async function sendJson(config: ServiceConfig, method: string, path: string, body: unknown): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(`${config.url}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    throw new ServiceUnavailableError(config.name, `${config.name} is unreachable at ${config.url} (${(error as Error).message})`);
+  }
+  const envelope = (await response.json().catch(() => null)) as { ok?: boolean; data?: unknown; error?: { message?: string; details?: unknown } } | null;
+  if (!response.ok || !envelope?.ok) {
+    const details = envelope?.error?.details;
+    const fields = details && typeof details === "object" ? Object.entries(details as Record<string, unknown>).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`) : [];
+    throw new BackendRequestError(response.status, [envelope?.error?.message ?? `${config.name} answered ${response.status}`, ...fields].join(" · "));
+  }
+  return envelope.data;
+}
+
 /** Instagram channel: DM ops snapshot. */
 export async function fetchInstagramOps(range: OpsRange): Promise<unknown> {
   return getJson(service("Instagram", "INSTAGRAM_API_URL", "INSTAGRAM_OPS_TOKEN"), `/ops/stats?range=${range}`);

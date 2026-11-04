@@ -288,3 +288,122 @@ export interface InstagramOps {
   generated_at: string;
   stats: InstagramStats;
 }
+
+/* ── The DM assistant: GET /internal/v1/ops/assistant (+ /turns/:id, /settings) ───────────── */
+
+export type AssistantTurnStatus = "replied" | "fallback" | "capped" | "failed";
+
+export interface AssistantSeriesPoint {
+  bucket: string;
+  replied: number;
+  fallback: number;
+  capped: number;
+  failed: number;
+  cost_usd: number;
+  senders: number;
+}
+
+export interface AssistantStats {
+  totals: {
+    turns: number;
+    replied: number;
+    fallback: number;
+    capped: number;
+    failed: number;
+    senders: number;
+    cost_usd: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    cached_tokens: number;
+    steps_avg: number | null;
+    typical_ms: Ms;
+    slow_ms: Ms;
+  };
+  previous: { turns: number; senders: number; cost_usd: number; failed: number };
+  series: AssistantSeriesPoint[];
+  tools: Array<{ name: string; uses: number }>;
+  models: Array<{ name: string; turns: number; cost_usd: number }>;
+}
+
+export interface AssistantTurnSummary {
+  id: string;
+  user_id: string;
+  username: string | null;
+  status: AssistantTurnStatus;
+  steps: number;
+  model: string | null;
+  cost_usd: number | null;
+  duration_ms: Ms;
+  prompt_tokens: number | null;
+  cached_tokens: number | null;
+  tool_names: string[];
+  error: string | null;
+  question: string | null;
+  answer: string | null;
+  created_at: string;
+}
+
+export interface AssistantOps {
+  range: OpsRange;
+  since: string;
+  bucket: "hour" | "day";
+  generated_at: string;
+  stats: AssistantStats;
+  turns: AssistantTurnSummary[];
+}
+
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  rich: { cards?: string[]; quick_replies?: string[]; map_link?: boolean } | null;
+  turn_id: string | null;
+  created_at: string;
+}
+
+export type AssistantPlanMessage =
+  | { kind: "text"; text: string; quick_replies?: Array<{ title: string; payload: string }> }
+  | { kind: "button"; text: string; buttons: Array<{ type: string; title: string; url?: string; payload?: string }>; quick_replies?: Array<{ title: string; payload: string }> }
+  | { kind: "carousel"; cards: Array<{ title: string; subtitle?: string; image_url?: string; url?: string; buttons: Array<{ type: string; title: string }> }> };
+
+export interface AssistantTurnDetail {
+  id: string;
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  channel: string;
+  status: AssistantTurnStatus;
+  steps: number;
+  model: string | null;
+  provider: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  cached_tokens: number | null;
+  cost_usd: number | null;
+  duration_ms: Ms;
+  tool_names: string[];
+  error: string | null;
+  plan: { messages: AssistantPlanMessage[] } | null;
+  created_at: string;
+  messages: AssistantMessage[];
+}
+
+export interface AssistantSettings {
+  model: string;
+  /** null = the prompt shipped in the backend. */
+  system_prompt: string | null;
+  default_prompt: string;
+  max_steps: number;
+  daily_turn_cap: number;
+  suggested_replies: boolean;
+  enabled: boolean;
+  updated_at: string | null;
+}
+
+export type AssistantSettingsPatch = Partial<Omit<AssistantSettings, "default_prompt" | "updated_at">>;
+
+/** Models the owner can pick from; both take the forced tool choice the assistant relies on. */
+export const ASSISTANT_MODELS: Array<{ id: string; label: string; detail: string }> = [
+  { id: "anthropic/claude-haiku-5.5", label: "Claude Haiku 5.5", detail: "$0.10 / $0.50 per M tokens · the default" },
+  { id: "openai/gpt-6-luna", label: "GPT-6 Luna", detail: "$0.10 / $0.50 per M tokens" },
+];

@@ -58,6 +58,42 @@ export type Database = {
           },
         ]
       }
+      assistant_settings: {
+        Row: {
+          created_at: string
+          daily_turn_cap: number
+          enabled: boolean
+          id: boolean
+          max_steps: number
+          model: string
+          suggested_replies: boolean
+          system_prompt: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_turn_cap?: number
+          enabled?: boolean
+          id?: boolean
+          max_steps?: number
+          model?: string
+          suggested_replies?: boolean
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_turn_cap?: number
+          enabled?: boolean
+          id?: boolean
+          max_steps?: number
+          model?: string
+          suggested_replies?: boolean
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assistant_turns: {
         Row: {
           cached_tokens: number | null
@@ -959,6 +995,18 @@ export type Database = {
             }
             Returns: string
           }
+      assistant_ops_detail: {
+        Args: { p_turn_id: string }
+        Returns: Json
+      }
+      assistant_ops_list: {
+        Args: { p_limit: number }
+        Returns: Json
+      }
+      assistant_ops_stats: {
+        Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
       claim_instagram_messages: {
         Args: { p_lease_seconds: number; p_limit: number }
         Returns: {
