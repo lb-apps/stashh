@@ -129,3 +129,51 @@ branch locally and on origin, and confirm whatever auto-deploys is tracking the 
 before the branch disappears. When the classifier denies a follow-up under the same label, use
 plain single commands (`git checkout develop`, then `git pull --ff-only`) — never widen the
 allow list just to get past a denial.
+
+## 2026-11-01 — Replacing a catch-all ingress took Instagram DMs down
+
+**What happened:** To add `api.stashh.me`, the tunnel moved from `--url http://instagram:3002`
+(every hostname → instagram) to an ingress file that named only `instagram.stashh.me`. Meta's
+callback was really `https://ig-dev.stashh.me/webhooks/instagram`, a hostname that had been
+repointed at the prod tunnel and only worked because of the catch-all. After the deploy Meta got
+404s, and DMs went unanswered until a hotfix (#18) put the `ig-dev` rule back.
+
+**Why it was wrong:** I checked the hostnames I knew (docs said `instagram.stashh.me`) instead of
+the ones actually routed: the DNS records pointing at the tunnel and the callback Meta has stored.
+
+**How to apply:** Before narrowing any routing (tunnel ingress, proxy, DNS), list what really
+uses it — every DNS name CNAMEd to the tunnel, and every external caller's configured URL (Meta
+callback, OAuth redirects) — and keep a rule for each, or move the caller first. After the deploy,
+watch real traffic (`instagram_messages` rows, container logs), not only `/health`.
+
+## 2026-11-04 — A Cloudflare dashboard edit can roll a Worker back to a stale version
+
+**What happened:** The two hooks-relay secrets were added one after the other on the
+stashh-hooks Settings page. The second save was made from a page that had not reloaded
+after the first, and Cloudflare built the new version from the old one. It dropped
+`HOOKS_RELAY_SECRET` and every binding the Git build had set (`DEFAULT_ENV`, `PROD_URL`,
+`DEV_URL`, KV, queue). The Worker would have refused or misrouted every delivery.
+
+**How to apply:** After any dashboard change to a Git-built Worker, read the live
+version's bindings back (Settings, or `/workers/scripts/<name>/settings`) before moving
+on. Reload the page between two saves. If bindings are lost, *Retry build* restores the
+config from `wrangler.jsonc`; secrets survive a `wrangler deploy`.
+
+## 2026-11-04 — A hostname the relay probes must not still be served by production
+
+**What happened:** While `ig-dev.stashh.me` still reached production (its old ingress
+rule), the owner sent `/env dev`. The relay's probe got 204 from production, so "dev" was
+production for a few minutes. Nothing broke, but the routing was not what it said.
+
+**How to apply:** Until a dev hostname really points at the dev machine, `/env dev` is
+not a test. Move the hostname first (DNS to the dev tunnel), confirm the probe is
+answered by the dev instance (its log says `environment: "dev"`), then test.
+
+## 2026-11-04 — Say "install the app on the org", not "connect GitHub"
+
+**Correction:** "yeni bir github hesabi neden? emirerdo'nun sahibi oldugu Little Big Apps
+organization altinda zaten proje."
+
+**How to apply:** For Workers Builds or any GitHub App, name exactly what happens: the
+owner installs the provider's GitHub App on the existing `lb-apps` org, only for the one
+repo. Never word it as a new account or a new connection.

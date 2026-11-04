@@ -38,6 +38,23 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  # The hooks relay Worker; it imports the shared core from instagram/src/webhooks/core.
+  hooks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/hooks
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: workers/hooks/package-lock.json
+      - run: npm ci
+      - run: npm run hooks:typecheck
+      - run: npm run hooks:test
+
   # A Dockerfile or compose.yaml that does not build fails here, not on the host that follows the repo.
   images:
     runs-on: ubuntu-latest

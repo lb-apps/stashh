@@ -3,7 +3,9 @@ import { GraphApiError, type Messenger, type OutboundMessage, type ProfileReader
 import { composeRecognitionReply, mapLinkMessage } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
 import { StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
+import { commandReply } from "../webhooks/core/commands.ts";
 import { interpret } from "./intent.ts";
+import { mayMessage, OUTBOUND_BLOCKED, type OutboundMode } from "./outbound.ts";
 import type { MessageStatus, MessageStore, Settlement, StoredMessage } from "./store.ts";
 
 /** Instagram only lets a business reply within 24 hours of the person's message. */
@@ -19,13 +21,17 @@ export interface ProcessorDeps {
   messenger: Messenger;
   profiles: ProfileReader;
   log: Logger;
+  /** Who this instance may write to (`outbound.ts`); production is always `live`. */
+  outbound?: OutboundMode;
   now?: () => Date;
 }
 
 /**
  * Advances one claimed message by one step of its state machine:
  *
- *   received  ── help / unsupported ──▶ reply ──▶ replied
+ *   received  ── not ours to answer (outbound.ts) ──▶ failed, nothing sent
+ *             ── env (a relay /env command) ──▶ reply with what the relay did ──▶ replied
+ *             ── help / unsupported ──▶ reply ──▶ replied
  *             ── link ──▶ resolve user, mint a sign-in link, reply ──▶ replied
  *             ── erase ──▶ erase user, reply, forget the sender
  *             ── recognize ──▶ create recognition (idempotent on mid) ──▶ submitted
@@ -43,6 +49,7 @@ export class MessageProcessor {
   private readonly messenger: Messenger;
   private readonly profiles: ProfileReader;
   private readonly log: Logger;
+  private readonly outbound: OutboundMode;
   private readonly now: () => Date;
 
   constructor(deps: ProcessorDeps) {
@@ -51,6 +58,7 @@ export class MessageProcessor {
     this.messenger = deps.messenger;
     this.profiles = deps.profiles;
     this.log = deps.log;
+    this.outbound = deps.outbound ?? "live";
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -60,6 +68,13 @@ export class MessageProcessor {
     if (this.now().getTime() - message.sentAt.getTime() > REPLY_WINDOW_MS) {
       log.warn("reply window closed; message expired");
       await this.settle(message, { status: "expired" });
+      return;
+    }
+
+    // Before any side effect: a blocked message costs no recognition and sends nothing.
+    if (!mayMessage(this.outbound, message)) {
+      log.warn({ outbound: this.outbound }, "sender not routed here by the hooks relay; not answered");
+      await this.settle(message, { status: "failed", lastError: OUTBOUND_BLOCKED });
       return;
     }
 
@@ -75,6 +90,8 @@ export class MessageProcessor {
     const intent = interpret(message);
 
     switch (intent.kind) {
+      case "env":
+        return this.reply(message, [text(commandReply(intent.outcome))]);
       case "help":
         return this.reply(message, [text(copy.help)]);
       case "unsupported":

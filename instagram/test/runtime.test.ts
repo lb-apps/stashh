@@ -84,14 +84,14 @@ describe("StoreSink", () => {
   it("queues only messages addressed to our account", async () => {
     const store = new MemoryStore(() => new Date());
     const counters = createWebhookCounters();
-    const sink = new StoreSink({ store, accountId: "17841400000000001", log, counters });
+    const sink = new StoreSink({ store, accountId: "17841400000000001", environment: "prod", log, counters });
     const fixture = (name: string) =>
       JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")) as WebhookEnvelope;
 
-    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("ig-reel-share.json"), receivedAt: new Date() });
-    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("dashboard-test-messages.json"), receivedAt: new Date() });
+    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("ig-reel-share.json"), relay: null, receivedAt: new Date() });
+    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("dashboard-test-messages.json"), relay: null, receivedAt: new Date() });
     // Meta redelivers the same event.
-    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("ig-reel-share.json"), receivedAt: new Date() });
+    await sink.accept({ rawBody: Buffer.alloc(0), body: fixture("ig-reel-share.json"), relay: null, receivedAt: new Date() });
 
     expect([...store.rows.values()].map((r) => r.senderId)).toEqual(["1234567890123456"]);
     expect(counters).toMatchObject({ messages_queued: 1, messages_duplicate: 1, other_account: 1 });

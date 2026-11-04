@@ -10,6 +10,8 @@ export interface AppDeps {
   sink: WebhookSink;
   log: Logger;
   counters?: WebhookCounters;
+  /** Opens the hooks relay's envelope (`HOOKS_RELAY_SECRET`); unset → no relayed deliveries. */
+  relaySecret?: string | undefined;
   /** Operator stats for the local ops dashboard; omitted (or tokenless) means no route. */
   ops?: OpsDeps;
 }
@@ -23,7 +25,8 @@ export function createApp(deps: AppDeps): Express {
     res.json({ status: "ok" });
   });
 
-  // Meta delivers to https://instagram.stashh.me/webhooks: the hostname names the service, the path the job.
+  // Meta delivers to https://instagram.stashh.me/webhooks — through the hooks relay
+  // (hooks.stashh.me, docs/webhook-relay.md) or directly: the hostname names the service, the path the job.
   const webhooks = createWebhookRouter(deps);
   app.use("/webhooks", webhooks);
   // Transition only: Meta's callback still points at the old path. Remove once it is moved.

@@ -42,6 +42,19 @@ const envSchema = z.object({
     .transform((value) => (value ?? "").split(",").map((t) => t.trim()).filter(Boolean))
     .refine((tokens) => tokens.every((t) => t.length >= 32), "Each OPS_API_TOKENS entry must be ≥ 32 chars"),
 
+  /**
+   * Opens the hooks relay's envelope (`hooks.stashh.me`); the same value as the Worker's secret.
+   * Unset → the relay's probe is not answered (it routes nobody here) and an enveloped delivery
+   * is refused; Meta's direct deliveries work either way.
+   */
+  HOOKS_RELAY_SECRET: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(32).optional()),
+
+  /**
+   * Outside production: `routed` (default, only senders the relay routed here), `live` (anyone;
+   * for testing without the relay) or `off`. Ignored in production, which always writes.
+   */
+  META_OUTBOUND: z.string().optional(),
+
   /** Messages processed at once by this instance. */
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
 

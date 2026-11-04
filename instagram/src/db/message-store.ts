@@ -1,20 +1,24 @@
-import { inboundAttachmentsSchema, type InboundMessage } from "../conversation/events.ts";
-import type { MessageStatus, MessageStore, Settlement, StoredMessage } from "../conversation/store.ts";
+import { inboundAttachmentsSchema } from "../conversation/events.ts";
+import type { MessageStatus, MessageStore, QueuedMessage, Settlement, StoredMessage } from "../conversation/store.ts";
+import { commandOutcomeOf } from "../webhooks/core/commands.ts";
+import type { Environment } from "../webhooks/core/environments.ts";
 import type { Db } from "./client.ts";
 import type { InstagramMessageRow, Json } from "./types.ts";
 
 /** Statuses a message never leaves; reaching one stamps `finished_at` (a table constraint requires it). */
 const FINAL_STATUSES: ReadonlySet<MessageStatus> = new Set(["replied", "failed", "expired"]);
 
-/** `MessageStore` on the `instagram_messages` table. */
+/** `MessageStore` on the `instagram_messages` table, scoped to this instance's environment. */
 export class SupabaseMessageStore implements MessageStore {
   private readonly db: Db;
+  private readonly environment: Environment;
 
-  constructor(db: Db) {
+  constructor(db: Db, options: { environment: Environment }) {
     this.db = db;
+    this.environment = options.environment;
   }
 
-  async insert(messages: InboundMessage[]): Promise<number> {
+  async insert(messages: QueuedMessage[]): Promise<number> {
     if (messages.length === 0) return 0;
     const { data, error } = await this.db
       .from("instagram_messages")
@@ -27,6 +31,9 @@ export class SupabaseMessageStore implements MessageStore {
           text: m.text,
           attachments: m.attachments as Json,
           payload: m.raw as Json,
+          environment: this.environment,
+          relay_routed: m.relayRouted ?? false,
+          relay_command: (m.relayCommand ?? null) as Json,
         })),
         // Meta redelivers; a mid already stored keeps its state untouched.
         { onConflict: "mid", ignoreDuplicates: true },
@@ -37,7 +44,11 @@ export class SupabaseMessageStore implements MessageStore {
   }
 
   async claim(limit: number, leaseSeconds: number): Promise<StoredMessage[]> {
-    const { data, error } = await this.db.rpc("claim_instagram_messages", { p_limit: limit, p_lease_seconds: leaseSeconds });
+    const { data, error } = await this.db.rpc("claim_instagram_messages", {
+      p_limit: limit,
+      p_lease_seconds: leaseSeconds,
+      p_environment: this.environment,
+    });
     if (error) throw new Error(`claim_instagram_messages failed: ${error.message}`);
     return data.map(toStoredMessage);
   }
@@ -94,6 +105,8 @@ function toStoredMessage(row: InstagramMessageRow): StoredMessage {
     sentAt: new Date(row.sent_at),
     text: row.text,
     attachments: inboundAttachmentsSchema.parse(row.attachments),
+    relayRouted: row.relay_routed,
+    relayCommand: commandOutcomeOf(row.relay_command),
     status: row.status,
     userId: row.user_id,
     recognitionId: row.recognition_id,

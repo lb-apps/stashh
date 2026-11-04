@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { Logger } from "../lib/logger.ts";
+import { RELAY_PROBE_QUERY } from "./core/commands.ts";
+import { openEnvelope, type RelayEnvelope } from "./core/envelope.ts";
 import { createWebhookCounters, type WebhookCounters } from "./counters.ts";
 import { isValidSignature } from "./signature.ts";
 
@@ -16,6 +18,8 @@ export interface WebhookSink {
 export interface VerifiedDelivery {
   rawBody: Buffer;
   body: WebhookEnvelope;
+  /** What the hooks relay said about this delivery; null when it came straight from Meta. */
+  relay: RelayEnvelope | null;
   receivedAt: Date;
 }
 
@@ -32,13 +36,28 @@ export interface WebhookRouterDeps {
   sink: WebhookSink;
   log: Logger;
   counters?: WebhookCounters;
+  /** Opens the hooks relay's envelope; unset → this instance takes no relayed deliveries. */
+  relaySecret?: string | undefined;
 }
 
-export function createWebhookRouter({ appSecret, verifyToken, sink, log, counters = createWebhookCounters() }: WebhookRouterDeps): Router {
+export function createWebhookRouter({
+  appSecret,
+  verifyToken,
+  sink,
+  log,
+  counters = createWebhookCounters(),
+  relaySecret,
+}: WebhookRouterDeps): Router {
   const router = Router();
 
-  // Subscription handshake: echo hub.challenge only for our verify token.
   router.get("/", (req: Request, res: Response) => {
+    // The relay asks before routing anyone here: 204 says this instance opens its envelope.
+    if (relaySecret && new URL(req.originalUrl, "http://localhost").search === `?${RELAY_PROBE_QUERY}`) {
+      res.sendStatus(204);
+      return;
+    }
+
+    // Subscription handshake: echo hub.challenge only for our verify token.
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
@@ -66,6 +85,15 @@ export function createWebhookRouter({ appSecret, verifyToken, sink, log, counter
       return;
     }
 
+    // Trusted like Meta's signature. Absent: a direct delivery from Meta, still valid. Present but
+    // not holding: refused, never read as direct — that would let a forged request skip the routing.
+    const opened = await openEnvelope({ get: (name) => req.get(name) ?? null }, rawBody.toString("utf8"), relaySecret);
+    if (!opened.ok) {
+      log.warn("webhook refused: relay envelope does not hold");
+      res.sendStatus(403);
+      return;
+    }
+
     const parsed = webhookEnvelopeSchema.safeParse(safeJsonParse(rawBody));
     if (!parsed.success) {
       // Signed by Meta but not a shape we handle (e.g. another product's object).
@@ -77,7 +105,7 @@ export function createWebhookRouter({ appSecret, verifyToken, sink, log, counter
     }
 
     try {
-      await sink.accept({ rawBody, body: parsed.data, receivedAt: new Date() });
+      await sink.accept({ rawBody, body: parsed.data, relay: opened.envelope, receivedAt: new Date() });
       counters.deliveries += 1;
       res.sendStatus(200);
     } catch (error) {

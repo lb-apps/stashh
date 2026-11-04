@@ -12,7 +12,10 @@
     "start": "node src/start.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tunnel:install": "scripts/dev-tunnel.sh install",
+    "tunnel:status": "scripts/dev-tunnel.sh status",
+    "tunnel:uninstall": "scripts/dev-tunnel.sh uninstall"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
