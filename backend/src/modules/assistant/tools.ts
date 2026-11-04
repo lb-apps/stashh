@@ -38,7 +38,7 @@ export const replySchema = z.object({
     )
     .max(REPLY_LIMITS.quickReplies)
     .optional()
-    .describe("Tap targets under your text: for a choice, a confirmation, or the obvious next step. Leave out when there is none."),
+    .describe("Tap targets under your text: a confirm / cancel pair before something irreversible, a pick among several named things, and (only while the account block says suggested quick replies are on) the obvious next step. Otherwise left out."),
   cards: z
     .discriminatedUnion("kind", [
       z.object({ kind: z.literal("places"), place_ids: z.array(uuid).min(1).max(REPLY_LIMITS.cards) }),

@@ -104,32 +104,30 @@ describe("composeRecognitionReply", () => {
     expect(sourceKindOf({ kind: "url", url: "https://vm.tiktok.com/X/" })).toBe("video");
     expect(sourceKindOf({ kind: "instagram_media", format: "post", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("post");
     expect(sourceKindOf({ kind: "instagram_media", format: "story", mediaId: "1", mediaUrl: "https://lookaside.fbsbx.com/x", caption: null })).toBe("story");
-    expect(composeRecognitionReply([place], "post").at(-1)).toEqual({
-      kind: "text",
-      text: "Bu gönderide 1 mekân var, hepsini haritana ekledik.",
-      quickReplies: [{ title: "Haritamı aç", payload: "OPEN_MAP" }],
-    });
+    expect(composeRecognitionReply([place], "post").at(-1)).toEqual({ kind: "text", text: "Bu gönderide 1 mekân var, hepsini haritana ekledik." });
   });
 
-  it("sends the cards first and the summary last, with the map link and the quick replies on it", () => {
-    const messages = composeRecognitionReply([place], "reel", "https://stashh.me/app/a/abc", "00000000-0000-4000-8000-0000000000aa");
+  it("sends the cards first and the summary last, with the map link on it", () => {
+    const messages = composeRecognitionReply([place], "reel", { mapUrl: "https://stashh.me/app/a/abc", recognitionId: "00000000-0000-4000-8000-0000000000aa" });
     expect(messages.map((m) => m.kind)).toEqual(["carousel", "button"]);
     expect(messages.at(-1)).toEqual({
       kind: "button",
       text: "Bu Reel'de 1 mekân var, hepsini haritana ekledik.",
       buttons: [{ type: "web_url", title: "Haritanda aç", url: "https://stashh.me/app/a/abc" }],
-      quickReplies: [{ title: "Listeye koy", payload: "ADD_TO_LIST:00000000-0000-4000-8000-0000000000aa" }],
     });
   });
 
-  it("offers the map as a quick reply when no link could be minted", () => {
-    expect(composeRecognitionReply([place], "reel", null, "00000000-0000-4000-8000-0000000000aa").at(-1)).toMatchObject({
+  it("adds the next-step quick replies only while suggested replies are on", () => {
+    const on = composeRecognitionReply([place], "reel", { recognitionId: "00000000-0000-4000-8000-0000000000aa", suggestedReplies: true }).at(-1);
+    expect(on).toMatchObject({
       kind: "text",
       quickReplies: [
         { title: "Listeye koy", payload: "ADD_TO_LIST:00000000-0000-4000-8000-0000000000aa" },
         { title: "Haritamı aç", payload: "OPEN_MAP" },
       ],
     });
+    const withMap = composeRecognitionReply([place], "reel", { mapUrl: "https://stashh.me/app/a/abc", recognitionId: "00000000-0000-4000-8000-0000000000aa", suggestedReplies: true }).at(-1);
+    expect(withMap).toMatchObject({ kind: "button", quickReplies: [{ title: "Listeye koy", payload: "ADD_TO_LIST:00000000-0000-4000-8000-0000000000aa" }] });
   });
 });
 

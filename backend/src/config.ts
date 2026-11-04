@@ -16,6 +16,12 @@ const envSchema = z.object({
   ASSISTANT_MAX_STEPS: z.coerce.number().int().min(1).max(12).default(6),
   /** Assistant turns one sender gets per rolling 24 hours; above it a fixed line, no model call. */
   ASSISTANT_DAILY_TURN_CAP: z.coerce.number().int().min(1).default(60),
+  /**
+   * Whether the assistant offers next-step quick replies under its answers ("Haritamı aç",
+   * list names). Off by the owner's call (2026-11-04): people write what they want. Confirm /
+   * cancel chips before something irreversible stay either way.
+   */
+  ASSISTANT_SUGGESTED_REPLIES: z.enum(["on", "off"]).default("off"),
   GOOGLE_PLACES_API_KEY: z.string().min(1, "GOOGLE_PLACES_API_KEY is required"),
   PORT: z.coerce.number().default(3000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

@@ -9,6 +9,8 @@ export interface AccountContext {
   profile: { username: string | null; displayName: string | null } | null;
   savedCount: number;
   lists: ListSummaryDto[];
+  /** Whether next-step quick replies are offered; the prompt explains both settings. */
+  suggestedReplies: boolean;
   recentRecognitions: Array<{
     recognition_id: string;
     at: string;
@@ -61,6 +63,7 @@ export function buildContextBlock(context: AccountContext): string {
     }
   }
 
+  lines.push(`- Suggested quick replies: ${context.suggestedReplies ? "on" : "off"}`);
   lines.push(`- Now: ${context.now.toISOString()}`);
   return lines.join("\n");
 }

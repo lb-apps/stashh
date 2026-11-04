@@ -43,7 +43,7 @@ export const copy = {
   },
   listNeedsLink:
     "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
-  help: "Instagram'da gördüğün mekânları kaydedemiyorsun ya 😅 Bir Reel'i ya da postu arkadaşına atar gibi bana at, içindeki tüm mekânları bulup sana özel haritana koyayım. Sonra liste yap, şehre ya da türe göre süz, istediğin an buradan ulaş.",
+  help: "Instagram'da gördüğün mekânları kaydedemiyorsun ya 😅 Bir Reel'i ya da postu arkadaşına atar gibi bana at, içindeki tüm mekânları bulup sana özel haritana koyayım. Sonra liste yap, şehre ya da türe göre filtrele, istediğin an buradan ulaş.",
   unsupported:
     "Bunu okuyamıyorum 😅 İçinde mekân geçen bir Reel, post ya da hikâye at, ya da bir Instagram / TikTok linki yapıştır; içindeki yerleri bulup haritana koyayım.",
   erased: "Stashh'teki verilerini sildik.",
@@ -51,7 +51,7 @@ export const copy = {
   mapLink: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
   /** The personal sign-in link to the web map. */
   openMyMap: "Haritanda aç",
-  /** Quick replies under a finished recognition; the assistant takes the tap from there. */
+  /** Quick replies under a finished recognition (`RECOGNITION_SUGGESTED_REPLIES`); the assistant takes the tap. */
   addToList: "Listeye koy",
   openMyMapQuick: "Haritamı aç",
   /** The assistant could not answer (backend down, model unavailable). */

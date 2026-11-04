@@ -12,7 +12,7 @@ describe("assistant prompt", () => {
 
   it("names the reply tool and the channel's button payloads", () => {
     expect(ASSISTANT_PROMPT).toContain(`\`${REPLY_TOOL}\``);
-    for (const payload of ["ERASE_CONFIRM", "ADD_TO_LIST:<recognition_id>", "OPEN_MAP", "SHOW_LIST:<list_id>"]) {
+    for (const payload of ["ERASE_CONFIRM", "SHOW_LIST:<list_id>", "ADD_TO_LIST:<recognition_id>", "OPEN_MAP"]) {
       expect(ASSISTANT_PROMPT).toContain(payload);
     }
   });

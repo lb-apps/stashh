@@ -35,6 +35,8 @@ export interface ProcessorDeps {
   log: Logger;
   /** Who this instance may write to (`outbound.ts`); production is always `live`. */
   outbound?: OutboundMode;
+  /** Quick replies under a finished recognition (`RECOGNITION_SUGGESTED_REPLIES`). */
+  suggestedReplies?: boolean;
   now?: () => Date;
 }
 
@@ -64,6 +66,7 @@ export class MessageProcessor {
   private readonly profiles: ProfileReader;
   private readonly log: Logger;
   private readonly outbound: OutboundMode;
+  private readonly suggestedReplies: boolean;
   private readonly now: () => Date;
 
   constructor(deps: ProcessorDeps) {
@@ -73,6 +76,7 @@ export class MessageProcessor {
     this.profiles = deps.profiles;
     this.log = deps.log;
     this.outbound = deps.outbound ?? "live";
+    this.suggestedReplies = deps.suggestedReplies ?? false;
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -185,6 +189,9 @@ export class MessageProcessor {
     const now = this.now();
     const settleAt = message.sentAt.getTime() + CHAT_DEBOUNCE_MS;
     if (now.getTime() < settleAt) {
+      // "Seen" and the typing bubble go up right away, so the wait for follow-ups is not silence.
+      await this.presence(message, "mark_seen");
+      await this.presence(message, "typing_on");
       await this.settle(message, { nextAttemptAt: new Date(settleAt) });
       return;
     }
@@ -229,7 +236,7 @@ export class MessageProcessor {
         return this.reply(message, [text(copy.listNeedsLink)]);
       }
       const mapUrl = places.length > 0 ? await this.mapUrl(message.userId, message.mid) : null;
-      return this.reply(message, composeRecognitionReply(places, kind, mapUrl, message.recognitionId));
+      return this.reply(message, composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies }));
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
       return this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);

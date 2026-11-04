@@ -102,6 +102,7 @@ function service(repo: MemoryRepo, model: ReturnType<typeof scriptedModel>, dail
     identities: { findProfileByUserId: async () => ({ username: "emir", displayName: "Emir" }) },
     maxSteps: 4,
     dailyTurnCap,
+    suggestedReplies: false,
     log: rootLogger,
   });
 }

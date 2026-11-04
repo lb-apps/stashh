@@ -29,6 +29,8 @@ export interface AssistantServiceDeps {
   identities: Pick<ChannelIdentityRepository, "findProfileByUserId">;
   maxSteps: number;
   dailyTurnCap: number;
+  /** Next-step quick replies under answers (`ASSISTANT_SUGGESTED_REPLIES`). */
+  suggestedReplies: boolean;
   log: Logger;
   now?: () => Date;
 }
@@ -87,7 +89,7 @@ export class AssistantService {
       recentRecognitions(ctx, RECENT_SHARES),
       repo.listRecentMessages(input.userId, input.channel, { limit: HISTORY_LIMIT, since: new Date(startedAt.getTime() - HISTORY_WINDOW_MS) }),
     ]);
-    const contextBlock = buildContextBlock({ profile, savedCount, lists, recentRecognitions: recent, now: startedAt });
+    const contextBlock = buildContextBlock({ profile, savedCount, lists, recentRecognitions: recent, suggestedReplies: this.deps.suggestedReplies, now: startedAt });
     const externalIds = new Set(input.messages.map((message) => message.external_id));
 
     try {

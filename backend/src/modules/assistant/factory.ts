@@ -35,6 +35,7 @@ export function createAssistantService(): AssistantService {
     identities: new ChannelIdentityRepository(serviceSb),
     maxSteps: config.ASSISTANT_MAX_STEPS,
     dailyTurnCap: config.ASSISTANT_DAILY_TURN_CAP,
+    suggestedReplies: config.ASSISTANT_SUGGESTED_REPLIES === "on",
     log: assistantLog,
   });
 }

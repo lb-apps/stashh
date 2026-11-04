@@ -6,14 +6,23 @@ import { copy, type SourceKind } from "./copy.tr.ts";
 export const ADD_TO_LIST_PAYLOAD = (recognitionId: string) => `ADD_TO_LIST:${recognitionId}`;
 export const OPEN_MAP_PAYLOAD = "OPEN_MAP";
 
+export interface RecognitionReplyOptions {
+  /** The person's sign-in link, for the map button under the summary. */
+  mapUrl?: string | null;
+  /** With `suggestedReplies`, "Listeye koy" carries this id to the assistant. */
+  recognitionId?: string | null;
+  /** Quick replies under the summary (`RECOGNITION_SUGGESTED_REPLIES`); off, people write what they want. */
+  suggestedReplies?: boolean;
+}
+
 /**
  * The reply to a finished recognition: the places as carousels, then a one-line summary that
- * carries the person's map button (their sign-in link) and the quick replies that hand the
- * next step to the assistant. The summary comes last because Instagram shows quick replies
- * only under the most recent message.
+ * carries the person's map button (their sign-in link). The summary comes last because, when
+ * suggested replies are on, Instagram shows its quick replies only under the most recent message.
  */
-export function composeRecognitionReply(places: Place[], kind: SourceKind, mapUrl: string | null = null, recognitionId: string | null = null): OutboundMessage[] {
+export function composeRecognitionReply(places: Place[], kind: SourceKind, options: RecognitionReplyOptions = {}): OutboundMessage[] {
   if (places.length === 0) return [{ kind: "text", text: copy.empty(kind) }];
+  const { mapUrl = null, recognitionId = null, suggestedReplies = false } = options;
 
   const cards = places.map(toCard);
   const carousels: OutboundMessage[] = [];
@@ -22,8 +31,8 @@ export function composeRecognitionReply(places: Place[], kind: SourceKind, mapUr
   }
 
   const quickReplies: QuickReply[] = [];
-  if (recognitionId) quickReplies.push({ title: copy.addToList, payload: ADD_TO_LIST_PAYLOAD(recognitionId) });
-  if (!mapUrl) quickReplies.push({ title: copy.openMyMapQuick, payload: OPEN_MAP_PAYLOAD });
+  if (suggestedReplies && recognitionId) quickReplies.push({ title: copy.addToList, payload: ADD_TO_LIST_PAYLOAD(recognitionId) });
+  if (suggestedReplies && !mapUrl) quickReplies.push({ title: copy.openMyMapQuick, payload: OPEN_MAP_PAYLOAD });
 
   const text = copy.found(places.length, kind);
   const taps = quickReplies.length > 0 ? { quickReplies } : {};

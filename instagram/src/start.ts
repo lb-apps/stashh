@@ -46,6 +46,7 @@ const processor = new MessageProcessor({
   profiles,
   log: log.child({ component: "processor" }),
   outbound,
+  suggestedReplies: config.RECOGNITION_SUGGESTED_REPLIES === "on",
 });
 const worker = new MessageWorker({
   store,

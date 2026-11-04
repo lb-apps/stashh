@@ -103,6 +103,7 @@ describe("buildContextBlock", () => {
       profile: { username: "emir", displayName: "Emir" },
       savedCount: 12,
       lists: [list(), list({ id: "l2", title: "Kahveciler", emoji: null, place_count: 1 })],
+      suggestedReplies: false,
       recentRecognitions: [
         {
           recognition_id: "r1",
@@ -119,11 +120,13 @@ describe("buildContextBlock", () => {
     expect(block).toContain("🌊 İzmir · 7 places · list_id 11111111-1111-4111-8111-111111111111");
     expect(block).toContain("Kahveciler · 1 place · list_id l2");
     expect(block).toContain("12 min ago: Reel by @izmirdeyiz → Ali Usta (place_id p1), Bilinmeyen · recognition_id r1");
+    expect(block).toContain("Suggested quick replies: off");
     expect(block).toContain("Now: 2026-11-04T12:00:00.000Z");
   });
 
   it("says when there is nothing yet", () => {
-    const block = buildContextBlock({ profile: null, savedCount: 0, lists: [], recentRecognitions: [], now: new Date() });
+    const block = buildContextBlock({ profile: null, savedCount: 0, lists: [], recentRecognitions: [], suggestedReplies: true, now: new Date() });
+    expect(block).toContain("Suggested quick replies: on");
     expect(block).toContain("profile not read yet");
     expect(block).toContain("Lists: none yet");
     expect(block).toContain("Recent shares: none yet");

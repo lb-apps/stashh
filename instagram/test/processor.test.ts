@@ -124,9 +124,8 @@ describe("recognizing a shared Reel", () => {
     expect(messenger.texts()).toEqual(["Bu Reel'de 2 mekân var, hepsini haritana ekledik."]);
     expect(stashh.minted).toEqual(["00000000-0000-4000-8000-000000000001"]);
     expect(messenger.buttons()).toEqual([{ title: "Haritanda aç", url: `https://stashh.me/app/a/${"c".repeat(31)}0` }]);
-    // The summary comes last, so its quick replies stay visible; they hand the next step to the assistant.
     expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
-    expect(messenger.quickReplies().at(-1)).toEqual([{ title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` }]);
+    expect(messenger.quickReplies().at(-1)).toEqual([]);
     const carousel = messenger.sent[0]?.message;
     expect(carousel?.kind).toBe("carousel");
     if (carousel?.kind === "carousel") {
@@ -387,10 +386,6 @@ describe("other intents", () => {
     expect(store.row(mid).status).toBe("replied");
     expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
     expect(messenger.texts()).toEqual(["Bu Reel'de 1 mekân var, hepsini haritana ekledik."]);
-    expect(messenger.quickReplies().at(-1)).toEqual([
-      { title: "Listeye koy", payload: `ADD_TO_LIST:${RECOGNITION_ID}` },
-      { title: "Haritamı aç", payload: "OPEN_MAP" },
-    ]);
   });
 
   it("sends no map link when nothing was found", async () => {
@@ -440,6 +435,8 @@ describe("talking to the assistant", () => {
     await tick();
     expect(store.row(mid)).toMatchObject({ status: "received", intent: "chat", lockedUntil: null });
     expect(stashh.turns).toEqual([]);
+    // Already seen and typing while the follow-up wait runs.
+    expect(messenger.actions.map((a) => a.action)).toEqual(["mark_seen", "typing_on"]);
 
     stashh.turnSteps.push({
       messages: [
@@ -449,7 +446,7 @@ describe("talking to the assistant", () => {
     });
     await settleChat();
 
-    expect(messenger.typed).toEqual([SENDER]);
+    expect(messenger.typed).toEqual([SENDER, SENDER]);
     expect(stashh.resolvedProfiles).toEqual([{ username: "ayse.k", name: "Ayşe" }]);
     expect(stashh.turns).toEqual([{ userId: "00000000-0000-4000-8000-000000000001", messages: [{ externalId: mid, text: "listelerim neler", tapped: null }] }]);
     expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
