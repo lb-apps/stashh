@@ -22,7 +22,7 @@ Given to Meta (permanent):
 
 Forwarded by the relay:
   prod  https://instagram.stashh.me/webhooks   (tunnel stashh-prod on home-server → instagram:3002)
-  dev   https://ig-dev.stashh.me/webhooks      (tunnel stashh-dev on the dev Mac → localhost:3002)
+  dev   https://ig-dev.stashh.me/webhooks      (tunnel stashh-dev on the dev Mac → 127.0.0.1:3002)
 
   GET https://hooks.stashh.me/health → "ok"
 ```

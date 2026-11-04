@@ -8,6 +8,9 @@
 #   scripts/dev-tunnel.sh status      is it running, and does the relay's probe pass through it
 #   scripts/dev-tunnel.sh uninstall   stop it and remove the LaunchAgent
 #
+# The origin is 127.0.0.1, not localhost: localhost can resolve to ::1, where another dev server
+# may hold :3002 while the service listens on IPv4 (2026-11-04).
+#
 # The token stays in ~/.cloudflared/stashh-dev.token (0600) and is read with --token-file, never
 # written into the plist. docs/webhook-relay.md, "Dev tunnel".
 
@@ -55,7 +58,7 @@ install() {
     <string>--no-autoupdate</string>
     <string>run</string>
     <string>--url</string>
-    <string>http://localhost:$port</string>
+    <string>http://127.0.0.1:$port</string>
     <string>--token-file</string>
     <string>$token_file</string>
   </array>
