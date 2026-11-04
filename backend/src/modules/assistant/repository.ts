@@ -65,12 +65,27 @@ export class AssistantRepository {
     return data;
   }
 
-  /** Stores messages; a user message whose external id was stored before (a retried turn) is left as is. */
+  /**
+   * Stores messages; a user message whose external id was stored before (a retried turn) is
+   * left as is. The uniqueness index is partial, which `ON CONFLICT` cannot name, so the
+   * duplicates are filtered out first.
+   */
   async insertMessages(rows: AssistantMessageInsert[]): Promise<void> {
     if (rows.length === 0) return;
-    const { error } = await this.supabase
-      .from("assistant_messages")
-      .upsert(rows, { onConflict: "channel,external_message_id", ignoreDuplicates: true });
+    const externalIds = rows.flatMap((row) => (row.external_message_id ? [row.external_message_id] : []));
+    const seen = new Set<string>();
+    if (externalIds.length > 0) {
+      const { data, error } = await this.supabase
+        .from("assistant_messages")
+        .select("external_message_id")
+        .eq("channel", rows[0]!.channel)
+        .in("external_message_id", externalIds);
+      if (error) throw error;
+      for (const row of data ?? []) if (row.external_message_id) seen.add(row.external_message_id);
+    }
+    const fresh = rows.filter((row) => !row.external_message_id || !seen.has(row.external_message_id));
+    if (fresh.length === 0) return;
+    const { error } = await this.supabase.from("assistant_messages").insert(fresh);
     if (error) throw error;
   }
 }

@@ -138,7 +138,7 @@ export class AssistantService {
           model: this.deps.modelId,
           status: "failed",
           duration_ms: this.now().getTime() - startedAt.getTime(),
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage(error),
           plan: null,
         })
         .catch((recordError: unknown) => {
@@ -179,6 +179,13 @@ export class AssistantService {
 
     return renderReply({ reply, places, lists, mapUrl });
   }
+}
+
+/** The message of an Error, or of a PostgREST error object, which is not an Error instance. */
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string") return (error as { message: string }).message;
+  return typeof error === "string" ? error : JSON.stringify(error);
 }
 
 /** A user message as the model reads it: the text, plus what was tapped when it was a tap. */
