@@ -95,10 +95,17 @@ export function track<N extends EventName>(name: N, props: EventProps<N>, option
   run((mixpanel) => mixpanel.track(name, props, options?.leavesPage ? { transport: "sendBeacon", send_immediately: true } : undefined));
 }
 
-/** The signed-in user's Supabase id. */
+/**
+ * The signed-in user's Supabase id. Another person's id on this device (a
+ * second Instagram account opening its DM link in the same in-app browser)
+ * gets a reset first, so the two are never merged into one profile.
+ */
 export function identify(userId: string) {
   run((mixpanel) => {
-    if (mixpanel.get_distinct_id() !== userId) mixpanel.identify(userId);
+    const current: unknown = mixpanel.get_property("$user_id");
+    if (current === userId) return;
+    if (current) mixpanel.reset();
+    mixpanel.identify(userId);
   });
 }
 
