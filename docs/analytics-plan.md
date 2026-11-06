@@ -59,8 +59,13 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 - `identify(userId)` runs once a session exists (`AnalyticsSession` in
   `app/(app)/_components/`), never with an anonymous id. Simplified ID Merge joins the
   device's earlier anonymous events, such as the landing visit before a DM map link.
-- `reset()` runs only on an explicit sign-out. A visitor who was never signed in keeps
-  one device id.
+- `reset()` runs on an explicit sign-out, and inside `identify` when the device still
+  carries another user's id. That happens when a second Instagram account opens its DM
+  link in the same in-app browser, so two people are never merged. A visitor who was
+  never signed in keeps one device id.
+- The DM link page names the link's user before it sends `map_link_opened`. The session
+  mirror identifies only after the next render, so without this the event would go to
+  the account that was signed in before.
 - **On every event**, added by a `before_track` hook. It is not `register`: the SDK
   sends the first page view inside `init`, and `reset` wipes registered properties.
   - `app_env`, a guard against a wrong token.

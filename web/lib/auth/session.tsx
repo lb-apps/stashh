@@ -26,10 +26,10 @@ export function useSession(): SessionState {
   return React.use(SessionContext);
 }
 
-/** Exchanges the single-use `token_hash` redeemed from a DM link for a session. */
-export async function signInWithTokenHash(tokenHash: string): Promise<boolean> {
-  const { error } = await supabase().auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
-  return !error;
+/** Exchanges the `token_hash` redeemed from a DM link for a session; resolves with the signed-in user's id. */
+export async function signInWithTokenHash(tokenHash: string): Promise<string | null> {
+  const { data, error } = await supabase().auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+  return error ? null : (data.user?.id ?? null);
 }
 
 export async function signOut(): Promise<void> {
