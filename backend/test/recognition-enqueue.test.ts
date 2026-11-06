@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { config } from "../src/config.js";
 import type { RecognitionRepository } from "../src/modules/recognitions/repository.js";
 import { RecognitionService } from "../src/modules/recognitions/service.js";
 import type { RecognitionTaskInsert, RecognitionTaskRow } from "../src/modules/recognitions/types.js";
@@ -11,6 +12,11 @@ class FakeRepository {
 
   async getRecognitionByIdempotencyKey(owner: string, key: string) {
     return this.tasks.find((t) => t.owner_user_id === owner && t.idempotency_key === key) ?? null;
+  }
+
+  /** Every task counts as started now; the cap test fills the day by itself. */
+  async countRecognitionsSince(owner: string) {
+    return this.tasks.filter((t) => t.owner_user_id === owner).length;
   }
 
   async getRecognitionResultBySourceUrl(sourceUrl: string) {
@@ -147,5 +153,14 @@ describe("RecognitionService.enqueueRecognition", () => {
     const again = await service.enqueueRecognition({ ownerUserId: OWNER, source, idempotencyKey: "mid-9" });
     expect(again.id).toBe(created.id);
     expect(repo.tasks).toHaveLength(1);
+  });
+
+  it("refuses a new recognition once the owner started the day's cap, but still replays a known key", async () => {
+    const { repo, service } = setup();
+    for (let i = 0; i < config.RECOGNITIONS_DAILY_CAP; i++) repo.tasks.push(task({ id: `old-${i}`, owner_user_id: OWNER, source_url: URL, idempotency_key: `k-${i}` }));
+
+    await expect(service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } })).rejects.toMatchObject({ status: 429, errorCode: "RECOGNITION_QUOTA" });
+    const replay = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "k-3" });
+    expect(replay.id).toBe("old-3");
   });
 });

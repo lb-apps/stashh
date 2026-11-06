@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { InboundMessage } from "../src/conversation/events.ts";
 import { CHAT_DEBOUNCE_MS, MessageProcessor } from "../src/conversation/processor.ts";
 import { GraphApiError } from "../src/meta/graph-client.ts";
+import { copy } from "../src/replies/copy.tr.ts";
 import { StashhApiError, type Place, type Recognition } from "../src/stashh/client.ts";
 import { clock, FakeMessenger, FakeProfiles, FakeStashh, MemoryStore } from "./support/fakes.ts";
 
@@ -286,6 +287,15 @@ describe("failures and retries", () => {
 
     expect(store.row(mid)).toMatchObject({ status: "failed", attempts: 1, lastError: "bad url" });
     expect(messenger.texts()).toHaveLength(1);
+  });
+
+  it("says the day's limit is reached, once, without retrying, when the backend refuses with RECOGNITION_QUOTA", async () => {
+    stashh.createSteps.push(new StashhApiError(429, "RECOGNITION_QUOTA", "Daily recognition limit reached"));
+    const mid = await reel();
+    await tick();
+
+    expect(store.row(mid)).toMatchObject({ status: "failed", lastError: "daily recognition cap reached" });
+    expect(messenger.texts()).toEqual([copy.dailyLimit]);
   });
 
   it("does not try to apologise when Instagram itself refuses the reply", async () => {

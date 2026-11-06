@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 import type { ChatCompletion, ChatCompletionRequest, ChatMessage, ModelUsage, ToolCall, ToolDefinition } from "../../lib/openrouter.js";
 import type { Logger } from "../../lib/logger.js";
+import { cleanUntrustedText, contactKey, findContactTokens } from "../../lib/untrusted-text.js";
 import { languageHintLine } from "./language.js";
 import { REPLY_TOOL, replySchema, type ReplyInput } from "./tools.js";
 
@@ -85,6 +86,8 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
     { role: "user", content: [input.contextBlock, "", NEWEST_MESSAGE_NOTE, ...(languageHintLine(input.userMessage) ? [languageHintLine(input.userMessage)] : []), input.userMessage].join("\n") },
   ];
   let usage: TurnUsage = { prompt_tokens: 0, completion_tokens: 0, cached_tokens: 0, cost_usd: null };
+  /** Links, phones and e-mails the reply may repeat: Stashh's own domain and what tools returned this turn. */
+  const trusted = new Set<string>(TRUSTED_CONTACTS);
   const toolNames: string[] = [];
   let model: string | null = null;
   let provider: string | null = null;
@@ -105,7 +108,8 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
     if (calls.length === 0) {
       // Not supposed to happen under a forced tool choice; the text is still the best reply there is.
       const text = completion.content?.trim();
-      if (text) return { reply: { text: text.slice(0, 900) }, status: "replied", steps: step, usage, toolNames, model, provider };
+      const reply = text ? parseReply({ id: "content", name: REPLY_TOOL, arguments: { text: text.slice(0, 900) }, rawArguments: "" }, trusted) : null;
+      if (reply?.ok) return { reply: reply.value, status: "replied", steps: step, usage, toolNames, model, provider };
       break;
     }
 
@@ -117,15 +121,15 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
 
     const replyCall = calls.find((call) => call.name === REPLY_TOOL);
     const dataCalls = calls.filter((call) => call.name !== REPLY_TOOL);
+    const reply = replyCall ? parseReply(replyCall, trusted) : null;
 
-    if (replyCall) {
-      const reply = parseReply(replyCall);
-      if (reply.ok) {
-        if (dataCalls.length > 0) input.log.warn({ tools: dataCalls.map((c) => c.name) }, "tool calls beside reply ignored");
-        return { reply: reply.value, status: "replied", steps: step, usage, toolNames, model, provider };
-      }
-      input.log.warn({ step, error: reply.error }, "reply arguments rejected; asking the model to repair");
+    if (reply?.ok && dataCalls.length === 0) {
+      return { reply: reply.value, status: "replied", steps: step, usage, toolNames, model, provider };
     }
+    // A reply written beside tool calls was written before their results: it may say "deleted"
+    // for a call that was refused or failed. The calls run, and the model replies again.
+    if (reply?.ok) input.log.info({ tools: dataCalls.map((c) => c.name) }, "reply came with tool calls; running them first");
+    else if (reply) input.log.warn({ step, error: reply.error }, "reply arguments rejected; asking the model to repair");
 
     const results = await Promise.all(
       dataCalls.map(async (call) => {
@@ -134,10 +138,13 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
         return { call, result: await input.execute(call.name, call.arguments) };
       }),
     );
+    for (const entry of results) collectTrusted(entry.result, trusted);
     for (const call of calls) {
       if (call.name === REPLY_TOOL) {
-        const reply = parseReply(call);
-        messages.push({ role: "tool", tool_call_id: call.id, content: toolResultContent(reply.ok ? { sent: true } : { error: "INVALID_REPLY", message: reply.error }) });
+        const answer = call === replyCall && reply?.ok
+          ? { error: "REPLY_NOT_SENT", message: "Not sent: your other tool calls ran first. Read their results, then call reply alone with what actually happened." }
+          : { error: "INVALID_REPLY", message: call === replyCall && reply && !reply.ok ? reply.error : "call reply once per step" };
+        messages.push({ role: "tool", tool_call_id: call.id, content: toolResultContent(answer) });
         continue;
       }
       const match = results.find((entry) => entry.call.id === call.id);
@@ -149,8 +156,41 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnResult> {
   return { reply: FALLBACK_REPLY, status: "fallback", steps: input.maxSteps, usage, toolNames, model, provider };
 }
 
-function parseReply(call: ToolCall): { ok: true; value: ReplyInput } | { ok: false; error: string } {
+const TRUSTED_CONTACTS = ["url:stashh.me"];
+
+/**
+ * Every link, phone, e-mail and wallet in a tool result, so the reply may repeat it (a place's
+ * website, its phone). A key ending in `_untrusted` holds text a stranger wrote and adds nothing.
+ */
+export function collectTrusted(value: unknown, into: Set<string>, key?: string): void {
+  if (key?.endsWith("_untrusted")) return;
+  if (typeof value === "string") {
+    for (const token of findContactTokens(value)) into.add(contactKey(token));
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectTrusted(item, into);
+  } else if (value && typeof value === "object") {
+    for (const [childKey, child] of Object.entries(value)) collectTrusted(child, into, childKey);
+  }
+}
+
+/**
+ * A `reply` call checked beyond its schema. Its words reach the person as Stashh's, so a link,
+ * phone number, e-mail or wallet in them must have come from a tool result of this turn: one
+ * that came from a post's text, or from nowhere, is what an injected instruction would plant.
+ */
+export function parseReply(call: ToolCall, trusted: ReadonlySet<string> = new Set(TRUSTED_CONTACTS)): { ok: true; value: ReplyInput } | { ok: false; error: string } {
   if (call.parseError) return { ok: false, error: `arguments are not JSON: ${call.parseError}` };
   const parsed = replySchema.safeParse(call.arguments ?? {});
-  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, error: z.prettifyError(parsed.error) };
+  if (!parsed.success) return { ok: false, error: z.prettifyError(parsed.error) };
+
+  const value: ReplyInput = { ...parsed.data, text: cleanUntrustedText(parsed.data.text, 900) || parsed.data.text };
+  const visible = [value.text, ...(value.quick_replies?.map((item) => item.title) ?? []), value.cards?.kind === "lists" ? value.cards.button_title : ""].join("\n");
+  const foreign = findContactTokens(visible).filter((token) => token.kind !== "handle" && !trusted.has(contactKey(token)));
+  if (foreign.length > 0) {
+    return {
+      ok: false,
+      error: `Your reply contains ${foreign.map((token) => `"${token.value}"`).join(", ")}, which no tool returned this turn. Write it again without links, phone numbers or e-mails of your own.`,
+    };
+  }
+  return { ok: true, value };
 }

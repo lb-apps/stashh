@@ -3,6 +3,7 @@ import {
   registry,
   successEnvelope,
   commonErrorResponses,
+  recognitionQuotaResponse,
 } from "../../lib/openapi.js";
 import { recognitionErrorCodes } from "./failure-reason.js";
 import {
@@ -110,6 +111,7 @@ Once the job reaches \`completed\` status, the full result (extracted places, ca
       content: { "application/json": { schema: successEnvelope(recognitionEnqueuedSchema, "EnqueueRecognition") } },
     },
     ...commonErrorResponses,
+    ...recognitionQuotaResponse,
   },
 });
 

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { LocateFixed } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { Button } from "@/lib/discovery/components/Button";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { useCopy } from "@/lib/i18n/provider";
@@ -22,9 +23,13 @@ export function LocationPrompt() {
   if (state.status === "denied") return <QuietNote>{copy.locationOff}</QuietNote>;
 
   const locating = state.status === "locating";
+  const turnOn = async () => {
+    const position = await locate();
+    track("location_permission_answered", { is_granted: position !== null, surface: "home_prompt" });
+  };
   return (
     <div>
-      <Button variant="secondary" shape="pill" disabled={locating} onClick={() => void locate()} leadingIcon={<Glyph icon={LocateFixed} />}>
+      <Button variant="secondary" shape="pill" disabled={locating} onClick={() => void turnOn()} leadingIcon={<Glyph icon={LocateFixed} />}>
         {locating ? copy.locating : copy.useLocation}
       </Button>
     </div>

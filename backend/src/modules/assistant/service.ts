@@ -1,17 +1,24 @@
 import type { ChatMessage } from "../../lib/openrouter.js";
 import type { Json } from "../../types/database.js";
 import type { Logger } from "../../lib/logger.js";
+import { cleanUntrustedText } from "../../lib/untrusted-text.js";
 import type { ChannelIdentityRepository } from "../identities/repository.js";
 import { toSavedPlaceDto } from "../places/service.js";
 import { buildContextBlock } from "./context.js";
 import type { AssistantMessageRow, AssistantRepository } from "./repository.js";
-import { renderReply } from "./render.js";
+import { detectLanguage } from "./language.js";
+import { renderReply, type ButtonLanguage } from "./render.js";
 import { runTurn, type TurnModel } from "./run-turn.js";
 import { executeTool, recentRecognitions, toolDefinitions, type ReplyInput, type ToolServices } from "./tools.js";
 import type { AssistantChannel, InboundTurnMessage, ReplyPlan } from "./types.js";
 
 /** How much of the conversation the model sees again. */
 const HISTORY_LIMIT = 20;
+/** Characters of one replayed history message; a long paste is context once, not on every later turn. */
+const HISTORY_ROW_MAX_CHARS = 1_000;
+/** Characters of one inbound message, and of the whole turn when several are coalesced (newest kept). */
+const MESSAGE_MAX_CHARS = 2_000;
+const TURN_MAX_CHARS = 4_000;
 const HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Recent shares named in the account block; the tool goes further back. */
@@ -68,7 +75,9 @@ export class AssistantService {
     }
 
     const startedAt = this.now();
-    const ctx = { userId: input.userId, services: this.deps.tools };
+    // Only the channel's report of a tap counts as one; a typed "[tapped …]" is just text.
+    const tappedPayloads = new Set(input.messages.flatMap((message) => (message.tapped ? [message.tapped.payload] : [])));
+    const ctx = { userId: input.userId, services: this.deps.tools, tappedPayloads };
     // Explicit times: the person's messages at the turn's start, the reply at its end. Rows written
     // in one statement would otherwise share a timestamp, and the history would pair a question
     // with the answer before it.
@@ -116,14 +125,14 @@ export class AssistantService {
         contextBlock,
         // A retried turn may already hold this turn's user rows; they are the turn, not history.
         history: history.filter((row) => !(row.external_message_id && externalIds.has(row.external_message_id))).map(toChatMessage),
-        userMessage: userRows.map((row) => row.content).join("\n"),
+        userMessage: newestFirstCap(userRows.map((row) => row.content).join("\n"), TURN_MAX_CHARS),
         tools: toolDefinitions(),
         execute: (name, args) => executeTool(ctx, name, args),
         maxSteps: this.deps.maxSteps,
         log,
       });
 
-      const plan = await this.render(input.userId, result.reply, lists);
+      const plan = await this.render(input.userId, result.reply, lists, buttonLanguageOf(last.text));
       const turn = await repo.insertTurn({
         user_id: input.userId,
         channel: input.channel,
@@ -177,7 +186,7 @@ export class AssistantService {
   }
 
   /** Resolves the reply's card ids and map link into what the channel can draw. */
-  private async render(userId: string, reply: ReplyInput, listsBefore: Array<{ id: string }>): Promise<ReplyPlan> {
+  private async render(userId: string, reply: ReplyInput, listsBefore: Array<{ id: string }>, buttonLanguage: ButtonLanguage): Promise<ReplyPlan> {
     const { tools, log } = this.deps;
     let places: Awaited<ReturnType<typeof toSavedPlaceDto>>[] = [];
     let lists: Awaited<ReturnType<typeof tools.lists.listLists>> = [];
@@ -203,8 +212,21 @@ export class AssistantService {
       }
     }
 
-    return renderReply({ reply, places, lists, mapUrl });
+    return renderReply({ reply, places, lists, mapUrl, buttonLanguage });
   }
+}
+
+/** Turkish for Turkish and for Latin-script text the hint cannot place; English for everything else. */
+export function buttonLanguageOf(text: string): ButtonLanguage {
+  const hint = detectLanguage(text);
+  if (hint) return hint === "English" ? "en" : "tr";
+  return /[^\p{Script=Latin}\P{L}]/u.test(text) ? "en" : "tr";
+}
+
+/** The end of a long text, which holds the newest message; the cut is marked. */
+function newestFirstCap(text: string, maxChars: number): string {
+  const codePoints = [...text];
+  return codePoints.length <= maxChars ? text : `…${codePoints.slice(-maxChars).join("")}`;
 }
 
 /** The message of an Error, or of a PostgREST error object, which is not an Error instance. */
@@ -216,8 +238,10 @@ function errorMessage(error: unknown): string {
 
 /** A user message as the model reads it: the text, plus what was tapped when it was a tap. */
 export function formatInbound(message: InboundTurnMessage): string {
-  if (!message.tapped) return message.text;
-  return `${message.text}\n[tapped "${message.tapped.title}" · payload ${message.tapped.payload}]`;
+  // Hidden characters out, length bounded, and a typed tap marker defused: only a real tap carries one.
+  const text = cleanUntrustedText(message.text, MESSAGE_MAX_CHARS).replace(/\[(\s*tapped)/gi, "($1");
+  if (!message.tapped) return text;
+  return `${text}\n[tapped "${cleanUntrustedText(message.tapped.title, 200)}" · payload ${message.tapped.payload}]`;
 }
 
 /** The non-text parts of a reply, kept so the next turn's history says what was shown. */
@@ -231,7 +255,7 @@ function richNote(reply: ReplyInput, plan: ReplyPlan): Json | null {
 }
 
 function toChatMessage(row: AssistantMessageRow): ChatMessage {
-  if (row.role === "user") return { role: "user", content: row.content };
+  if (row.role === "user") return { role: "user", content: cleanUntrustedText(row.content, HISTORY_ROW_MAX_CHARS) };
   const rich = (row.rich ?? null) as null | { cards?: string[]; quick_replies?: string[]; map_link?: boolean };
   const notes: string[] = [];
   if (rich?.cards?.length) notes.push(`you sent cards: ${rich.cards.join(", ")}`);

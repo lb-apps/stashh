@@ -1,4 +1,5 @@
 import { config } from "../../config.js";
+import { AppHttpError } from "../../errors/appHttpError.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
 import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
@@ -12,6 +13,8 @@ import type {
   RecognitionTaskRow,
   SharedMediaFormat,
 } from "./types.js";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface RecognitionBackoffResult {
   retryCount: number;
@@ -140,6 +143,12 @@ export class RecognitionService {
     if (idempotencyKey) {
       const existing = await this.recognitionRepository.getRecognitionByIdempotencyKey(params.ownerUserId, idempotencyKey);
       if (existing) return existing;
+    }
+
+    // One account cannot run up the model and Places bill by pasting link after link.
+    const startedToday = await this.recognitionRepository.countRecognitionsSince(params.ownerUserId, new Date(Date.now() - DAY_MS));
+    if (startedToday >= config.RECOGNITIONS_DAILY_CAP) {
+      throw new AppHttpError(429, "Daily recognition limit reached; try again tomorrow", "RECOGNITION_QUOTA");
     }
 
     try {

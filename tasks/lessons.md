@@ -201,3 +201,14 @@ yerli kullanan".
 want (the feature stays behind `ASSISTANT_SUGGESTED_REPLIES` / `RECOGNITION_SUGGESTED_REPLIES`, off).
 A friend's register with emoji where they add meaning. Small talk is answered as small talk, never with
 the product pitch. Verbatim samples in the prompt get copied: keep them few and mark their language.
+
+## 2026-11-06 — Product analytics live in the interfaces people use
+
+**Correction:** "bu eventler worker tarafi icin degil, sadece insanlarin gordugu ve kullandigi
+arayuzler icin olmali" — the first Mixpanel plan put events in the backend services, the recognition
+worker and the Instagram DM service.
+
+**How to apply:** Mixpanel events are fired from the UI a person sees and touches (web today, iOS
+when it resumes). Backend, worker, DM service and ops carry no Mixpanel code; their numbers stay in
+the ops SQL functions. A state change is tracked in the client when the server confirms it (the
+mutation's `onSuccess`), so one action is one event.

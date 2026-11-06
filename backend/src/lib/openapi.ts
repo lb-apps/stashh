@@ -67,6 +67,14 @@ export function successEnvelope<T extends z.ZodTypeAny>(dataSchema: T, name: str
 
 // ── Common error responses ────────────────────────────────────────────────────
 
+/** A recognition request over the user's daily cap or the per-minute rate limit. */
+export const recognitionQuotaResponse = {
+  429: {
+    description: "`RECOGNITION_QUOTA`: the user started `RECOGNITIONS_DAILY_CAP` recognitions in the last 24 hours (default 100); `RATE_LIMIT`: too many requests this minute",
+    content: { "application/json": { schema: errorEnvelopeSchema } },
+  },
+};
+
 export const commonErrorResponses = {
   400: {
     description: "Validation error",

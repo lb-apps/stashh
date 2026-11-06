@@ -47,6 +47,8 @@ export const copy = {
   unsupported:
     "Bunu okuyamıyorum 😅 İçinde mekân geçen bir Reel, post ya da hikâye at, ya da bir Instagram / TikTok linki yapıştır; içindeki yerleri bulup haritana koyayım.",
   erased: "Stashh'teki verilerini sildik.",
+  /** A share past the daily recognition cap (`RECOGNITION_QUOTA`). */
+  dailyLimit: "Bugünlük çok paylaşım yaptın 😅 Yarın yeni Reel'leri okumaya devam ederim, kaydettiklerin haritanda duruyor.",
   /** With a fresh sign-in link, when someone writes "harita". */
   mapLink: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
   /** The personal sign-in link to the web map. */

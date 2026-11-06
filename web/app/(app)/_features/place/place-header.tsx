@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Bookmark, Navigation } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { Badge } from "@/lib/discovery/components/Badge";
 import { ButtonLink } from "@/lib/discovery/components/Button";
 import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
@@ -183,6 +184,7 @@ function PrimaryActions({ place }: { place: SavedPlace }) {
     <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-8)" }}>
       <ButtonLink
         href={directionsHref(place, os)}
+        onClick={() => track("directions_opened", {}, { leavesPage: true })}
         variant="primary"
         size="lg"
         shape="pill"

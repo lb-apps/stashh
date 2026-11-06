@@ -66,8 +66,8 @@ export function PasteSheet() {
   const typedLink = parseSourceLink(text);
   const showPasteButton = watchClipboard && canRead;
 
-  const begin = (link: SourceLink) =>
-    start.mutate(link.url, {
+  const begin = (link: SourceLink, entry: "clipboard" | "paste") =>
+    start.mutate({ sourceUrl: link.url, platform: link.platform, entry }, {
       onSuccess: ({ recognition_id }) => {
         void client.invalidateQueries({ queryKey: keys.recents });
         nav.open({ name: "recognizing", recognitionId: recognition_id });
@@ -95,7 +95,7 @@ export function PasteSheet() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (typedLink) begin(typedLink);
+    if (typedLink) begin(typedLink, "paste");
     else setTouched(true);
   };
 
@@ -105,7 +105,7 @@ export function PasteSheet() {
       <SheetBody>
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-8)" }}>
           {clipboardLink ? (
-            <ClipboardCard link={clipboardLink} busy={start.isPending} onFind={() => begin(clipboardLink)} onDismiss={() => setClipboardLink(null)} />
+            <ClipboardCard link={clipboardLink} busy={start.isPending} onFind={() => begin(clipboardLink, "clipboard")} onDismiss={() => setClipboardLink(null)} />
           ) : showPasteButton ? (
             <Button variant="secondary" size="lg" shape="pill" fullWidth leadingIcon={<Glyph icon={ClipboardPaste} />} onClick={readClipboard}>
               {c.paste.fromClipboard}

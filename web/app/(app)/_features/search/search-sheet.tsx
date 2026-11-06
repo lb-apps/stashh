@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { track } from "@/lib/analytics/analytics";
 import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
 import { SearchField } from "@/lib/discovery/components/SearchField";
 import { TEXT_SECONDARY_STRONG } from "@/lib/discovery/pending-tokens";
@@ -43,7 +44,10 @@ export function SearchSheet() {
     return sortNearYou(searchPlaces(places, query, (c) => t.categories[c]), origin);
   }, [places, searching, query, t, origin]);
 
-  const openPlace = (place: SavedPlace) => open({ name: "place", placeId: place.id });
+  const openPlace = (place: SavedPlace) => {
+    track("place_viewed", { entry: "search" });
+    open({ name: "place", placeId: place.id });
+  };
 
   return (
     <>

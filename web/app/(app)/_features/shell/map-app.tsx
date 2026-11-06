@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import { track } from "@/lib/analytics/analytics";
 import { DetentSheet } from "@/lib/discovery/components/DetentSheet";
 import { GlassProvider } from "@/lib/discovery/glass";
 import { useLiquidGlass } from "@/lib/discovery/liquid-glass/use-liquid-glass";
@@ -117,7 +118,11 @@ function MapScreen() {
         ref={mapRef}
         places={places}
         selectedId={selectedId}
-        onSelect={(placeId) => (placeId ? nav.open({ name: "place", placeId }) : nav.home())}
+        onSelect={(placeId) => {
+          if (!placeId) return nav.home();
+          track("place_viewed", { entry: "map_pin" });
+          nav.open({ name: "place", placeId });
+        }}
         dropping={landed === state.justSaved ? [] : state.justSaved}
         onDropped={() => setLanded(state.justSaved)}
         bottomInset={bottomInset}

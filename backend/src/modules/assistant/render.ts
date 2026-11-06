@@ -1,6 +1,6 @@
 import type { ListSummaryDto } from "../lists/service.js";
 import type { SavedPlaceDto } from "../places/service.js";
-import type { ReplyInput } from "./tools.js";
+import { CANCEL_PAYLOAD, confirmPayload, type ConfirmAction, type ReplyInput } from "./tools.js";
 import type { PlanButton, PlanCard, PlanMessage, ReplyPlan } from "./types.js";
 
 /**
@@ -16,12 +16,33 @@ export interface RenderInput {
   lists: ListSummaryDto[];
   /** The minted sign-in link when the reply asked for one; null when it could not be minted. */
   mapUrl: string | null;
+  /** The language the confirm buttons are written in; the model never writes them. */
+  buttonLanguage?: ButtonLanguage;
+}
+
+export type ButtonLanguage = "tr" | "en";
+
+/**
+ * The confirm / cancel pair for an irreversible action. Fixed titles that say exactly what a tap
+ * does, so no text the model was talked into can dress the erase button up as something else.
+ */
+const CONFIRM_TITLES: Record<ButtonLanguage, Record<ConfirmAction["action"] | "cancel", string>> = {
+  tr: { delete_list: "Evet, listeyi sil", remove_place: "Evet, mekânı kaldır", erase_data: "Evet, verilerimi sil", cancel: "Vazgeç" },
+  en: { delete_list: "Yes, delete list", remove_place: "Yes, remove place", erase_data: "Yes, erase my data", cancel: "Cancel" },
+};
+
+export function confirmQuickReplies(confirm: ConfirmAction, language: ButtonLanguage): Array<{ title: string; payload: string }> {
+  const titles = CONFIRM_TITLES[language];
+  return [
+    { title: titles[confirm.action], payload: confirmPayload(confirm) },
+    { title: titles.cancel, payload: CANCEL_PAYLOAD },
+  ];
 }
 
 /** The button label on the person's map link, understood in either of the channel's languages. */
 export const MAP_BUTTON_TITLE = "stashh.me";
 
-export function renderReply({ reply, places, lists, mapUrl }: RenderInput): ReplyPlan {
+export function renderReply({ reply, places, lists, mapUrl, buttonLanguage = "tr" }: RenderInput): ReplyPlan {
   const messages: PlanMessage[] = [];
 
   if (reply.cards?.kind === "places" && places.length > 0) {
@@ -31,7 +52,9 @@ export function renderReply({ reply, places, lists, mapUrl }: RenderInput): Repl
     messages.push({ kind: "carousel", cards: lists.map((list) => listCard(list, buttonTitle)) });
   }
 
-  const quickReplies = reply.quick_replies?.map((item) => ({ title: item.title, payload: item.payload ?? item.title }));
+  const quickReplies = reply.confirm
+    ? confirmQuickReplies(reply.confirm, buttonLanguage)
+    : reply.quick_replies?.map((item) => ({ title: item.title, payload: item.payload ?? item.title }));
   const last: PlanMessage =
     reply.map_link && mapUrl
       ? { kind: "button", text: reply.text, buttons: [{ type: "web_url", title: MAP_BUTTON_TITLE, url: mapUrl }] }

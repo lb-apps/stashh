@@ -22,4 +22,12 @@ export const publicEnv = {
   get mapboxToken() {
     return required("NEXT_PUBLIC_MAPBOX_TOKEN", process.env.NEXT_PUBLIC_MAPBOX_TOKEN);
   },
+  /** Optional: without it analytics stays off (local dev, CI). */
+  get mixpanelToken(): string | null {
+    return process.env.NEXT_PUBLIC_MIXPANEL_TOKEN || null;
+  },
+  /** `production` only on stashh.me; tags every event so a wrong token shows up at once. */
+  get appEnv(): string {
+    return process.env.NEXT_PUBLIC_APP_ENV || "development";
+  },
 };

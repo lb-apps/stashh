@@ -8,6 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import { LocationProvider } from "@/lib/platform/location";
 import { PlatformProvider, type Platform } from "@/lib/platform/provider";
 import { StashhApiError } from "@/lib/stashh/api";
+import { AnalyticsSession } from "./analytics-session";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -30,6 +31,7 @@ export function Providers({ locale, platform, children }: { locale: Locale; plat
       <I18nProvider locale={locale}>
         <SessionProvider>
           <QueryClientProvider client={queryClient}>
+            <AnalyticsSession />
             <LocationProvider>{children}</LocationProvider>
           </QueryClientProvider>
         </SessionProvider>

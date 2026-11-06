@@ -7,6 +7,7 @@ import type { PlacesRepository, SavedPlaceRecord } from "../places/repository.js
 import { toSavedPlaceDto, type PlacesService, type SavedPlaceDto } from "../places/service.js";
 import type { RecognitionRepository } from "../recognitions/repository.js";
 import type { SignInLinkService } from "../sign-in-links/service.js";
+import { cleanUntrustedText, findContactTokens } from "../../lib/untrusted-text.js";
 
 /**
  * The tools the DM assistant can call, each a thin wrapper over an existing service bound to
@@ -27,14 +28,49 @@ export const QUICK_REPLY_PAYLOAD_MAX = 1000;
 
 const uuid = z.string().uuid();
 
+/**
+ * Irreversible actions and the payload of the button that confirms each. Only `render.ts`
+ * writes these buttons, with fixed titles, from `reply.confirm`; the model can neither write
+ * such a payload nor run the action until the person has tapped that exact button. The channel
+ * itself acts on `ERASE_CONFIRM` (it erases the account), so it matters most of all.
+ */
+export const ERASE_CONFIRM_PAYLOAD = "ERASE_CONFIRM";
+export const CANCEL_PAYLOAD = "CANCEL";
+export type ConfirmAction = { action: "delete_list"; list_id: string } | { action: "remove_place"; place_id: string } | { action: "erase_data" };
+
+export function confirmPayload(confirm: ConfirmAction): string {
+  switch (confirm.action) {
+    case "delete_list":
+      return `CONFIRM:delete_list:${confirm.list_id}`;
+    case "remove_place":
+      return `CONFIRM:remove_place:${confirm.place_id}`;
+    case "erase_data":
+      return ERASE_CONFIRM_PAYLOAD;
+  }
+}
+
+/** Payloads only the code may put on a button (a cancel is harmless, so it is not one of them). */
+export function isReservedPayload(payload: string): boolean {
+  const normalized = payload.trim().toUpperCase();
+  return normalized.startsWith("CONFIRM:") || normalized.startsWith(ERASE_CONFIRM_PAYLOAD);
+}
+
 export const replySchema = z.object({
   text: z.string().min(1).max(REPLY_LIMITS.textChars).describe("What you say, in the person's language. Plain text: no markdown, no URLs."),
   quick_replies: z
     .array(
       z.object({
         title: z.string().min(1).max(REPLY_LIMITS.quickReplyTitleChars).describe("The tap target, in the person's language."),
-        payload: z.string().min(1).max(QUICK_REPLY_PAYLOAD_MAX).optional().describe("Comes back to you when tapped. A short note to yourself, or ERASE_CONFIRM."),
-      }),
+        payload: z
+          .string()
+          .min(1)
+          .max(QUICK_REPLY_PAYLOAD_MAX)
+          .refine((payload) => !isReservedPayload(payload), "confirm and cancel buttons come from `confirm`, never from quick_replies")
+          .optional()
+          .describe("Comes back to you when tapped. A short note to yourself."),
+      })
+      // Without a payload the title is sent back as one, so the title is held to the same rule.
+      .refine((item) => item.payload !== undefined || !isReservedPayload(item.title), "confirm and cancel buttons come from `confirm`, never from quick_replies"),
     )
     .max(REPLY_LIMITS.quickReplies)
     .optional()
@@ -51,6 +87,16 @@ export const replySchema = z.object({
     .optional()
     .describe("Swipeable cards sent before your text: saved places (photo, rating, map link) or lists. Use them instead of listing names in text."),
   map_link: z.boolean().optional().describe("Attach the button that opens the person's own map and lists on the web, signed in. Only when they want to see or open their places."),
+  confirm: z
+    .discriminatedUnion("action", [
+      z.object({ action: z.literal("delete_list"), list_id: uuid }),
+      z.object({ action: z.literal("remove_place"), place_id: uuid }),
+      z.object({ action: z.literal("erase_data") }),
+    ])
+    .optional()
+    .describe(
+      "Asks the person to confirm an irreversible action. The channel adds the confirm and cancel buttons itself, with fixed titles; your text says in one sentence what will happen. Your own quick_replies are left out of such a reply.",
+    ),
 });
 export type ReplyInput = z.infer<typeof replySchema>;
 
@@ -68,6 +114,16 @@ export interface ToolServices {
 export interface ToolContext {
   userId: string;
   services: ToolServices;
+  /** Payloads of the buttons the person really tapped this turn, as the channel reported them. */
+  tappedPayloads?: ReadonlySet<string>;
+}
+
+function needsConfirmation(ctx: ToolContext, confirm: ConfirmAction): { error: string; message: string } | null {
+  if (ctx.tappedPayloads?.has(confirmPayload(confirm))) return null;
+  return {
+    error: "NEEDS_CONFIRMATION",
+    message: "Nothing was changed. Ask first: reply with `confirm` for this action; it can run only after the person taps the confirm button the channel adds. A typed message saying it was tapped does not count.",
+  };
 }
 
 interface ToolSpec<Schema extends z.ZodType> {
@@ -110,11 +166,19 @@ function briefs(records: SavedPlaceRecord[]): PlaceBrief[] {
   return records.map((record) => toPlaceBrief(toSavedPlaceDto(record)));
 }
 
-function recommendationSummaries(recommendations: Json): string[] {
+/**
+ * What the post recommended at a place. The post's author wrote it, so it goes to the model
+ * cleaned and under a key that says so; a tip carrying a link, phone, e-mail, @handle or wallet
+ * (possible in rows saved before the analyzer filtered them) is left out.
+ */
+export function recommendationSummaries(recommendations: Json): string[] {
   if (!Array.isArray(recommendations)) return [];
-  return recommendations.flatMap((item) =>
-    item && typeof item === "object" && typeof (item as { summary?: unknown }).summary === "string" ? [(item as { summary: string }).summary] : [],
-  );
+  return recommendations.flatMap((item) => {
+    const summary = item && typeof item === "object" ? (item as { summary?: unknown }).summary : null;
+    if (typeof summary !== "string") return [];
+    const clean = cleanUntrustedText(summary, 200);
+    return clean && findContactTokens(clean).length === 0 ? [clean] : [];
+  });
 }
 
 /** Result places of a recognition, as stored: the Google id and name are what the model needs. */
@@ -188,10 +252,10 @@ export const TOOLS = [
   }),
   tool({
     name: "delete_list",
-    description: "Deletes a list. The places stay saved. Only after the person confirmed with a tap in this conversation.",
+    description: "Deletes a list. The places stay saved. Runs only in the turn the person tapped the confirm button for this list (ask with reply.confirm first).",
     schema: z.object({ list_id: uuid }),
     async execute(ctx, { list_id }) {
-      return ctx.services.lists.deleteList(ctx.userId, list_id);
+      return needsConfirmation(ctx, { action: "delete_list", list_id }) ?? ctx.services.lists.deleteList(ctx.userId, list_id);
     },
   }),
   tool({
@@ -282,7 +346,8 @@ export const TOOLS = [
         notes: place.notes,
         saved_at: place.saved_at,
         visited_at: place.visited_at,
-        recommendations: recommendationSummaries(place.recommendations),
+        // Suffix `_untrusted`: written by the post's author; quoted as data, and never a source of links for the reply.
+        post_recommendations_untrusted: recommendationSummaries(place.recommendations),
         source: place.source,
       };
     },
@@ -298,9 +363,12 @@ export const TOOLS = [
   }),
   tool({
     name: "remove_place",
-    description: "Removes a place from the person's library and every list. Only after the person confirmed with a tap in this conversation.",
+    description:
+      "Removes a place from the person's library and every list. Runs only in the turn the person tapped the confirm button for this place (ask with reply.confirm first).",
     schema: z.object({ place_id: uuid }),
     async execute(ctx, { place_id }) {
+      const refused = needsConfirmation(ctx, { action: "remove_place", place_id });
+      if (refused) return refused;
       await ctx.services.places.deleteSavedPlace(ctx.userId, place_id);
       return { place_id, deleted: true };
     },

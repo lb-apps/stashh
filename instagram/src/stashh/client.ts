@@ -98,6 +98,9 @@ export type RecognitionSource =
   | { kind: "url"; url: string; caption?: string | null }
   | { kind: "instagram_media"; format: "post" | "story"; mediaId: string; mediaUrl: string; caption: string | null };
 
+/** The backend's answer when a user started their daily number of recognitions. */
+export const RECOGNITION_QUOTA = "RECOGNITION_QUOTA";
+
 export class StashhApiError extends Error {
   readonly status: number;
   readonly code: string | null;
@@ -109,8 +112,9 @@ export class StashhApiError extends Error {
     this.code = code;
   }
 
-  /** 5xx, 429 and network failures are worth retrying; 4xx are not. */
+  /** 5xx, 429 and network failures are worth retrying; 4xx are not, nor the daily recognition cap. */
   get retryable(): boolean {
+    if (this.code === RECOGNITION_QUOTA) return false;
     return this.status === 0 || this.status === 429 || this.status >= 500;
   }
 }
