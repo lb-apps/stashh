@@ -139,3 +139,29 @@ Asked by the owner on 2026-11-04 ("bu agent'in ayarlarını dashboard'da görüp
 - [x] `ops/README.md` and CLAUDE.md updated (PR #30, merged e60d605)
 - [ ] `instagram_ops_stats` v3 counting the `chat` intent (the Instagram page's "What was asked" still omits it)
 
+
+# Mixpanel product analytics (web)
+
+Asked by the owner on 2026-11-06: "projeye mixpanel ekleyeceksin … My Dora Website'daki best practice'lere
+uygun". Owner's calls: a new Little Big Apps org, two projects, no consent banner, and — after the first
+plan — events only from the interfaces people use, never from the worker/backend/DM side. Branch
+`feature/mixpanel` from `origin/develop`. Guide: docs/analytics-plan.md.
+
+- [x] Mixpanel: "Stashh - Production" (4081399) and "Stashh - Staging" (4081400), EU, Europe/Istanbul, Simplified ID Merge, in the Little Big Apps org
+- [x] `web/lib/analytics/`: typed catalog (`events.ts`), one SDK module (`analytics.ts`: core build, lazy, EU host, context via `before_track`, no autocapture/replay/heatmaps)
+- [x] 20 events wired: writes in `mutations.ts` `onSuccess`, views at the call sites, outbound clicks with `leavesPage`; identify on session, profile from `/me`, reset on sign-out
+- [x] Landing CTA as a client island; SDK absent from the landing first load (36 KB gzip lazy chunk)
+- [x] Privacy policy §3/§4/§5 name Mixpanel (drafted by GPT-6.1 Sol, reviewed); CLAUDE.md section; lesson logged
+- [x] Vercel env: production token + `NEXT_PUBLIC_APP_ENV=production`; staging token for preview/development
+- [ ] Lexicon (display names, descriptions, verified) in both projects once events land in production — the Mixpanel MCP is signed in to the My Dora account and cannot see the Little Big Apps org; reconnect it or do it in the UI
+- [ ] Privacy: effective date and Mixpanel retention / erase-on-"sil" (the DM erase does not delete Mixpanel data yet) — owner's call
+
+## Review
+
+Verified end to end against Stashh - Staging (local backend + web, dev test user): page views, `place_viewed`
+(map_pin, home), `place_visited` ×2, `place_note_saved`, `clipboard_watch_toggled` ×2, `user_signed_out`,
+`instagram_cta_clicked` (sendBeacon, page left) all arrived in Mixpanel's Events view with `app_env`, the
+Supabase user id and `api-eu`. Found and fixed during the check: `reset()` wiped registered super properties and
+the first page view fired inside `init` before `register` — context now rides a `before_track` hook. Not
+exercised live (no test data written to the shared DB): `list_created`, `places_saved`, `recognition_*`,
+`place_removed`, `location_permission_answered`, `map_link_*` — same code paths, typechecked.
