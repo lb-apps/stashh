@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ExternalLink, Film, Image as ImageIcon } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { MicroLabel } from "@/lib/discovery/components/MicroLabel";
 import { PlacePhoto } from "@/lib/discovery/components/PlacePhoto";
@@ -75,6 +76,7 @@ function OpenPostLink({ href, label }: { href: string; label: string }) {
     <a
       href={href}
       aria-label={label}
+      onClick={() => track("source_post_opened", { surface: "place" }, { leavesPage: true })}
       {...press.handlers}
       style={{
         display: "grid",

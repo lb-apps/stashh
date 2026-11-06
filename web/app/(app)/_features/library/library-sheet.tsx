@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { track } from "@/lib/analytics/analytics";
 import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { TEXT_SECONDARY_STRONG, TITLE_3 } from "@/lib/discovery/pending-tokens";
@@ -64,7 +65,10 @@ function Library({ places }: { places: SavedPlace[] }) {
   const categories = countBy<CategoryGroup>(places, (p) => p.category_group);
   const recent = newestFirst(places).slice(0, RECENT_LIMIT);
   const n = (count: number) => formatCount(count, locale);
-  const openPlace = (place: SavedPlace) => open({ name: "place", placeId: place.id });
+  const openPlace = (place: SavedPlace) => {
+    track("place_viewed", { entry: "library" });
+    open({ name: "place", placeId: place.id });
+  };
 
   return (
     <SheetBody>
@@ -84,7 +88,10 @@ function Library({ places }: { places: SavedPlace[] }) {
                 key={list.id}
                 list={list}
                 meta={copy.places(n(list.place_count), list.place_count)}
-                onOpen={() => open({ name: "listdetail", listId: list.id })}
+                onOpen={() => {
+                  track("list_viewed", { entry: "library", place_count: list.place_count });
+                  open({ name: "listdetail", listId: list.id });
+                }}
               />
             ))}
           </div>

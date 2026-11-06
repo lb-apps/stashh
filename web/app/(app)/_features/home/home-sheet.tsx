@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CircleCheck, Clock, Flag, LayoutGrid, Map as MapGlyph, type LucideIcon } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { CategoryPill } from "@/lib/discovery/components/CategoryPill";
 import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
 import { Glyph } from "@/lib/discovery/components/Glyph";
@@ -101,7 +102,10 @@ function HomeContent({ all }: { all: SavedPlace[] }) {
   const openable = reels.filter(isOpenable).slice(0, REEL_LIMIT);
 
   const n = (count: number) => formatCount(count, locale);
-  const openPlace = (place: SavedPlace) => open({ name: "place", placeId: place.id });
+  const openPlace = (place: SavedPlace) => {
+    track("place_viewed", { entry: "home" });
+    open({ name: "place", placeId: place.id });
+  };
   const openLibrary = () => open({ name: "library" });
   const openReel = (reel: RecentRecognition) =>
     open(reel.status === "completed" ? { name: "results", recognitionId: reel.recognition_id } : { name: "recognizing", recognitionId: reel.recognition_id });
@@ -154,7 +158,10 @@ function HomeContent({ all }: { all: SavedPlace[] }) {
                   icon={CATEGORY_GLYPH[cover]}
                   title={list.title}
                   meta={copy.spots(n(list.place_count), list.place_count)}
-                  onClick={() => open({ name: "listdetail", listId: list.id })}
+                  onClick={() => {
+                    track("list_viewed", { entry: "home", place_count: list.place_count });
+                    open({ name: "listdetail", listId: list.id });
+                  }}
                 />
               );
             })}

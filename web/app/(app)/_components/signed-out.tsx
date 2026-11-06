@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@/lib/analytics/analytics";
 import { BrandMoment } from "@/lib/discovery/components/BrandMoment";
 import { ButtonLink } from "@/lib/discovery/components/Button";
 import { GlossyObject } from "@/lib/discovery/components/GlossyObject";
@@ -23,7 +24,12 @@ export function SignedOut({ variant }: { variant: "signed-out" | "invalid" }) {
       sub={variant === "invalid" ? t.auth.linkInvalidBody : t.auth.signedOutBody}
       action={
         inAppBrowser === "instagram" ? null : (
-          <ButtonLink href={INSTAGRAM_DM} variant="onBrand" size="lg">
+          <ButtonLink
+            href={INSTAGRAM_DM}
+            onClick={() => track("instagram_cta_clicked", { surface: variant === "invalid" ? "invalid_link" : "signed_out" }, { leavesPage: true })}
+            variant="onBrand"
+            size="lg"
+          >
             {t.auth.openInstagram}
           </ButtonLink>
         )

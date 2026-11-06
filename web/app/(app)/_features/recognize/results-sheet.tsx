@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ExternalLink, MapPin } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { Button, ButtonLink } from "@/lib/discovery/components/Button";
 import { Checkbox } from "@/lib/discovery/components/Checkbox";
 import { SheetFooter } from "@/lib/discovery/components/DetentSheet";
@@ -69,6 +70,7 @@ export function ResultsSheet({ recognitionId }: { recognitionId: string }) {
             ) : null}
             <ButtonLink
               href={data.source_url}
+              onClick={() => track("source_post_opened", { surface: "results" }, { leavesPage: true })}
               variant="secondary"
               size="sm"
               shape="pill"

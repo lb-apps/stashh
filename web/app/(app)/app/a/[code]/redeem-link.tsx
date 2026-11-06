@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { track } from "@/lib/analytics/analytics";
 import { BrandMoment } from "@/lib/discovery/components/BrandMoment";
 import { GlossyObject } from "@/lib/discovery/components/GlossyObject";
 import { signInWithTokenHash } from "@/lib/auth/session";
@@ -23,8 +24,10 @@ export function RedeemLink({ code }: { code: string }) {
     (async () => {
       const result = await redeem(code);
       if (result.ok && (await signInWithTokenHash(result.tokenHash))) {
+        track("map_link_opened", {});
         router.replace("/app");
       } else {
+        track("map_link_failed", {});
         setFailed(true);
       }
     })();
