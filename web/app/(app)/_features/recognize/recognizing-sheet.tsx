@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
+import { track } from "@/lib/analytics/analytics";
 import { Button } from "@/lib/discovery/components/Button";
 import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
 import { GlossyObject } from "@/lib/discovery/components/GlossyObject";
@@ -14,7 +15,7 @@ import { useStartRecognition } from "@/lib/stashh/mutations";
 import { keys, useRecognition } from "@/lib/stashh/queries";
 import { useSheetNav } from "../shell/sheet-state";
 import { recognizeCopy } from "./copy";
-import { recognitionOutcome, STAGE_ORDER, type FailureKind, type Outcome } from "./recognition-view";
+import { recognitionOutcome, saveablePlaces, STAGE_ORDER, type FailureKind, type Outcome } from "./recognition-view";
 import { parseSourceLink } from "./source-link";
 
 /** Glossy object sizes: the working orb at peek, the empty-handed one at full height. */
@@ -41,6 +42,8 @@ export function RecognizingSheet({ recognitionId }: { recognitionId: string }) {
 
   // The poll settling is the external event: move on once, when it does.
   const settle = React.useEffectEvent((kind: "found" | "failed") => {
+    if (outcome.kind === "failed") track("recognition_failed", { reason: outcome.reason === "noPlaces" ? "no_places" : outcome.reason });
+    else if (data) track("recognition_completed", { place_count: saveablePlaces(data).length, duration_ms: Date.now() - Date.parse(data.created_at) });
     if (kind === "found") {
       // "Last pulled in" and the results header want this post's author.
       void client.invalidateQueries({ queryKey: keys.recents });
@@ -151,8 +154,12 @@ function RecognitionFailed({ reason, sourceUrl }: { reason: FailureKind; sourceU
   const canRetry = sourceUrl != null && (reason === "unavailable" || reason === "unreadable");
 
   const retry = () => {
-    if (!sourceUrl) return;
-    start.mutate(sourceUrl, { onSuccess: ({ recognition_id }) => nav.open({ name: "recognizing", recognitionId: recognition_id }) });
+    const link = sourceUrl ? parseSourceLink(sourceUrl) : null;
+    if (!sourceUrl || !link) return;
+    start.mutate(
+      { sourceUrl, platform: link.platform, entry: "retry" },
+      { onSuccess: ({ recognition_id }) => nav.open({ name: "recognizing", recognitionId: recognition_id }) },
+    );
   };
 
   return (

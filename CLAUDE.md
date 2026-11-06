@@ -112,6 +112,22 @@ kit splits the token system in half — if a component is missing, add it to
 **Light only.** Discovery is a single warm-bone light system. There is no dark
 theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
+## Product analytics — Mixpanel
+
+Guide: [docs/analytics-plan.md](docs/analytics-plan.md). Events come only from the interfaces
+people use (web today, iOS when it resumes); backend, worker, DM service, relay and `ops/` send
+none — their numbers stay in the ops SQL functions.
+
+- One module touches the SDK: `web/lib/analytics/analytics.ts` (core build, lazy-loaded, EU host,
+  no autocapture / replay / heatmaps). Names are coined only in `web/lib/analytics/events.ts`:
+  `snake_case`, `object_action`, past tense, typed props, no personal data in properties.
+- A write is tracked in its mutation's `onSuccess` (`lib/stashh/mutations.ts`), once; a click that
+  leaves the page passes `{ leavesPage: true }`.
+- Identity: the Supabase user id; `identify` only with a session, `reset` only on sign-out.
+- Two projects in the Little Big Apps org: Stashh - Production (Vercel production) and Stashh -
+  Staging (local, previews). A new event gets a Lexicon display name, description and `verified`
+  in both.
+
 ## Ops dashboard — `ops/` (local only)
 
 `ops/` is an internal tool, never deployed: `cd ops && npm run dev` serves it on

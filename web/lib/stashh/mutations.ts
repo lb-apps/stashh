@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { track } from "@/lib/analytics/analytics";
+import type { RecognitionEntry } from "@/lib/analytics/events";
 import { api } from "./endpoints";
 import { keys } from "./queries";
 import type { CategoryGroup, SavedPlace } from "./types";
@@ -10,6 +12,9 @@ import type { CategoryGroup, SavedPlace } from "./types";
  * cache changes on tap and rolls back if the request fails, so the UI never
  * waits on the network for a toggle. Refetches after a write run in the
  * background — a screen moves on as soon as the write itself succeeds.
+ *
+ * Each write reports its analytics event here, once the server has confirmed
+ * it: one place per action, whichever screen started it.
  */
 
 function patchPlace(client: QueryClient, placeId: string, patch: (p: SavedPlace) => SavedPlace | null) {
@@ -28,6 +33,7 @@ function useOptimisticPlaceMutation<V>(
   run: (vars: V) => Promise<unknown>,
   placeIdOf: (vars: V) => string,
   patch: (vars: V) => (p: SavedPlace) => SavedPlace | null,
+  onSuccess: (vars: V) => void,
 ) {
   const client = useQueryClient();
   return useMutation({
@@ -39,6 +45,7 @@ function useOptimisticPlaceMutation<V>(
     onError: (_error, _vars, context) => {
       if (context?.previous) client.setQueryData(keys.places, context.previous);
     },
+    onSuccess: (_data, vars) => onSuccess(vars),
     onSettled: () => void client.invalidateQueries({ queryKey: keys.places }),
   });
 }
@@ -48,6 +55,7 @@ export function useSetVisited() {
     ({ placeId, visited }: { placeId: string; visited: boolean }) => api.places.setVisited(placeId, visited),
     (v) => v.placeId,
     ({ visited }) => (p) => ({ ...p, visited_at: visited ? new Date().toISOString() : null }),
+    ({ visited }) => track("place_visited", { is_visited: visited }),
   );
 }
 
@@ -56,6 +64,7 @@ export function useSetNote() {
     ({ placeId, notes }: { placeId: string; notes: string | null }) => api.places.setNote(placeId, notes),
     (v) => v.placeId,
     ({ notes }) => (p) => ({ ...p, notes }),
+    ({ notes }) => track("place_note_saved", { has_note: Boolean(notes?.trim()) }),
   );
 }
 
@@ -64,11 +73,16 @@ export function useRemovePlace() {
     ({ placeId }: { placeId: string }) => api.places.remove(placeId),
     (v) => v.placeId,
     () => () => null,
+    () => track("place_removed", {}),
   );
 }
 
+/** `platform` is the reader's link as `parseSourceLink` read it; `entry` is where they started from. */
 export function useStartRecognition() {
-  return useMutation({ mutationFn: (sourceUrl: string) => api.recognitions.start(sourceUrl) });
+  return useMutation({
+    mutationFn: (input: { sourceUrl: string; platform: "instagram" | "tiktok"; entry: RecognitionEntry }) => api.recognitions.start(input.sourceUrl),
+    onSuccess: (_data, { platform, entry }) => track("recognition_started", { entry, source_platform: platform }),
+  });
 }
 
 /**
@@ -99,6 +113,13 @@ export function useSaveRecognised() {
       }
       return placeIds;
     },
+    onSuccess: (placeIds, { into }) => {
+      track("places_saved", {
+        place_count: placeIds.length,
+        target: into.kind === "list" ? "existing_list" : into.kind === "new" ? "new_list" : "no_list",
+      });
+      if (into.kind === "new") track("list_created", { entry: "recognition" });
+    },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.places });
       void client.invalidateQueries({ queryKey: keys.lists });
@@ -119,6 +140,7 @@ export function useAddToList() {
     onError: (_error, _vars, context) => {
       if (context?.previous) client.setQueryData(keys.places, context.previous);
     },
+    onSuccess: () => track("place_added_to_list", {}),
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.places });
       void client.invalidateQueries({ queryKey: keys.lists });
@@ -132,6 +154,7 @@ export function useCreateList() {
   return useMutation({
     mutationFn: (body: { title: string; description: string | null; cover: CategoryGroup; placeIds: string[] }) =>
       api.lists.create({ title: body.title, description: body.description, cover_category: body.cover, place_ids: body.placeIds }),
+    onSuccess: (_data, { placeIds }) => track("list_created", { entry: placeIds.length ? "place" : "empty" }),
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.places });
       void client.invalidateQueries({ queryKey: keys.lists });

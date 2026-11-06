@@ -3,6 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { reset as resetAnalytics, track } from "@/lib/analytics/analytics";
 import { signOut } from "@/lib/auth/session";
 import { ActionPill } from "@/lib/discovery/components/ActionPill";
 import { Avatar } from "@/lib/discovery/components/Avatar";
@@ -160,10 +161,19 @@ function Settings() {
   const [reduceTransparency, setReduceTransparency] = useReduceTransparency();
   const { state, locate } = useLocation();
 
+  const toggleWatchClipboard = (on: boolean) => {
+    setWatchClipboard(on);
+    track("clipboard_watch_toggled", { is_enabled: on });
+  };
+  const turnOnLocation = async () => {
+    const position = await locate();
+    track("location_permission_answered", { is_granted: position !== null, surface: "profile" });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--row-gap)" }}>
       <SettingRow title={c.watchClipboard} hint={c.watchClipboardHint}>
-        {(hintId) => <Switch checked={watchClipboard} onChange={setWatchClipboard} label={c.watchClipboard} aria-describedby={hintId} />}
+        {(hintId) => <Switch checked={watchClipboard} onChange={toggleWatchClipboard} label={c.watchClipboard} aria-describedby={hintId} />}
       </SettingRow>
       <SettingRow title={c.reduceTransparency} hint={c.reduceTransparencyHint}>
         {(hintId) => <Switch checked={reduceTransparency} onChange={setReduceTransparency} label={c.reduceTransparency} aria-describedby={hintId} />}
@@ -171,7 +181,7 @@ function Settings() {
       <SettingRow title={c.location} hint={c.locationHint[state.status]}>
         {(hintId) =>
           state.status === "granted" ? null : (
-            <ActionPill aria-describedby={hintId} disabled={state.status === "locating"} onClick={() => void locate()} style={{ flex: "0 0 auto" }}>
+            <ActionPill aria-describedby={hintId} disabled={state.status === "locating"} onClick={() => void turnOnLocation()} style={{ flex: "0 0 auto" }}>
               {c.turnOn}
             </ActionPill>
           )
@@ -206,7 +216,10 @@ function SignOutDialog({ onCancel }: { onCancel: () => void }) {
   const client = useQueryClient();
 
   const confirm = async () => {
+    track("user_signed_out", {});
     await signOut();
+    // A fresh device id, so the next person on this device is not filed under this one.
+    resetAnalytics();
     // The next reader on this device must not see this one's cache.
     client.clear();
   };

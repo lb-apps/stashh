@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { track } from "@/lib/analytics/analytics";
 import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
 import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
 import { Glyph } from "@/lib/discovery/components/Glyph";
@@ -49,7 +50,10 @@ function ListDetail({ list }: { list: ListSummary }) {
   const places = usePlaces().data;
   const inList = React.useMemo(() => places?.filter((p) => p.list_ids.includes(list.id)) ?? [], [places, list.id]);
   const cover = list.cover_category ?? "default";
-  const openPlace = (place: SavedPlace) => open({ name: "place", placeId: place.id });
+  const openPlace = (place: SavedPlace) => {
+    track("place_viewed", { entry: "list" });
+    open({ name: "place", placeId: place.id });
+  };
 
   return (
     <>
