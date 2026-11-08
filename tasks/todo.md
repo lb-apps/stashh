@@ -165,3 +165,16 @@ Supabase user id and `api-eu`. Found and fixed during the check: `reset()` wiped
 the first page view fired inside `init` before `register` — context now rides a `before_track` hook. Not
 exercised live (no test data written to the shared DB): `list_created`, `places_saved`, `recognition_*`,
 `place_removed`, `location_permission_answered`, `map_link_*` — same code paths, typechecked.
+
+# Google search failures no longer look like "no place found"
+
+Ankapark (and every other venue) stopped matching on 2026-11-08 around 18:40 UTC. The analyzer still named
+it; every Google Text Search failed, and `GooglePlacesClient` turned the HTTP error into an empty list. The run
+reported success, 0 matched, and cached the empty result for the post. Branch `fix/places-search-errors`.
+
+- [x] `searchText` / `searchNearby` throw `GooglePlacesSearchError` with Google's own reason; the worker's existing failure path retries, records it on the run, and writes no result
+- [x] Tests: refused text and nearby searches, non-JSON failures, a plain empty answer, and `matchPlaces` failing rather than answering "not found"
+- [ ] A new, restricted `GOOGLE_PLACES_API_KEY` on `home-server` and in `backend/.env` (owner; the local one answers "API key expired")
+- [ ] After the key: re-run with `x-bypass-cache` the posts cached empty since the outage (Dblijq3NCgq, DdHLN1at2AU, DaK2Apbs8mN, DfeTJZzNwus) and DcqsIBesH40 (its result was overwritten by the diagnostic re-run)
+- [ ] After the key: confirm Ankapark matches; if it does not, read the `not a business` rejection and fix `isBusiness`
+- [ ] `ops/.env.local` points `STASHH_API_URL` at an old Tailscale IP; docs/deploy.md's `http://home-server:3000` is the one that answers
