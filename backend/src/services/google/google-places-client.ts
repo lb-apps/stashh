@@ -40,10 +40,30 @@ export interface NearbySearchParams {
   maxResultCount?: number;
 }
 
+/**
+ * Google refused or failed a search. It is thrown rather than answered with an empty list
+ * because "no such place" and "the key is dead" must not look alike: a recognition that took
+ * one for the other reported success, found nothing, and cached that for the post.
+ */
+export class GooglePlacesSearchError extends Error {
+  constructor(
+    readonly status: number,
+    reason: string,
+  ) {
+    super(`Google Places search failed (HTTP ${status}): ${reason}`);
+    this.name = "GooglePlacesSearchError";
+  }
+}
+
+async function searchErrorFrom(response: Response): Promise<GooglePlacesSearchError> {
+  const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return new GooglePlacesSearchError(response.status, body?.error?.message ?? response.statusText);
+}
+
 export interface IGooglePlacesClient {
-  /** Text Search candidates in Google's rank order; empty when nothing matched or the call failed. */
+  /** Text Search candidates in Google's rank order; empty when nothing matched. Throws `GooglePlacesSearchError` when the call fails. */
   searchText(query: string, maxResultCount?: number): Promise<TextSearchResult[]>;
-  /** Places around a point, nearest first; empty when nothing matched or the call failed. */
+  /** Places around a point, nearest first; empty when nothing matched. Throws `GooglePlacesSearchError` when the call fails. */
   searchNearby(params: NearbySearchParams): Promise<TextSearchResult[]>;
   getPlaceDetails(googlePlaceId: string): Promise<GooglePlaceV1 | null>;
   getPlacePhotos(googlePlaceId: string): Promise<string[]>;
@@ -66,10 +86,7 @@ export class GooglePlacesClient implements IGooglePlacesClient {
       body: JSON.stringify({ textQuery: query, maxResultCount }),
     });
 
-    if (!response.ok) {
-      this.log?.warn({ query, status: response.status }, "text search failed");
-      return [];
-    }
+    if (!response.ok) throw await searchErrorFrom(response);
 
     const data = (await response.json()) as { places?: TextSearchResult[] };
     return data.places ?? [];
@@ -91,10 +108,7 @@ export class GooglePlacesClient implements IGooglePlacesClient {
       }),
     });
 
-    if (!response.ok) {
-      this.log?.warn({ center: params.center, status: response.status }, "nearby search failed");
-      return [];
-    }
+    if (!response.ok) throw await searchErrorFrom(response);
 
     const data = (await response.json()) as { places?: TextSearchResult[] };
     return data.places ?? [];
