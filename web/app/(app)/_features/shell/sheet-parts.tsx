@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
+import { ScreenHeader } from "@/lib/discovery/components/Screen";
 import { MicroLabel } from "@/lib/discovery/components/MicroLabel";
 import { TEXT_SECONDARY_STRONG } from "@/lib/discovery/pending-tokens";
 import type { SavedPlace } from "@/lib/stashh/types";
@@ -14,9 +14,9 @@ import { PlaceListRow } from "../places/place-row";
  */
 
 /**
- * The sheet's pinned header with the screen-owning title ("My places",
- * "Filter"), an optional grey line under it, and an optional control beside
- * it. `children` go under the title, still pinned.
+ * The screen's header with its title ("My places", "Filter"), an optional grey
+ * line under it, and an optional control beside it. `children` go under the
+ * title. In a sheet the navigation bar takes the title over once it scrolls away.
  */
 export function SheetTitle({
   title,
@@ -24,7 +24,7 @@ export function SheetTitle({
   trailing,
   children,
 }: {
-  title: React.ReactNode;
+  title: string;
   sub?: React.ReactNode;
   trailing?: React.ReactNode;
   children?: React.ReactNode;
@@ -35,7 +35,7 @@ export function SheetTitle({
     </h2>
   );
   return (
-    <SheetHeader style={{ paddingBottom: "var(--sp-6)" }}>
+    <ScreenHeader navTitle={title} style={{ paddingBottom: "var(--sp-6)" }}>
       {trailing ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-6)" }}>
           {heading}
@@ -50,7 +50,7 @@ export function SheetTitle({
         </p>
       ) : null}
       {children}
-    </SheetHeader>
+    </ScreenHeader>
   );
 }
 

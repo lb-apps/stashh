@@ -212,3 +212,23 @@ worker and the Instagram DM service.
 when it resumes). Backend, worker, DM service and ops carry no Mixpanel code; their numbers stay in
 the ops SQL functions. A state change is tracked in the client when the server confirms it (the
 mutation's `onSuccess`), so one action is one event.
+
+## 2026-11-08 — UI previews run in the Instagram in-app browser simulator
+
+**Correction:** "UI calisirken hep instagram in app browser simulator'de calisacagiz" — I opened a
+bare 375pt viewport, while the simulator built in an earlier session sat uncommitted in the
+`ui-changes` worktree.
+
+**How to apply:** Web UI work opens at `/app/dev/iab`, as CLAUDE.md now says. When the owner refers
+to something built before and `develop` has no trace of it, check `git worktree list` and past
+session transcripts before concluding it does not exist.
+
+## 2026-11-08 — Never drive the owner's default browser
+
+**Correction:** "hicbir zaman default browser yani arc'i kullanmamali Claude benim hesabimda" — I used
+claude-in-chrome to read claude.ai/design and kept retrying it after it timed out. The tool reports only
+"Browser 1, macOS", so being listed as the preferred browser says nothing about which browser it really is.
+
+**How to apply:** no `mcp__claude-in-chrome__*` and nothing that opens the default browser (`open <url>`,
+CLI logins). claude.ai goes through the built-in pane after the owner signs in there, or through files
+they download.

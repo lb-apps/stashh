@@ -5,8 +5,8 @@ import { Search, X } from 'lucide-react';
 import { focusOutline } from '../use-pressable';
 import { Glyph } from './Glyph';
 
-/** The field's height and side padding. */
-const FIELD_H = 56;
+/** The field's height at each size, and its side padding. */
+const FIELD_H = { md: 48, lg: 56 } as const;
 const FIELD_PAD = 18;
 /** The search glyph, and the clear button's visible disc and its glyph. */
 const SEARCH_GLYPH = 20;
@@ -18,8 +18,12 @@ type SearchFieldProps = Omit<React.ComponentProps<'input'>, 'style' | 'size'> & 
   /** The clear button's accessible name. */
   clearLabel?: string;
   variant?: 'filled' | 'filledOnWhite' | 'floating';
+  /** `md` for a field pinned in a page's chrome; `lg` (the default) for a screen's main field. */
+  size?: keyof typeof FIELD_H;
   align?: 'left' | 'center';
   icon?: boolean;
+  /** Controls drawn inside the pill at its end, after the clear button — 44px icon buttons sit flush. */
+  trailing?: React.ReactNode;
   /** Styles the rounded field, not the input inside it. */
   style?: React.CSSProperties;
 };
@@ -36,8 +40,10 @@ export function SearchField({
   onClear,
   clearLabel = 'Clear',
   variant = 'filled',
+  size = 'lg',
   align = 'left',
   icon = true,
+  trailing,
   style,
   onFocus,
   onBlur,
@@ -66,8 +72,9 @@ export function SearchField({
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        height: FIELD_H,
-        padding: `0 ${FIELD_PAD}px`,
+        height: FIELD_H[size],
+        // Trailing buttons sit as far from the end as from the top and bottom.
+        padding: trailing ? `0 calc((${FIELD_H[size]}px - var(--hit-min)) / 2) 0 ${FIELD_PAD}px` : `0 ${FIELD_PAD}px`,
         borderRadius: 'var(--r-pill)',
         ...(variants[variant] || variants.filled),
         // The ring hugs the pill, so it fits inside a pinned header without clipping.
@@ -147,6 +154,7 @@ export function SearchField({
           </span>
         </button>
       ) : null}
+      {trailing ? <span style={{ display: 'flex', alignItems: 'center', flex: '0 0 auto' }}>{trailing}</span> : null}
     </div>
   );
 }

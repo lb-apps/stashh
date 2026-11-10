@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
+import { CategorySticker } from "@/lib/discovery/components/CategorySticker";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { MetaDot } from "@/lib/discovery/components/MetaDot";
 import { Rating } from "@/lib/discovery/components/Rating";
@@ -72,11 +72,23 @@ export function PlaceCaption({ name, meta, style }: { name: string; meta: PlaceM
   );
 }
 
-/** The place's category orb with its glyph, for laying over a photo. */
-export function PlaceOrb({ place, size, glyphSize, style }: { place: SavedPlace; size: number; glyphSize: number; style?: React.CSSProperties }) {
+/** The place's category sticker with its glyph, for laying over a photo. */
+export function PlaceSticker({
+  place,
+  width,
+  height,
+  glyphSize,
+  style,
+}: {
+  place: SavedPlace;
+  width: number;
+  height: number;
+  glyphSize: number;
+  style?: React.CSSProperties;
+}) {
   return (
-    <CategoryOrb category={place.category_group} size={size} style={{ position: "absolute", zIndex: 1, ...style }}>
+    <CategorySticker category={place.category_group} width={width} height={height} style={{ position: "absolute", zIndex: 1, ...style }}>
       <Glyph icon={CATEGORY_GLYPH[place.category_group]} size={glyphSize} />
-    </CategoryOrb>
+    </CategorySticker>
   );
 }

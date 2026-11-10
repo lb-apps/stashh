@@ -267,13 +267,8 @@
   isolation: isolate;
 }
 
-/* Insets: never smaller than the token, never under the notch or home bar. */
+/* Insets: never smaller than the token, never under the notch or home bar.
+   The bottom inset reads `--safe-area-bottom` first: a frame cannot set env(),
+   so the in-app-browser preview (`/app/dev/iab`) sets that variable instead. */
 .app-inset-top { padding-top: max(env(safe-area-inset-top), var(--sp-7)); }
-.app-inset-bottom { padding-bottom: max(env(safe-area-inset-bottom), var(--sp-7)); }
-
-/* Mapbox's logo and attribution sit just above the sheet and move with it.
-   `--sheet-cover` is written by the sheet every frame (no React render). */
-.app-map .mapboxgl-ctrl-bottom-left,
-.app-map .mapboxgl-ctrl-bottom-right {
-  bottom: var(--sheet-cover, 0px);
-}
+.app-inset-bottom { padding-bottom: max(var(--safe-area-bottom, env(safe-area-inset-bottom)), var(--sp-7)); }

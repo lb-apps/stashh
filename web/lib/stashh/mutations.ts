@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { track } from "@/lib/analytics/analytics";
-import type { RecognitionEntry } from "@/lib/analytics/events";
 import { api } from "./endpoints";
 import { keys } from "./queries";
 import type { CategoryGroup, SavedPlace } from "./types";
@@ -75,57 +74,6 @@ export function useRemovePlace() {
     () => () => null,
     () => track("place_removed", {}),
   );
-}
-
-/** `platform` is the reader's link as `parseSourceLink` read it; `entry` is where they started from. */
-export function useStartRecognition() {
-  return useMutation({
-    mutationFn: (input: { sourceUrl: string; platform: "instagram" | "tiktok"; entry: RecognitionEntry }) => api.recognitions.start(input.sourceUrl),
-    onSuccess: (_data, { platform, entry }) => track("recognition_started", { entry, source_platform: platform }),
-  });
-}
-
-/**
- * Saves recognised places, then files them into a list (an existing one, a new
- * one, or none). Resolves with the library ids of the saved places, for the
- * pin-drop celebration.
- */
-export function useSaveRecognised() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      resultId: string;
-      googlePlaceIds: string[];
-      into: { kind: "none" } | { kind: "list"; listId: string } | { kind: "new"; title: string; description: string | null; cover: CategoryGroup };
-    }) => {
-      const { results } = await api.places.addFromRecognition(input.resultId, input.googlePlaceIds);
-      const placeIds = results.map((r) => r.place_id);
-      if (input.into.kind === "list") {
-        const listId = input.into.listId;
-        await Promise.all(placeIds.map((id) => api.lists.addPlace(listId, id)));
-      } else if (input.into.kind === "new") {
-        await api.lists.create({
-          title: input.into.title,
-          description: input.into.description,
-          cover_category: input.into.cover,
-          place_ids: placeIds,
-        });
-      }
-      return placeIds;
-    },
-    onSuccess: (placeIds, { into }) => {
-      track("places_saved", {
-        place_count: placeIds.length,
-        target: into.kind === "list" ? "existing_list" : into.kind === "new" ? "new_list" : "no_list",
-      });
-      if (into.kind === "new") track("list_created", { entry: "recognition" });
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: keys.places });
-      void client.invalidateQueries({ queryKey: keys.lists });
-      void client.invalidateQueries({ queryKey: keys.recents });
-    },
-  });
 }
 
 /** Files an already-saved place into a list. */

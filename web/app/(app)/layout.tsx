@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { fontVariables } from "../fonts";
-import { negotiateLocale } from "@/lib/i18n";
+import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n";
+import { previewUserAgent } from "@/lib/platform/dev-preview";
 import { detectInAppBrowser, detectOS } from "@/lib/platform/in-app-browser";
 import { Providers } from "./_components/providers";
 import "../globals.css";
@@ -25,8 +26,8 @@ export const viewport: Viewport = {
 // Root layout for the signed-in app (stashh.me/app). Utility mode, light only.
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const requestHeaders = await headers();
-  const userAgent = requestHeaders.get("user-agent");
-  const locale = negotiateLocale(requestHeaders.get("accept-language"));
+  const userAgent = previewUserAgent(requestHeaders) ?? requestHeaders.get("user-agent");
+  const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
 
   return (
     <html lang={locale} className={`${fontVariables} app-document`}>

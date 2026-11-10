@@ -10,18 +10,18 @@ import { Avatar } from "@/lib/discovery/components/Avatar";
 import { Button } from "@/lib/discovery/components/Button";
 import { Dialog } from "@/lib/discovery/components/Dialog";
 import { MicroLabel } from "@/lib/discovery/components/MicroLabel";
+import { SegmentedControl } from "@/lib/discovery/components/SegmentedControl";
 import { Sticker } from "@/lib/discovery/components/Sticker";
-import { Switch } from "@/lib/discovery/components/Switch";
-import { readReduceTransparency, writeReduceTransparency } from "@/lib/discovery/liquid-glass/use-liquid-glass";
 import { TEXT_SECONDARY_STRONG } from "@/lib/discovery/pending-tokens";
-import { useCopy, useIntlLocale, useT } from "@/lib/i18n/provider";
+import { isLocale, type Locale } from "@/lib/i18n";
+import { useCopy, useIntlLocale, useLocale, useT } from "@/lib/i18n/provider";
 import { useLocation } from "@/lib/platform/location";
 import { formatCount } from "@/lib/stashh/format";
 import { useLists, useMe, usePlaces } from "@/lib/stashh/queries";
 import { countBy } from "@/lib/stashh/selectors";
 import type { SavedPlace } from "@/lib/stashh/types";
-import { createStoredFlag, useWatchClipboard } from "../recognize/stored-flag";
 import { Section, SheetBody } from "../shell/sheet-parts";
+import { setLocale } from "./actions";
 import { profileCopy } from "./copy";
 
 /** The ID card's slight tilt, as in the design. */
@@ -35,8 +35,13 @@ const REGULAR_MIN = 3;
 /** Above the sheet and the map chrome. */
 const DIALOG_LAYER = 100;
 
-/** Reduce Transparency, as a switch; the map's glass re-tiers as soon as it changes. */
-const useReduceTransparency = createStoredFlag({ read: readReduceTransparency, write: writeReduceTransparency, fallback: false });
+/** The language control's width in px: room for both names with air around them, even on a 320pt-wide row. */
+const LANGUAGE_W = 176;
+/** Each language is named in itself, so every reader can find theirs. */
+const LANGUAGES: Array<{ value: Locale; label: string }> = [
+  { value: "tr", label: "Türkçe" },
+  { value: "en", label: "English" },
+];
 
 /** The reader's ID card, their device settings, and signing out. */
 export function ProfileSheet() {
@@ -157,14 +162,8 @@ function whereabouts(places: SavedPlace[]): { city: string | null; cities: numbe
 
 function Settings() {
   const c = useCopy(profileCopy);
-  const [watchClipboard, setWatchClipboard] = useWatchClipboard();
-  const [reduceTransparency, setReduceTransparency] = useReduceTransparency();
   const { state, locate } = useLocation();
 
-  const toggleWatchClipboard = (on: boolean) => {
-    setWatchClipboard(on);
-    track("clipboard_watch_toggled", { is_enabled: on });
-  };
   const turnOnLocation = async () => {
     const position = await locate();
     track("location_permission_answered", { is_granted: position !== null, surface: "profile" });
@@ -172,12 +171,7 @@ function Settings() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--row-gap)" }}>
-      <SettingRow title={c.watchClipboard} hint={c.watchClipboardHint}>
-        {(hintId) => <Switch checked={watchClipboard} onChange={toggleWatchClipboard} label={c.watchClipboard} aria-describedby={hintId} />}
-      </SettingRow>
-      <SettingRow title={c.reduceTransparency} hint={c.reduceTransparencyHint}>
-        {(hintId) => <Switch checked={reduceTransparency} onChange={setReduceTransparency} label={c.reduceTransparency} aria-describedby={hintId} />}
-      </SettingRow>
+      <LanguageRow />
       <SettingRow title={c.location} hint={c.locationHint[state.status]}>
         {(hintId) =>
           state.status === "granted" ? null : (
@@ -188,6 +182,31 @@ function Settings() {
         }
       </SettingRow>
     </div>
+  );
+}
+
+/**
+ * The app's language on this device. The choice shows at once; the server
+ * saves it and sends the app back in that language without closing the sheet.
+ */
+function LanguageRow() {
+  const c = useCopy(profileCopy);
+  const locale = useLocale();
+  const [shown, setShown] = React.useOptimistic(locale);
+  const [pending, startTransition] = React.useTransition();
+
+  const choose = (next: string) => {
+    if (pending || !isLocale(next) || next === shown) return;
+    startTransition(async () => {
+      setShown(next);
+      await setLocale(next);
+    });
+  };
+
+  return (
+    <SettingRow title={c.language} hint={c.languageHint}>
+      {(hintId) => <SegmentedControl aria-label={c.language} aria-describedby={hintId} options={LANGUAGES} value={shown} onChange={choose} style={{ flex: "0 0 auto", width: LANGUAGE_W }} />}
+    </SettingRow>
   );
 }
 
