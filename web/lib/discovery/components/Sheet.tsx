@@ -6,12 +6,14 @@ type SheetProps = Omit<React.ComponentPropsWithoutRef<'div'>, 'style' | 'title'>
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
   onClose?: () => void;
+  /** The close button's accessible name. */
+  closeLabel?: string;
   grabber?: boolean;
   padding?: number | string;
   style?: React.CSSProperties;
 };
 
-export function Sheet({ children, title, subtitle, onClose, grabber = true, padding = 'var(--gutter)', style, ...rest }: SheetProps) {
+export function Sheet({ children, title, subtitle, onClose, closeLabel = 'Close', grabber = true, padding = 'var(--gutter)', style, ...rest }: SheetProps) {
   return (
     <div
       style={{
@@ -33,7 +35,7 @@ export function Sheet({ children, title, subtitle, onClose, grabber = true, padd
       {onClose ? (
         <button
           type="button"
-          aria-label="Close"
+          aria-label={closeLabel}
           onClick={onClose}
           style={{
             position: 'absolute', top: 20, right: 20, width: 40, height: 40,

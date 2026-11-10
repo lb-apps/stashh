@@ -166,7 +166,6 @@ the first page view fired inside `init` before `register` — context now rides 
 exercised live (no test data written to the shared DB): `list_created`, `places_saved`, `recognition_*`,
 `place_removed`, `location_permission_answered`, `map_link_*` — same code paths, typechecked.
 
-
 # Meta Pixel + Conversions API (web)
 
 Asked by the owner on 2026-11-10: send the DM map link's open to Meta too, to target lookalikes of the
@@ -181,3 +180,119 @@ only `/app`. Branch `feature/meta-pixel` from `origin/develop`. Guide: docs/anal
 - [ ] Verified with a test event code: one browser and one server `MapLinkOpened`, deduplicated
 - [ ] Website Custom Audience (`MapLinkOpened`, 180 days), then the lookalike once it holds 100 people
 - [ ] Erase-on-"sil" cannot recall events already sent to Meta (the policy says so)
+
+# /app home matches the design: `Stashh - stack lists.dc.html`
+
+Owner's call 2026-11-08: the home screen's layout, design and content follow that file, in the Claude Design
+project "Form scope and fidelity". Work runs in the simulator at `/app/dev/iab`.
+
+- [x] Neighbourhoods rail: map tiles (205×130 lead, 133×130 rest), pin, name and count chip, "See all areas" past 5
+- [x] A tile opens search filled with the neighbourhood, keyboard closed; "See all areas" opens the library
+- [x] Mapbox credit line under the rail (static maps carry no credit of their own)
+- [x] Values read from the design file's source, not measured off the screen (212/138×136 tiles, 6 areas)
+- [x] Sheet peeks at 48%; header card is the area and "17 places"; profile and recenter ride above the sheet
+- [x] Scope pills All · Lists · Nearby (owner: no Saved, it equals All; Open now leaves home, To go / Been stay in Filter)
+- [x] My scans → Paste; stacked list rows (3 lists, "+N more lists" → library); "Types", 52px pills → search
+- [x] Category stickers on Near you and Saved spots; "From your reels" removed (its Reels live under My scans)
+- [x] Filter moved from the header to search: Filter / Filtered chip and five type shortcuts; results honour filters
+- [ ] Weather in the header card: Stashh has no weather data source, owner's call to leave it out for now
+
+# /app is Turkish by default; Settings switches it
+
+- [x] `resolveLocale` reads the `stashh-locale` cookie (path `/app`, a year), Turkish otherwise; Accept-Language dropped
+- [x] Profil > Ayarlar > Dil (Türkçe | English) through a Server Action; the sheet stays open, `<html lang>` follows
+
+# /app: no half-open sheet, every screen full page
+
+Owner's call: the bottom sheet that peeks over the map is gone ahead of the main layout change.
+
+- [x] `Screen` / `ScreenHeader` / `ScreenFooter` replace `DetentSheet` (deleted): no grabber, no drag, one close button
+- [x] Home is always mounted underneath (keeps its scroll); one other screen over it, keyed by route, closed to home
+- [x] The live map is not rendered (owner: parked until the new layout); `map-view`, `dropping-pins`, `MapHeader`,
+      `MapControls` stay in the code, unused
+- [x] Profile moved next to search on home; place shows everything at once; "Reduce transparency" row removed
+- [ ] Mapbox logo: with the live map gone no Mapbox wordmark is on the page, while the Neighbourhoods thumbnails use
+      `logo=false`. Settle with the map's new place, or turn the logo back on in the thumbnails
+- [ ] The area card (name and place count) left with the map; the new layout decides where it goes
+
+# Home: the top is the app's bar; search everything, grouped
+
+- [x] Search field at the very top with Filter (dot when a filter is on) and Profile beside it
+- [x] Tabs Tümü · Yakında · Listeler swap the body in place with a slide (fade only with reduced motion);
+      Near you's chevron opens Yakında, Your lists' chevron and "+N more lists" open Listeler
+- [x] Typing replaces the body with groups that have hits: Mekanlar, Listeler, Türler, Semtler, Şehirler; case and
+      accents folded; a type, area or city narrows the search; clear brings the tabs back
+- [x] Home's type pills and neighbourhood tiles fill the search and scroll to the top; the search screen, its route
+      and the home scope (All / Nearby) are gone; place search also matches the address
+
+Verified in the simulator: "kadikoy" → Mekanlar 4, Semtler 1; "kahve" → Mekanlar 1, Türler 1; "deneme" → Listeler 3;
+"istanbul" → Mekanlar 16, Şehirler 2; no hit shows the message; no errors; `iphone-se` field 223px, no overflow.
+
+Owner's follow-ups, same day:
+- [x] Search field full width ("Her şeyde ara"); the filter sits inside its end (`SearchField` got a `trailing` slot)
+- [x] Profile is the last item of the tab row and scrolls with it; tabs keep their icons; 8px between chips
+- [x] Search results draw with home's own rails (`home-rails.tsx`): place cards, list stacks, two-row type pills,
+      map tiles for neighbourhoods and for cities (zoom 10); one Mapbox credit per screen
+- [x] "Near you" moved into the Yakında tab (all places as cards, no chevron); All starts with Saved spots
+- [x] My scans / New list row removed from All for now; New list stays atop the Lists tab, paste on the + button
+- [x] Search moved out of the bar into a tab page (`home/tab-search.tsx`): on All (everything, filter inside) and
+      Lists (list names and the places in them); it sticks under the tab bar (measured), 48px (`SearchField` size `md`);
+      each tab keeps its own query, reset on switching. Checked: stays at 54px after 600px of scroll; eslint clean
+- [x] The live map is back at the top of Yakında (`home/nearby-map.tsx`, full bleed, ~48% of the screen): visible
+      places as pins, a pin opens its place (checked: Cochet Patisserie), recenter glass button, Mapbox logo and credit
+      on the map. It loads only when the tab opens
+- [x] "New list" tile removed from Lists
+- [x] The + button is "Create": a half sheet asks what to create (`shell/create-sheet.tsx`); for now only List, which
+      opens the new list screen. Scrim, Escape and close dismiss it. Paste a Reel is no longer reachable from it
+      (owner: no scanning in the project); the paste/recognize screens stay in the code, unlinked
+
+# /app: the paste-a-Reel flow is deleted
+
+Owner: "Sil". Reels reach Stashh only through the Instagram DM; the backend and the DM flow are untouched.
+
+- [x] Deleted paste, recognizing, results and celebration screens, `recognition-view`, `source-link`, `stored-flag`,
+      the recognition hooks in `queries.ts` / `mutations.ts`, and the "Watch my clipboard" setting
+- [x] Empty library links to the DM (`ig.me/m/stashh.me`, "@stashh.me’ye yaz")
+- [x] Analytics: five events no longer sent (`recognition_*`, `places_saved`, `clipboard_watch_toggled`) left
+      `events.ts`; `docs/analytics-plan.md` lists them as retired
+- [ ] Hide those five events in Lexicon in both Mixpanel projects (owner's go-ahead: it is a write to Mixpanel)
+
+# /app: details open as iOS page sheets, over the current screen
+
+Owner: a place (and every other detail) slides up from the bottom over the screen it was opened from, with a bar on
+top and a close button.
+
+- [x] `PageSheet` (Discovery): slides up (`--dur-sheet`, `--ease-out`; fade with reduced motion), the screen under it
+      steps back (0.92, rounded) behind the scrim, a strip of it stays in view; navigation bar with the close button
+      and the screen's title once its large title has scrolled away; drag the bar down, Escape or the strip dismiss;
+      focus moves in and returns to the opener; covered screens are `inert`
+- [x] Navigation is a stack (`sheet-state.tsx`): a place over its list, the list picker over the place, a new list
+      over the picker; closing uncovers the screen under it with its scroll. `useCloseScreen()` replaces "go home";
+      a new list made from the picker closes the picker with it
+- [x] `ScreenHeader` takes a `navTitle`; on home it stays pinned, in a sheet it scrolls under the bar
+- [x] The parked `MapHeader` / `MapControls` and the `--sheet-cover` CSS are deleted: they rode on the old bottom
+      sheet, and Yakında's map has its own recenter. The + button moved into `create-sheet.tsx`
+- [ ] The offline note left with `MapHeader`; `useOnline` (`lib/platform/use-online.ts`) is kept for where it returns
+
+## Review
+
+Page sheets (2026-11-10): typecheck, eslint and build pass; no console errors. In the simulator: list → place stacks
+(list steps back 8px above, home behind it); the place's name appears in the bar after scrolling; place → "Listeye
+ekle" → "Yeni liste" stacks three deep, X and Escape each close one, focus returns to the button that opened each;
+an 80px drag springs back, a 240px drag dismisses; Filter's "17 mekanı göster" closes to where it was opened; profile
+and + → Liste open as sheets. Not exercised: creating a list (writes to the shared test data) and a real finger
+drag on a phone.
+
+Full-page screens: typecheck and build pass. A fresh load fetches no `mapbox-gl` and no tiles, only the six static
+thumbnails. Search, profile, library, paste, new list, list detail, place and filter each open full page and close
+to home; home keeps its scroll (420px before and after); the filter's action sits on the bottom edge; no errors,
+no sideways scroll on `iphone-se`. "Taramalarım" did not fit the half tile, so the Turkish title is "Taramalar".
+
+Home and language: `npm run typecheck` and `npm run build` pass. In the simulator, no console errors, no sideways
+scroll on `iphone-16` and `iphone-se`. Every tap was exercised: Lists, My scans, list row, "+N more lists", a type, a
+neighbourhood, the Filter chip and a type shortcut (chip shows "Filtered", toggles back), profile. Not exercised:
+Nearby and recenter, because they raise the browser's location prompt. "10 reels · 24 spots" does not fit a
+half-width tile at 393pt, so that line wraps instead of being cut. Language: no cookie gives Turkish, English
+persists across a reload, back to Turkish works. Thumbnails use Mapbox `streets-v12` because the Static Images API
+cannot draw the live map's Standard style, so they are a little more colourful than the map above them. Not
+confirmed by Mapbox: whether `logo=false` is acceptable when the wordmark is only on the live map.

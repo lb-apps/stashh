@@ -2,9 +2,7 @@
 
 import * as React from "react";
 import { Check, Plus } from "lucide-react";
-import { Button } from "@/lib/discovery/components/Button";
 import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
-import { SheetFooter } from "@/lib/discovery/components/DetentSheet";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { TEXT_DANGER_STRONG } from "@/lib/discovery/pending-tokens";
 import { useCopy, useT } from "@/lib/i18n/provider";
@@ -12,7 +10,7 @@ import { useLists, usePlace } from "@/lib/stashh/queries";
 import type { ListSummary } from "@/lib/stashh/types";
 import { CATEGORY_GLYPH } from "../places/category-glyph";
 import { SheetBody, SheetTitle } from "../shell/sheet-parts";
-import { useSheetNav, type ListTarget } from "../shell/sheet-state";
+import { useCloseScreen, useSheetNav, type ListTarget } from "../shell/sheet-state";
 import { recognizeCopy } from "./copy";
 import { TapRow } from "./parts";
 import { useFileTarget } from "./use-file-target";
@@ -23,23 +21,21 @@ const DISC_GLYPH = 22;
 const MARK = 36;
 const MARK_GLYPH = 18;
 
-/**
- * Save to a list: recognised places, or one saved place, go into the list
- * tapped — or a new one. Recognised places may also stay out of every list.
- */
+/** Save to a list: a saved place goes into the list tapped, or a new one. */
 export function ListPickerSheet({ target }: { target: ListTarget }) {
   const c = useCopy(recognizeCopy);
   const t = useT();
   const nav = useSheetNav();
+  const close = useCloseScreen();
   const lists = useLists();
   const place = usePlace(target.kind === "place" ? target.placeId : null);
   const file = useFileTarget(target);
 
-  const sub =
-    target.kind === "recognition" ? c.picker.subPlaces(target.googlePlaceIds.length) : place ? c.picker.subPlace(place.name) : c.picker.subEmpty;
+  const sub = place ? c.picker.subPlace(place.name) : c.picker.subEmpty;
 
+  // A list the place is already in has nothing to file: back to the place.
   const pick = (list: ListSummary) => {
-    if (target.kind === "place" && place?.list_ids.includes(list.id)) nav.open({ name: "place", placeId: target.placeId });
+    if (target.kind === "place" && place?.list_ids.includes(list.id)) close();
     else file.intoList(list.id);
   };
 
@@ -83,13 +79,6 @@ export function ListPickerSheet({ target }: { target: ListTarget }) {
           </p>
         ) : null}
       </SheetBody>
-      {target.kind === "recognition" ? (
-        <SheetFooter>
-          <Button variant="primary" size="lg" shape="pill" fullWidth disabled={file.pending} onClick={file.outOfList}>
-            {c.picker.keepOut}
-          </Button>
-        </SheetFooter>
-      ) : null}
     </>
   );
 }

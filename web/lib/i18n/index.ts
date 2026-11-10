@@ -6,26 +6,20 @@ export type { Dictionary };
 
 const DICTIONARIES: Record<Locale, Dictionary> = { en, tr };
 
+/** Stashh speaks Turkish unless the reader picks English in Settings. */
+export const DEFAULT_LOCALE: Locale = "tr";
+/** The reader's pick, per device. Read on the server, so the first paint is already in it. */
+export const LOCALE_COOKIE = "stashh-locale";
+
 export function dictionaryFor(locale: Locale): Dictionary {
   return DICTIONARIES[locale];
 }
 
-/**
- * Picks the locale from an Accept-Language header: the first supported
- * language by q-weight, English otherwise. Server-side, so the first paint is
- * already in the reader's language.
- */
-export function negotiateLocale(acceptLanguage: string | null | undefined): Locale {
-  if (!acceptLanguage) return "en";
-  const ranked = acceptLanguage
-    .split(",")
-    .map((part) => {
-      const [tag, ...params] = part.trim().split(";");
-      const q = params.find((p) => p.trim().startsWith("q="));
-      return { lang: tag.toLowerCase().split("-")[0], q: q ? Number(q.trim().slice(2)) : 1 };
-    })
-    .filter((entry) => entry.lang && !Number.isNaN(entry.q))
-    .sort((a, b) => b.q - a.q);
-  const hit = ranked.find((entry): entry is { lang: Locale; q: number } => entry.lang in DICTIONARIES);
-  return hit?.lang ?? "en";
+export function isLocale(value: unknown): value is Locale {
+  return typeof value === "string" && Object.hasOwn(DICTIONARIES, value);
+}
+
+/** The reader's language: their pick from Settings, Turkish otherwise. The browser's language is not consulted. */
+export function resolveLocale(cookie: string | undefined): Locale {
+  return isLocale(cookie) ? cookie : DEFAULT_LOCALE;
 }

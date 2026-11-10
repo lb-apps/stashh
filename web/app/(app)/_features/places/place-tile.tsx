@@ -5,16 +5,15 @@ import { PlacePhoto } from "@/lib/discovery/components/PlacePhoto";
 import { BUTTON_RESET, usePressable } from "@/lib/discovery/use-pressable";
 import type { SavedPlace } from "@/lib/stashh/types";
 import { CATEGORY_GLYPH } from "./category-glyph";
-import { PlaceCaption, PlaceOrb } from "./place-parts";
+import { PlaceCaption, PlaceSticker } from "./place-parts";
 import { usePlaceMeta } from "./use-place-meta";
 
 /** Tile width in px; the photo is square at the same size. */
 const TILE_W = 158;
-const ORB = 32;
-const ORB_GLYPH = 16;
+const STICKER = { width: 34, height: 29, glyph: 16 } as const;
 
 /**
- * A "Saved spots" tile: a free-standing square photo with the category orb in
+ * A "Saved spots" tile: a free-standing square photo with the category sticker in
  * its corner, then the same caption as a card. The whole tile opens the place.
  */
 export function PlaceTile({ place, onOpen }: { place: SavedPlace; onOpen: (place: SavedPlace) => void }) {
@@ -36,7 +35,7 @@ export function PlaceTile({ place, onOpen }: { place: SavedPlace; onOpen: (place
         radius="var(--r-cta)"
         raised
       >
-        <PlaceOrb place={place} size={ORB} glyphSize={ORB_GLYPH} style={{ left: "var(--sp-5)", bottom: "var(--sp-5)" }} />
+        <PlaceSticker place={place} width={STICKER.width} height={STICKER.height} glyphSize={STICKER.glyph} style={{ left: "var(--sp-7)", bottom: "var(--sp-6)" }} />
       </PlacePhoto>
       <PlaceCaption name={place.name} meta={meta} style={{ marginTop: "var(--sp-5)" }} />
     </button>

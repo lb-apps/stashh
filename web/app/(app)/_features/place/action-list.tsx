@@ -7,7 +7,7 @@ import { Switch } from "@/lib/discovery/components/Switch";
 import { useCopy, useIntlLocale, useT } from "@/lib/i18n/provider";
 import { useRemovePlace, useSetVisited } from "@/lib/stashh/mutations";
 import type { SavedPlace } from "@/lib/stashh/types";
-import { useSheetNav } from "../shell/sheet-state";
+import { useCloseScreen } from "../shell/sheet-state";
 import { placeSheetCopy } from "./copy";
 import { SECTION_GAP, SunkenCard, captionStyle } from "./parts";
 
@@ -66,7 +66,7 @@ function BeenThere({ place }: { place: SavedPlace }) {
 
 function RemovePlace({ place }: { place: SavedPlace }) {
   const copy = useCopy(placeSheetCopy);
-  const { home } = useSheetNav();
+  const close = useCloseScreen();
   const removePlace = useRemovePlace();
   const [confirming, setConfirming] = React.useState(false);
 
@@ -88,7 +88,7 @@ function RemovePlace({ place }: { place: SavedPlace }) {
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             removePlace.mutate({ placeId: place.id });
-            home();
+            close();
           }}
         />
       ) : null}

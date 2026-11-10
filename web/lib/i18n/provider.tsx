@@ -9,7 +9,8 @@ export function I18nProvider({ locale, children }: { locale: Locale; children: R
   return <I18nContext value={locale}>{children}</I18nContext>;
 }
 
-function useLocale(): Locale {
+/** The active locale, for the one control that changes it. Everything else reads copy through the hooks below. */
+export function useLocale(): Locale {
   const locale = React.use(I18nContext);
   if (!locale) throw new Error("i18n hooks must be used inside <I18nProvider>");
   return locale;

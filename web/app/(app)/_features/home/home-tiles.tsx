@@ -1,17 +1,27 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { BUTTON_RESET, usePressable } from "@/lib/discovery/use-pressable";
 
-/** The circle in front of the scope pills, and the new-list tile's plus disc, in px. */
-const DISC = 36;
-/** Dashed outline width of the new-list tile, in px. */
-const DASH = 2;
-
-/** The round search button that leads the scope pills. */
-export function SearchCircle({ label, onClick }: { label: string; onClick: () => void }) {
+/**
+ * A round icon button: on its own a grey disc; `plain` draws only the glyph, for
+ * inside the search field. `dot` marks it as on (a filter is applied).
+ */
+export function CircleButton({
+  icon,
+  label,
+  dot = false,
+  plain = false,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  dot?: boolean;
+  plain?: boolean;
+  onClick: () => void;
+}) {
   const press = usePressable<HTMLButtonElement>({}, "var(--press-scale-tight)");
   return (
     <button
@@ -21,78 +31,35 @@ export function SearchCircle({ label, onClick }: { label: string; onClick: () =>
       {...press.handlers}
       style={{
         ...BUTTON_RESET,
+        position: "relative",
         display: "grid",
         placeItems: "center",
         flex: "0 0 auto",
         width: "var(--hit-min)",
         height: "var(--hit-min)",
         borderRadius: "var(--r-circle)",
-        background: "var(--surface-sunken-on-white)",
+        background: plain ? "transparent" : "var(--surface-sunken-on-white)",
         color: "var(--text-primary)",
         ...press.style,
       }}
     >
-      <Glyph icon={Search} />
-    </button>
-  );
-}
-
-/**
- * "New list", beside the My spots tile: the same shape drawn as an empty slot —
- * a dashed outline and a cobalt plus — so it reads as a place to add one.
- */
-export function NewListTile({ label, onClick }: { label: string; onClick: () => void }) {
-  const press = usePressable<HTMLButtonElement>();
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      {...press.handlers}
-      style={{
-        ...BUTTON_RESET,
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--sp-5)",
-        width: "100%",
-        minWidth: 0,
-        minHeight: "var(--hit-min)",
-        padding: `calc(var(--sp-5) - ${DASH}px) calc(var(--sp-6) - ${DASH}px)`,
-        borderRadius: "var(--r-field)",
-        border: `${DASH}px dashed var(--grey-300)`,
-        textAlign: "left",
-        ...press.style,
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{
-          display: "grid",
-          placeItems: "center",
-          flex: "0 0 auto",
-          width: DISC,
-          height: DISC,
-          borderRadius: "var(--r-circle)",
-          background: "var(--surface-sunken-on-white)",
-          color: "var(--cobalt-500)",
-        }}
-      >
-        <Glyph icon={Plus} />
-      </span>
-      <span
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "var(--fs-body)",
-          lineHeight: "var(--lh-label)",
-          fontWeight: "var(--fw-bold)",
-          letterSpacing: "var(--tr-tight)",
-          color: "var(--text-primary)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {label}
-      </span>
+      <Glyph icon={icon} />
+      {dot ? (
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "var(--sp-3)",
+            right: "var(--sp-3)",
+            width: "var(--sp-4)",
+            height: "var(--sp-4)",
+            borderRadius: "var(--r-circle)",
+            background: "var(--cobalt-500)",
+            // A ring in the colour behind the button, so the dot reads as cut out of it.
+            boxShadow: `0 0 0 var(--sp-1) ${plain ? "var(--surface-field-on-white)" : "var(--surface-sunken-on-white)"}`,
+          }}
+        />
+      ) : null}
     </button>
   );
 }

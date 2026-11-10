@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/lib/discovery/components/Button";
-import { SheetFooter } from "@/lib/discovery/components/DetentSheet";
+import { ScreenFooter } from "@/lib/discovery/components/Screen";
 import { ScopePill } from "@/lib/discovery/components/ScopePill";
 import { SegmentedControl } from "@/lib/discovery/components/SegmentedControl";
 import { useCopy, useIntlLocale, useT } from "@/lib/i18n/provider";
@@ -12,7 +12,7 @@ import { useLists, usePlaces } from "@/lib/stashh/queries";
 import { countBy, isFiltered, NO_FILTERS, type DistanceFilter, type PlaceFilters, type VisitFilter } from "@/lib/stashh/selectors";
 import type { CategoryGroup } from "@/lib/stashh/types";
 import { QuietNote, SectionLabel, SheetBody, SheetTitle } from "../shell/sheet-parts";
-import { useSheetNav } from "../shell/sheet-state";
+import { useCloseScreen, useSheetNav } from "../shell/sheet-state";
 import { useVisiblePlaces } from "../shell/use-visible-places";
 import { filterCopy } from "./copy";
 
@@ -28,7 +28,8 @@ export function FilterSheet() {
   const t = useT();
   const copy = useCopy(filterCopy);
   const locale = useIntlLocale();
-  const { state, setFilters, home } = useSheetNav();
+  const { state, setFilters } = useSheetNav();
+  const close = useCloseScreen();
   const { locate, state: location } = useLocation();
   const origin = usePosition();
   const lists = useLists().data ?? [];
@@ -102,11 +103,11 @@ export function FilterSheet() {
         </FilterGroup>
       </SheetBody>
 
-      <SheetFooter>
-        <Button variant="primary" size="lg" shape="pill" fullWidth disabled={visible === 0} onClick={home}>
+      <ScreenFooter>
+        <Button variant="primary" size="lg" shape="pill" fullWidth disabled={visible === 0} onClick={() => close()}>
           {visible === 0 ? copy.nothingMatches : copy.show(formatCount(visible, locale), visible)}
         </Button>
-      </SheetFooter>
+      </ScreenFooter>
     </>
   );
 }

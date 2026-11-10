@@ -1,64 +1,15 @@
-import type { SourceType } from "@/lib/stashh/types";
-import type { FailureKind } from "./recognition-view";
-import type { SourceKind, SourcePlatform } from "./source-link";
-
 const places = (n: number) => (n === 1 ? "1 place" : `${n} places`);
 
-/** Copy for the paste → recognise → results → list flow. */
+/** Copy for saving a place into a list and for making a new list. */
 export const recognizeCopy = {
   en: {
-    paste: {
-      title: "Paste a Reel",
-      sub: "We read the video and pull out every place in it.",
-      fromClipboard: "Paste from clipboard",
-      onClipboard: "On your clipboard",
-      dismissLink: "Dismiss this link",
-      orPasteYourself: "Or paste it yourself",
-      pasteLink: "Paste the link",
-      placeholder: "instagram.com/reel/…",
-      notALink: "That isn’t an Instagram or TikTok link.",
-      find: "Find the places",
-      lastPulledIn: "Last pulled in",
-      nothingYet: "Nothing pulled in yet",
-      nothingYetSub: "Copy a Reel link in Instagram, then paste it here.",
-    },
-    platform: { instagram: "Instagram", tiktok: "TikTok" } satisfies Record<SourcePlatform, string>,
-    sourceType: { reel: "Reel", post: "Post", story: "Story", tiktok: "TikTok" } satisfies Record<SourceType, string>,
-    recent: {
-      found: (n: number, author: string | null) => (author ? `${places(n)} from @${author}` : places(n)),
-      reading: "Still reading…",
-    },
-    stages: ["Reading the post", "Watching the video", "Finding the places", "Matching addresses"],
-    stageDone: "Done",
-    progress: "Progress",
-    foot: { queued: "In line — we’ll start in a moment.", early: "This takes about 20 seconds.", late: "Almost there." },
-    fail: {
-      retry: "Try that link again",
-      other: "Paste a different link",
-      /** Titles break onto two lines at `\n`. */
-      reasons: {
-        private: { title: "That account\nis private", body: "We can’t see posts from private accounts. Send a public link instead." },
-        unavailable: { title: "We couldn’t\nget the video", body: "Instagram held the video back. Trying again in a minute usually works." },
-        unreadable: { title: "We couldn’t\nread that one", body: "That one’s on us. Try again, or paste a different link." },
-        noPlaces: { title: "No places in\nthat video", body: "Nobody named a venue in it. Try a post where the place is tagged or said out loud." },
-      } satisfies Record<FailureKind, { title: string; body: string }>,
-    },
-    results: {
-      title: (n: number, kind: SourceKind) => `${places(n)} in that ${kind === "reel" ? "Reel" : kind}`,
-      from: (handle: string) => `From @${handle}`,
-      openPost: "Open the post",
-      add: (n: number) => `Add ${places(n)}`,
-      nothingSelected: "Nothing selected",
-    },
     picker: {
       title: "Save to a list",
-      subPlaces: (n: number) => `${places(n)} · pick a list or start a new one`,
       subPlace: (name: string) => `Pick a list for ${name}`,
       subEmpty: "Start a list, then fill it from your map.",
       count: places,
       inList: "Already in this list",
       newList: "New list",
-      keepOut: "Keep them out of a list for now",
     },
     newList: {
       title: "New list",
@@ -70,64 +21,15 @@ export const recognizeCopy = {
       createAndSave: "Create and save",
       create: "Create list",
     },
-    celebration: {
-      saved: (n: number, list: string | null) => (list ? `${places(n)} saved to ${list}` : `${places(n)} saved`),
-      onMap: "They’re on your map now.",
-      see: "See them on the map",
-    },
   },
   tr: {
-    paste: {
-      title: "Reel yapıştır",
-      sub: "Videoyu izleyip içindeki her mekanı çıkarıyoruz.",
-      fromClipboard: "Panodan yapıştır",
-      onClipboard: "Panonda",
-      dismissLink: "Bu linki kapat",
-      orPasteYourself: "Ya da kendin yapıştır",
-      pasteLink: "Linki yapıştır",
-      placeholder: "instagram.com/reel/…",
-      notALink: "Bu bir Instagram ya da TikTok linki değil.",
-      find: "Mekanları bul",
-      lastPulledIn: "Son eklediklerin",
-      nothingYet: "Henüz bir şey eklemedin",
-      nothingYetSub: "Instagram’da bir Reel linkini kopyala, sonra buraya yapıştır.",
-    },
-    platform: { instagram: "Instagram", tiktok: "TikTok" },
-    sourceType: { reel: "Reel", post: "Gönderi", story: "Hikâye", tiktok: "TikTok" },
-    recent: {
-      found: (n: number, author: string | null) => (author ? `@${author} · ${n} mekan` : `${n} mekan`),
-      reading: "Hâlâ okunuyor…",
-    },
-    stages: ["Gönderi okunuyor", "Video izleniyor", "Mekanlar bulunuyor", "Adresler eşleşiyor"],
-    stageDone: "Bitti",
-    progress: "İlerleme",
-    foot: { queued: "Sıradasın, birazdan başlıyoruz.", early: "Bu yaklaşık 20 saniye sürer.", late: "Az kaldı." },
-    fail: {
-      retry: "Bu linki tekrar dene",
-      other: "Başka bir link yapıştır",
-      reasons: {
-        private: { title: "Bu hesap\ngizli", body: "Gizli hesapların gönderilerini göremiyoruz. Herkese açık bir link gönder." },
-        unavailable: { title: "Videoya\nulaşamadık", body: "Instagram videoyu şu an vermedi. Bir dakika sonra tekrar denemek genelde işe yarar." },
-        unreadable: { title: "Bunu\nokuyamadık", body: "Sorun bizde. Tekrar dene ya da başka bir link yapıştır." },
-        noPlaces: { title: "Bu videoda\nmekan yok", body: "Videoda kimse bir mekan adı söylemedi. Mekanın etiketlendiği ya da adının geçtiği bir gönderi dene." },
-      },
-    },
-    results: {
-      title: (n: number, kind: SourceKind) => `${kind === "reel" ? "Bu Reel’de" : kind === "post" ? "Bu gönderide" : "Bu videoda"} ${n} mekan`,
-      from: (handle: string) => `Paylaşan: @${handle}`,
-      openPost: "Gönderiyi aç",
-      add: (n: number) => `${n} mekanı ekle`,
-      nothingSelected: "Hiçbiri seçilmedi",
-    },
     picker: {
       title: "Bir listeye kaydet",
-      subPlaces: (n: number) => `${n} mekan · bir liste seç ya da yenisini başlat`,
       subPlace: (name: string) => `${name} için bir liste seç`,
       subEmpty: "Bir liste başlat, sonra haritandan doldur.",
       count: (n: number) => `${n} mekan`,
       inList: "Zaten bu listede",
       newList: "Yeni liste",
-      keepOut: "Şimdilik listeye koyma",
     },
     newList: {
       title: "Yeni liste",
@@ -138,11 +40,6 @@ export const recognizeCopy = {
       cover: "Kapak",
       createAndSave: "Oluştur ve kaydet",
       create: "Listeyi oluştur",
-    },
-    celebration: {
-      saved: (n: number, list: string | null) => (list ? `${n} mekan “${list}” listesine kaydedildi` : `${n} mekan kaydedildi`),
-      onMap: "Artık haritanda.",
-      see: "Haritada gör",
     },
   },
 };

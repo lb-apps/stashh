@@ -5,7 +5,7 @@ import { Bookmark, Navigation } from "lucide-react";
 import { track } from "@/lib/analytics/analytics";
 import { Badge } from "@/lib/discovery/components/Badge";
 import { ButtonLink } from "@/lib/discovery/components/Button";
-import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
+import { ScreenHeader } from "@/lib/discovery/components/Screen";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { IconButton } from "@/lib/discovery/components/IconButton";
 import { MetaDot } from "@/lib/discovery/components/MetaDot";
@@ -29,15 +29,15 @@ const THUMB = 84;
 const THUMB_GLYPH = 30;
 
 /**
- * The pinned top of the sheet and its drag handle: photo, category (and
- * "visited") and the name. The sheet draws the close button.
+ * The top of the place: photo, category (and "visited") and the name. The
+ * sheet's navigation bar shows the name once this scrolls away.
  */
 export function PlaceHeader({ place, photo }: { place: SavedPlace; photo: string | null }) {
   const t = useT();
   const copy = useCopy(placeSheetCopy);
 
   return (
-    <SheetHeader style={{ paddingBottom: "var(--sp-4)" }}>
+    <ScreenHeader navTitle={place.name} style={{ paddingBottom: "var(--sp-4)" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--sp-7)" }}>
         <PlacePhoto
           src={photo}
@@ -59,14 +59,14 @@ export function PlaceHeader({ place, photo }: { place: SavedPlace; photo: string
           </h2>
         </div>
       </div>
-    </SheetHeader>
+    </ScreenHeader>
   );
 }
 
 /**
- * What the peek shows under the name, so the map stays in view: the address,
- * rating · reviews · price · distance, whether it is open, and the two
- * actions. Each line is drawn only when there is something to say.
+ * The first things under the name: the address, rating · reviews · price ·
+ * distance, whether it is open, and the two actions. Each line is drawn only
+ * when there is something to say.
  */
 export function PlaceSummary({ place }: { place: SavedPlace }) {
   const address = place.short_formatted_address ?? place.district ?? place.city;

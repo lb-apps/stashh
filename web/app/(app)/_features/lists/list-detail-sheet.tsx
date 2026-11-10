@@ -3,7 +3,7 @@
 import * as React from "react";
 import { track } from "@/lib/analytics/analytics";
 import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
-import { SheetHeader } from "@/lib/discovery/components/DetentSheet";
+import { ScreenHeader } from "@/lib/discovery/components/Screen";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { TEXT_SECONDARY_STRONG } from "@/lib/discovery/pending-tokens";
 import { useCopy, useIntlLocale, useT } from "@/lib/i18n/provider";
@@ -31,7 +31,7 @@ export function ListDetailSheet({ listId }: { listId: string }) {
   if (!list) {
     return (
       <>
-        <SheetHeader>{null}</SheetHeader>
+        <ScreenHeader>{null}</ScreenHeader>
         {lists.data ? (
           <SheetBody>
             <QuietNote>{t.errors.notFound}</QuietNote>
@@ -57,7 +57,7 @@ function ListDetail({ list }: { list: ListSummary }) {
 
   return (
     <>
-      <SheetHeader>
+      <ScreenHeader navTitle={list.title}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)", paddingBlock: "var(--sp-3) var(--sp-6)" }}>
           <CategoryOrb category={cover} size={COVER_ORB}>
             <Glyph icon={CATEGORY_GLYPH[cover]} size={COVER_GLYPH} />
@@ -71,7 +71,7 @@ function ListDetail({ list }: { list: ListSummary }) {
             </span>
           </div>
         </div>
-      </SheetHeader>
+      </ScreenHeader>
       <SheetBody gap="var(--sp-8)">
         {list.description ? (
           <p className="ds-body" style={{ margin: 0, color: TEXT_SECONDARY_STRONG }}>
