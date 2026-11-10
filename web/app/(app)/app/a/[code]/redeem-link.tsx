@@ -24,11 +24,11 @@ export function RedeemLink({ code }: { code: string }) {
     (async () => {
       const result = await redeem(code);
       const userId = result.ok ? await signInWithTokenHash(result.tokenHash) : null;
-      if (userId) {
+      if (result.ok && userId) {
         // Named before the event: the session mirror identifies only after this render, and the
         // device may still carry the previous account's id.
         identify(userId);
-        track("map_link_opened", {});
+        track("map_link_opened", {}, { meta: { eventId: result.eventId, userId } });
         router.replace("/app");
       } else {
         track("map_link_failed", {});

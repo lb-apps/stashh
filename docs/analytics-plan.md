@@ -91,7 +91,7 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 |---|---|---|
 | `$mp_web_page_view` | SDK, on load and path change | — |
 | `instagram_cta_clicked` | landing button, signed-out screen | `surface`: landing, signed_out, invalid_link |
-| `map_link_opened` | `/app/a/[code]`, sign-in succeeded | — |
+| `map_link_opened` | `/app/a/[code]`, sign-in succeeded; also to Meta as `MapLinkOpened` | — |
 | `map_link_failed` | `/app/a/[code]`, link invalid | — |
 | `recognition_started` | paste sheet, retry | `entry`: clipboard, paste, retry; `source_platform` |
 | `recognition_completed` | recognizing sheet settles with places | `place_count`, `duration_ms` |
@@ -116,6 +116,36 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 - **The core job:** `recognition_started` → `recognition_completed` → `places_saved`.
 - **Going:** `place_viewed` → `directions_opened`.
 - **Landing:** `$mp_web_page_view` (path `/`) → `instagram_cta_clicked`.
+
+## Meta: Pixel and Conversions API
+
+Meta is a second destination for the few events ad audiences are built from, not a
+second analytics tool. Today that is one event: `map_link_opened`, sent as
+`MapLinkOpened`, the seed of the lookalike audience for DM campaigns.
+
+- **Which events:** only those in `metaEvents` in `events.ts`. Nothing else reaches
+  Meta: no page views (on load or on route changes), no autocapture
+  (`autoConfig` off, `disablePushState` on).
+- **Sent twice, counted once.** The browser sends it through the pixel
+  ([`meta-pixel.ts`](../web/lib/analytics/meta-pixel.ts), called only by `track` when it
+  is given `{ meta: { eventId, userId } }`). The Next server sends the same event to the
+  Conversions API ([`meta-capi.ts`](../web/lib/analytics/meta-capi.ts)) from the `redeem`
+  server action, in `after()`, with the same `event_id`. Meta drops the duplicate.
+- **Why the Next server, not the backend:** it is the only place that sees the visitor's
+  own IP and user agent, which is what Meta matches on. The backend still sends nothing.
+- **What Meta receives:** the event and its time, IP, user agent, the pixel's own
+  `_fbp`/`_fbc` cookies, and the SHA-256 of the Supabase user id (`external_id`).
+  Never the Instagram id, a username or the link's code (`event_source_url` is `/app/a`).
+- **The server's copy is sent when the code is valid**, the browser's after the sign-in.
+  If `verifyOtp` fails in between, Meta has a server event and Mixpanel has
+  `map_link_failed`. Rare, and harmless for an audience.
+- **Env:** `NEXT_PUBLIC_META_PIXEL_ID` (empty: nothing is sent from either side),
+  `META_CAPI_ACCESS_TOKEN` (server only), `META_TEST_EVENT_CODE` (local and preview only;
+  events land under Test Events and build no audience). Set in Vercel production only.
+- **No consent banner**, the owner's call (2026-11-10); the privacy policy names the
+  sharing and its legal basis. Adding an event to `metaEvents` means updating the policy
+  in the same change.
+- **Graph API version** is a constant in `meta-capi.ts`; raise it when Meta retires it.
 
 ## Adding an event
 

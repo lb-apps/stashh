@@ -127,6 +127,11 @@ none — their numbers stay in the ops SQL functions.
 - Two projects in the Little Big Apps org: Stashh - Production (Vercel production) and Stashh -
   Staging (local, previews). A new event gets a Lexicon display name, description and `verified`
   in both.
+- **Meta gets only the events in `metaEvents`** (`events.ts`; today `map_link_opened` → `MapLinkOpened`),
+  to build ad audiences: once from the browser (`meta-pixel.ts`, through `track(…, { meta })`) and once
+  from the Next server (`meta-capi.ts`, Conversions API), under one event id. No page views, no
+  autocapture, no Instagram id, never from the backend. An event Meta should get is added to that map
+  and to the privacy policy in the same change.
 
 ## Ops dashboard — `ops/` (local only)
 
