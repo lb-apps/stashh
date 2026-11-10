@@ -3,10 +3,15 @@
 import type { Config, Mixpanel } from "mixpanel-browser";
 import { publicEnv } from "@/lib/env";
 import { detectInAppBrowser, type InAppBrowser } from "@/lib/platform/in-app-browser";
-import type { EventName, EventProps } from "./events";
+import { metaEvents, type EventName, type EventProps, type MetaEventName } from "./events";
+import { sendPixelEvent } from "./meta-pixel";
 
 /**
- * Mixpanel for the interfaces people use (stashh.me and /app). One SDK
+ * Product analytics for the interfaces people use (stashh.me and /app), and
+ * the only module pages call. Everything goes to Mixpanel; the few events in
+ * `metaEvents` also go to the Meta Pixel (meta-pixel.ts).
+ *
+ * Mixpanel: one SDK
  * instance per page, loaded on first use with a dynamic import so the landing
  * page's bundle never carries it; calls made before it loads run in order once
  * it has. Without a token every call is a no-op (local dev without one, CI).
@@ -90,9 +95,18 @@ export function startAnalytics() {
  * `leavesPage` for a click that navigates away in the same tab (links open in
  * place: popups break in in-app browsers). The event then goes out at once by
  * sendBeacon instead of waiting in the batch queue the navigation would cut off.
+ *
+ * `meta` for an event in `metaEvents`: it then also goes to the Meta Pixel,
+ * under the event id the server gave the Conversions API for the same action.
  */
-export function track<N extends EventName>(name: N, props: EventProps<N>, options?: { leavesPage?: boolean }) {
+export function track<N extends EventName>(
+  name: N,
+  props: EventProps<N>,
+  options?: { leavesPage?: boolean; meta?: { eventId: string; userId: string } },
+) {
   run((mixpanel) => mixpanel.track(name, props, options?.leavesPage ? { transport: "sendBeacon", send_immediately: true } : undefined));
+  const metaName = (metaEvents as Partial<Record<EventName, MetaEventName>>)[name];
+  if (metaName && options?.meta) sendPixelEvent(metaName, options.meta);
 }
 
 /**

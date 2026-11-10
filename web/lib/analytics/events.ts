@@ -52,3 +52,13 @@ export type EventCatalog = {
 
 export type EventName = keyof EventCatalog;
 export type EventProps<N extends EventName> = EventCatalog[N];
+
+/**
+ * The events Meta also receives, under the name its Events Manager shows, to
+ * build ad audiences from. An event absent from this map never leaves for Meta.
+ */
+export const metaEvents = {
+  map_link_opened: "MapLinkOpened",
+} as const satisfies Partial<Record<EventName, string>>;
+
+export type MetaEventName = (typeof metaEvents)[keyof typeof metaEvents];

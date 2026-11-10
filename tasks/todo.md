@@ -165,3 +165,19 @@ Supabase user id and `api-eu`. Found and fixed during the check: `reset()` wiped
 the first page view fired inside `init` before `register` — context now rides a `before_track` hook. Not
 exercised live (no test data written to the shared DB): `list_created`, `places_saved`, `recognition_*`,
 `place_removed`, `location_permission_answered`, `map_link_*` — same code paths, typechecked.
+
+
+# Meta Pixel + Conversions API (web)
+
+Asked by the owner on 2026-11-10: send the DM map link's open to Meta too, to target lookalikes of the
+people who opened it. Owner's calls: no consent banner (policy updated instead), only `map_link_opened`,
+only `/app`. Branch `feature/meta-pixel` from `origin/develop`. Guide: docs/analytics-plan.md, "Meta".
+
+- [x] `metaEvents` in `events.ts`; `meta-pixel.ts` (lazy, no page views, no autocapture); `track(…, { meta })`
+- [x] `meta-capi.ts` + `redeem` server action: same event id, sent in `after()`; the owner's id stays on the server
+- [x] Env names in `web/.env.example`; privacy policy and data-deletion page (drafted by GPT-6.1 Sol, reviewed)
+- [x] docs/analytics-plan.md and CLAUDE.md
+- [x] Meta: dataset "Stashh Web" (1130325262921071) in the Little Big Apps business, linked to the Stashh ad account; automatic page info, events and matching off; id + token in Vercel production
+- [ ] Verified with a test event code: one browser and one server `MapLinkOpened`, deduplicated
+- [ ] Website Custom Audience (`MapLinkOpened`, 180 days), then the lookalike once it holds 100 people
+- [ ] Erase-on-"sil" cannot recall events already sent to Meta (the policy says so)
