@@ -1,27 +1,13 @@
 "use client";
 
 import * as React from "react";
-import type { Detent } from "@/lib/discovery";
-import { NO_FILTERS, type PlaceFilters, type Scope } from "@/lib/stashh/selectors";
+import { NO_FILTERS, type PlaceFilters } from "@/lib/stashh/selectors";
 
-/**
- * Which sheet is up, and how high. One reducer for the whole app so only one
- * sheet exists at a time and every transition is a named action — the screen
- * flow of the design (home → paste → results → list picker → celebrate, pin →
- * place, …) reads straight off `reduce`.
- */
-/** What a list picker / new list files: recognised places, one saved place, or nothing yet. */
-export type ListTarget =
-  | { kind: "recognition"; recognitionId: string; resultId: string; googlePlaceIds: string[] }
-  | { kind: "place"; placeId: string }
-  | { kind: "empty" };
+/** What a list picker / new list files: one saved place, or nothing yet. */
+export type ListTarget = { kind: "place"; placeId: string } | { kind: "empty" };
 
+/** A screen presented over home or over another presented screen. */
 export type SheetRoute =
-  | { name: "home" }
-  | { name: "search" }
-  | { name: "paste" }
-  | { name: "recognizing"; recognitionId: string }
-  | { name: "results"; recognitionId: string }
   | { name: "listpicker"; target: ListTarget }
   | { name: "newlist"; target: ListTarget }
   | { name: "place"; placeId: string }
@@ -30,78 +16,69 @@ export type SheetRoute =
   | { name: "filter" }
   | { name: "profile" };
 
-export interface SheetState {
+/** One presented screen. The id tells it apart from a screen presented later at the same depth. */
+export interface Presented {
+  id: number;
   route: SheetRoute;
-  detent: Detent;
-  scope: Scope;
-  /** Narrow the map and lists (Filter sheet). */
+}
+
+/**
+ * Which screens are up. Home is always underneath; every other screen is
+ * presented over the one on top, as an iOS sheet, and closing it uncovers the
+ * screen it came from. One reducer for the whole app, so every transition is a
+ * named action that reads straight off `reduceSheet`.
+ */
+export interface SheetState {
+  /** Presented screens, bottom to top. Empty: home. */
+  stack: Presented[];
+  nextId: number;
+  /** Narrow the places home shows (Filter screen). */
   filters: PlaceFilters;
-  /** Library ids of places just saved — their pins drop in. */
-  justSaved: string[];
-  /** The list they were filed into, for the celebration. */
-  justSavedInto: string | null;
 }
 
 export type SheetAction =
-  | { type: "open"; route: SheetRoute; detent?: Detent }
-  | { type: "home" }
-  | { type: "detent"; detent: Detent }
-  | { type: "scope"; scope: Scope }
-  | { type: "filters"; filters: PlaceFilters }
-  | { type: "saved"; placeIds: string[]; listName: string | null }
-  | { type: "celebrated" };
+  | { type: "present"; route: SheetRoute }
+  /** Closes the screen at `depth` and everything presented over it. */
+  | { type: "close"; depth: number }
+  | { type: "filters"; filters: PlaceFilters };
 
-export const initialSheetState: SheetState = { route: { name: "home" }, detent: "peek", scope: "all", filters: NO_FILTERS, justSaved: [], justSavedInto: null };
+export const initialSheetState: SheetState = { stack: [], nextId: 0, filters: NO_FILTERS };
 
-/** Pin taps and the recognition progress peek over the map; everything else opens full. */
-function defaultDetent(route: SheetRoute): Detent {
-  return route.name === "place" || route.name === "home" || route.name === "recognizing" ? "peek" : "full";
-}
+const sameRoute = (a: SheetRoute | undefined, b: SheetRoute) => JSON.stringify(a) === JSON.stringify(b);
 
 export function reduceSheet(state: SheetState, action: SheetAction): SheetState {
   switch (action.type) {
-    case "open":
-      return { ...state, route: action.route, detent: action.detent ?? defaultDetent(action.route) };
-    case "home":
-      return { ...state, route: { name: "home" }, detent: "peek" };
-    case "detent":
-      return { ...state, detent: action.detent };
-    case "scope":
-      return { ...state, scope: action.scope };
+    case "present":
+      // A second tap on what is already on top presents nothing new.
+      if (sameRoute(state.stack.at(-1)?.route, action.route)) return state;
+      return { ...state, stack: [...state.stack, { id: state.nextId, route: action.route }], nextId: state.nextId + 1 };
+    case "close":
+      return { ...state, stack: state.stack.slice(0, Math.max(0, action.depth)) };
     case "filters":
       return { ...state, filters: action.filters };
-    case "saved":
-      return { ...state, route: { name: "home" }, detent: "peek", justSaved: action.placeIds, justSavedInto: action.listName };
-    case "celebrated":
-      return { ...state, justSaved: [], justSavedInto: null };
   }
 }
 
 interface SheetNav {
   state: SheetState;
-  /** Raw actions, for the shell (detent changes, end of the celebration). */
-  dispatch: React.Dispatch<SheetAction>;
-  open: (route: SheetRoute, detent?: Detent) => void;
-  home: () => void;
-  setScope: (scope: Scope) => void;
+  /** Presents a screen over the one on top. */
+  open: (route: SheetRoute) => void;
+  /** Closes the screen at `depth` and everything presented over it. */
+  close: (depth: number) => void;
   setFilters: (filters: PlaceFilters) => void;
-  /** After saving recognised places: back to the map, pins drop in. */
-  saved: (placeIds: string[], listName: string | null) => void;
 }
 
 const SheetNavContext = React.createContext<SheetNav | null>(null);
+const DepthContext = React.createContext<number | null>(null);
 
-/** Sheets navigate through this — never by holding the reducer themselves. */
+/** Screens navigate through this — never by holding the reducer themselves. */
 export function SheetNavProvider({ state, dispatch, children }: { state: SheetState; dispatch: React.Dispatch<SheetAction>; children: React.ReactNode }) {
   const nav = React.useMemo<SheetNav>(
     () => ({
       state,
-      dispatch,
-      open: (route, detent) => dispatch({ type: "open", route, detent }),
-      home: () => dispatch({ type: "home" }),
-      setScope: (scope) => dispatch({ type: "scope", scope }),
+      open: (route) => dispatch({ type: "present", route }),
+      close: (depth) => dispatch({ type: "close", depth }),
       setFilters: (filters) => dispatch({ type: "filters", filters }),
-      saved: (placeIds, listName) => dispatch({ type: "saved", placeIds, listName }),
     }),
     [state, dispatch],
   );
@@ -112,4 +89,21 @@ export function useSheetNav(): SheetNav {
   const nav = React.use(SheetNavContext);
   if (!nav) throw new Error("useSheetNav() must be used inside <SheetNavProvider>");
   return nav;
+}
+
+/** Tells a presented screen where it stands in the stack, so it can close itself. */
+export function PresentedAt({ depth, children }: { depth: number; children: React.ReactNode }) {
+  return <DepthContext value={depth}>{children}</DepthContext>;
+}
+
+/**
+ * Closes the screen it is called from, uncovering the one under it. With
+ * `alsoBelow`, that many of the screens it was presented over close too — a new
+ * list made from the list picker closes the picker with it.
+ */
+export function useCloseScreen(): (alsoBelow?: number) => void {
+  const depth = React.use(DepthContext);
+  const { close } = useSheetNav();
+  if (depth == null) throw new Error("useCloseScreen() must be used inside a presented screen");
+  return React.useCallback((alsoBelow = 0) => close(depth - alsoBelow), [close, depth]);
 }

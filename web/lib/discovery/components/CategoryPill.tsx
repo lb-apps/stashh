@@ -9,9 +9,9 @@ import { TEXT_SECONDARY_STRONG } from '../pending-tokens';
 import { BUTTON_RESET, usePressable } from '../use-pressable';
 
 /** Pill height (clears --hit-min) and its chip-scale orb, in px. */
-const PILL_H = 46;
-const ORB = 26;
-const ORB_GLYPH = 14;
+const PILL_H = 52;
+const ORB = 28;
+const ORB_GLYPH = 15;
 
 type CategoryPillProps = Omit<React.ComponentPropsWithoutRef<'button'>, 'style' | 'children'> & {
   category: PlaceCategory;
@@ -22,7 +22,7 @@ type CategoryPillProps = Omit<React.ComponentPropsWithoutRef<'button'>, 'style' 
   style?: React.CSSProperties;
 };
 
-/** A "Browse by type" pill: small category orb, the category's name, its count. */
+/** A "Types" pill: small category orb, the category's name, its count. */
 export function CategoryPill({ category, icon, label, count, style, ...rest }: CategoryPillProps) {
   const press = usePressable<HTMLButtonElement>(rest);
   return (
@@ -34,10 +34,10 @@ export function CategoryPill({ category, icon, label, count, style, ...rest }: C
         ...BUTTON_RESET,
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 'var(--sp-4)',
+        gap: 'var(--sp-5)',
         flex: '0 0 auto',
         height: PILL_H,
-        padding: '0 var(--sp-7) 0 var(--sp-4)',
+        padding: '0 var(--sp-8) 0 var(--sp-6)',
         borderRadius: 'var(--r-pill)',
         background: 'var(--surface-sunken-on-white)',
         whiteSpace: 'nowrap',

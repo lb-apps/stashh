@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Button } from "@/lib/discovery/components/Button";
 import { CategoryOrb } from "@/lib/discovery/components/CategoryOrb";
-import { SheetFooter } from "@/lib/discovery/components/DetentSheet";
+import { ScreenFooter } from "@/lib/discovery/components/Screen";
 import { GhostInput } from "@/lib/discovery/components/GhostInput";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { TEXT_DANGER_STRONG } from "@/lib/discovery/pending-tokens";
@@ -29,8 +29,7 @@ const COVER_RING = "0 0 0 3px var(--white), 0 0 0 6px var(--cobalt-500)";
 
 /**
  * A new list: title, optional description, cover. Creating it also files
- * whatever the sheet was opened for — recognised places, one saved place, or
- * nothing (an empty list from the library).
+ * whatever the screen was opened for — one saved place, or nothing (an empty list).
  */
 export function NewListSheet({ target }: { target: ListTarget }) {
   const c = useCopy(recognizeCopy);
@@ -96,11 +95,11 @@ export function NewListSheet({ target }: { target: ListTarget }) {
           </p>
         ) : null}
       </SheetBody>
-      <SheetFooter>
+      <ScreenFooter>
         <Button type="submit" form={formId} variant="primary" size="lg" shape="pill" fullWidth disabled={!title.trim() || file.pending}>
           {target.kind === "empty" ? c.newList.create : c.newList.createAndSave}
         </Button>
-      </SheetFooter>
+      </ScreenFooter>
     </>
   );
 }

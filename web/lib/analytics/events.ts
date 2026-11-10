@@ -12,10 +12,6 @@
  * - No personal data in properties: no usernames, note text or source URLs.
  */
 
-/** Where a recognition was started from. */
-export type RecognitionEntry = "clipboard" | "paste" | "retry";
-/** Why a recognition gave nothing to save (`FailureKind` in recognize/recognition-view.ts). */
-export type RecognitionFailure = "private" | "unavailable" | "unreadable" | "no_places";
 /** Where a saved place's card was opened from. */
 export type PlaceEntry = "map_pin" | "home" | "list" | "library" | "search";
 
@@ -27,14 +23,7 @@ export type EventCatalog = {
   /** A DM map link could not sign the reader in. */
   map_link_failed: Record<string, never>;
 
-  recognition_started: { entry: RecognitionEntry; source_platform: "instagram" | "tiktok" };
-  /** The reader watched a recognition settle with places to pick from. */
-  recognition_completed: { place_count: number; duration_ms: number };
-  recognition_failed: { reason: RecognitionFailure };
-  /** Recognised places saved to the library, and where they were filed. */
-  places_saved: { place_count: number; target: "no_list" | "existing_list" | "new_list" };
-
-  list_created: { entry: "recognition" | "place" | "empty" };
+  list_created: { entry: "place" | "empty" };
   list_viewed: { entry: "home" | "library"; place_count: number };
   place_added_to_list: Record<string, never>;
 
@@ -43,10 +32,9 @@ export type EventCatalog = {
   place_note_saved: { has_note: boolean };
   place_removed: Record<string, never>;
   directions_opened: Record<string, never>;
-  source_post_opened: { surface: "place" | "results" };
+  source_post_opened: { surface: "place" };
 
   location_permission_answered: { is_granted: boolean; surface: "profile" | "home_prompt" };
-  clipboard_watch_toggled: { is_enabled: boolean };
   user_signed_out: Record<string, never>;
 };
 

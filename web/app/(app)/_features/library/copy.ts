@@ -11,8 +11,8 @@ export const libraryCopy = {
     recentlySaved: "Recently saved",
     places: (n: string, count: number) => (count === 1 ? "1 place" : `${n} places`),
     emptyHeadline: "Nothing saved here yet",
-    emptySub: "Paste a Reel and we’ll pull the places out of it.",
-    pasteReel: "Paste a Reel",
+    emptySub: "Send a Reel to @stashh.me on Instagram and its places land here.",
+    messageUs: "Message @stashh.me",
   },
   tr: {
     title: "Mekanlarım",
@@ -25,7 +25,7 @@ export const libraryCopy = {
     recentlySaved: "Son kaydedilenler",
     places: (n: string) => `${n} mekan`,
     emptyHeadline: "Henüz bir şey kaydetmedin",
-    emptySub: "Bir Reel yapıştır, içindeki mekanları biz çıkaralım.",
-    pasteReel: "Reel yapıştır",
+    emptySub: "Instagram’da @stashh.me’ye bir Reel gönder, içindeki mekanlar buraya gelsin.",
+    messageUs: "@stashh.me’ye yaz",
   },
 };

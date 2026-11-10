@@ -93,11 +93,7 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 | `instagram_cta_clicked` | landing button, signed-out screen | `surface`: landing, signed_out, invalid_link |
 | `map_link_opened` | `/app/a/[code]`, sign-in succeeded; also to Meta as `MapLinkOpened` | — |
 | `map_link_failed` | `/app/a/[code]`, link invalid | — |
-| `recognition_started` | paste sheet, retry | `entry`: clipboard, paste, retry; `source_platform` |
-| `recognition_completed` | recognizing sheet settles with places | `place_count`, `duration_ms` |
-| `recognition_failed` | recognizing sheet settles empty-handed | `reason`: private, unavailable, unreadable, no_places |
-| `places_saved` | recognised places saved | `place_count`; `target`: no_list, existing_list, new_list |
-| `list_created` | new list | `entry`: recognition, place, empty |
+| `list_created` | new list | `entry`: place, empty |
 | `list_viewed` | list opened from home or library | `entry`, `place_count` |
 | `place_added_to_list` | saved place filed into a list | — |
 | `place_viewed` | place card opened | `entry`: map_pin, home, list, library, search |
@@ -105,15 +101,18 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 | `place_note_saved` | note committed | `has_note` |
 | `place_removed` | place removed from the library | — |
 | `directions_opened` | directions button | — |
-| `source_post_opened` | open the post, from a place or the results | `surface` |
+| `source_post_opened` | open the post, from a place | `surface` |
 | `location_permission_answered` | location asked for from profile or home | `is_granted`, `surface` |
-| `clipboard_watch_toggled` | profile setting | `is_enabled` |
 | `user_signed_out` | sign-out confirmed | — |
+
+**Retired (2026-11-10):** `recognition_started`, `recognition_completed`,
+`recognition_failed`, `places_saved`, `clipboard_watch_toggled`. `/app` no longer
+recognises pasted links: Reels arrive only through the Instagram DM, whose numbers live
+in the ops SQL functions. Hide these five in Lexicon in both projects.
 
 ## Funnels
 
 - **Arrival:** `map_link_opened` → `place_viewed`.
-- **The core job:** `recognition_started` → `recognition_completed` → `places_saved`.
 - **Going:** `place_viewed` → `directions_opened`.
 - **Landing:** `$mp_web_page_view` (path `/`) → `instagram_cta_clicked`.
 

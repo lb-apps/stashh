@@ -112,6 +112,15 @@ kit splits the token system in half — if a component is missing, add it to
 **Light only.** Discovery is a single warm-bone light system. There is no dark
 theme: no `dark` class, no `data-theme`, no `prefers-color-scheme` switch.
 
+**UI work runs in the Instagram in-app browser simulator.** People reach `/app` from a
+DM link, so every UI change there is built and checked at `localhost:3001/app/dev/iab`
+(dev only, sign in first at `/app/dev`), never in a bare mobile viewport or a plain tab.
+The page frames the app at real iPhone size under Instagram's header, and the server reads
+the frame as Instagram on iOS (`lib/platform/dev-preview.ts`). `?device=iphone-16 |
+iphone-16-pro-max | iphone-se` picks the screen, `?inset=<points>` the home-bar inset.
+A frame cannot set `env()`, so a bottom inset is always written
+`var(--safe-area-bottom, env(safe-area-inset-bottom))`.
+
 ## Product analytics — Mixpanel
 
 Guide: [docs/analytics-plan.md](docs/analytics-plan.md). Events come only from the interfaces

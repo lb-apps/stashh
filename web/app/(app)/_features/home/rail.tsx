@@ -1,13 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useSheetDetent } from "@/lib/discovery/components/DetentSheet";
 
 /**
  * A horizontal strip that bleeds past the screen gutter, so items scroll off
  * the edge instead of stopping short of it. Bottom padding leaves room for
- * the items' shadows. It pans sideways natively; a vertical drag moves the
- * sheet at peek and scrolls the sheet's content at full height.
+ * the items' shadows. It pans sideways natively; a vertical drag scrolls the screen.
  */
 export function Rail({
   children,
@@ -22,7 +20,6 @@ export function Rail({
   "aria-label"?: string;
   role?: React.AriaRole;
 }) {
-  const detent = useSheetDetent();
   return (
     <div
       role={role}
@@ -36,7 +33,6 @@ export function Rail({
         padding: `var(--sp-1) var(--gutter) ${paddingBottom}`,
         overflowX: "auto",
         overscrollBehaviorX: "contain",
-        touchAction: detent === "full" ? "pan-x pan-y" : "pan-x",
       }}
     >
       {children}

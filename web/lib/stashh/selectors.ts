@@ -77,11 +77,10 @@ export function searchPlaces(places: SavedPlace[], query: string, categoryLabel:
   const q = foldForSearch(query.trim());
   if (!q) return places;
   return places.filter((p) =>
-    [p.name, p.district, p.city, categoryLabel(p.category_group)].some((field) => field && foldForSearch(field).includes(q)),
+    [p.name, p.short_formatted_address, p.district, p.city, categoryLabel(p.category_group)].some((field) => field && foldForSearch(field).includes(q)),
   );
 }
 
-export type Scope = "all" | "open" | "togo" | "been";
 export type VisitFilter = "all" | "togo" | "been";
 export type DistanceFilter = "any" | 1000 | 3000;
 
@@ -112,18 +111,6 @@ export function applyFilters(places: SavedPlace[], filters: PlaceFilters, origin
   });
 }
 
-export function applyScope(places: SavedPlace[], scope: Scope, now = new Date()): SavedPlace[] {
-  switch (scope) {
-    case "open":
-      return places.filter((p) => isOpenNow(p, now) === true);
-    case "togo":
-      return places.filter((p) => !p.visited_at);
-    case "been":
-      return places.filter((p) => Boolean(p.visited_at));
-    default:
-      return places;
-  }
-}
 
 /** Nearest first when there is an origin, newest saved first otherwise. */
 export function sortNearYou(places: SavedPlace[], origin: LatLng | null): SavedPlace[] {
@@ -140,4 +127,26 @@ export function countBy<K extends string>(places: SavedPlace[], key: (p: SavedPl
     if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
   }
   return [...counts].map(([k, count]) => ({ key: k, count })).sort((a, b) => b.count - a.count);
+}
+
+/** A neighbourhood or a city: its name, how many places are saved there, and the middle of them. */
+export interface Area {
+  name: string;
+  count: number;
+  centre: LatLng;
+}
+
+/** Places grouped by an area (district, city) that can be drawn on a map, largest first, each centred on the middle of its places. */
+export function areasBy(places: SavedPlace[], areaOf: (p: SavedPlace) => string | null): Area[] {
+  return countBy(places, areaOf).flatMap(({ key, count }) => {
+    const points = places.flatMap((p) => (areaOf(p) === key && p.location ? [p.location] : []));
+    if (!points.length) return [];
+    const mean = (value: (point: LatLng) => number) => points.reduce((sum, point) => sum + value(point), 0) / points.length;
+    return [{ name: key, count, centre: { latitude: mean((point) => point.latitude), longitude: mean((point) => point.longitude) } }];
+  });
+}
+
+/** Districts that can be drawn on a map, largest first. */
+export function neighbourhoods(places: SavedPlace[]): Area[] {
+  return areasBy(places, (p) => p.district);
 }
