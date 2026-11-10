@@ -26,6 +26,10 @@ export const publicEnv = {
   get mixpanelToken(): string | null {
     return process.env.NEXT_PUBLIC_MIXPANEL_TOKEN || null;
   },
+  /** Optional: without it nothing is sent to Meta, from the browser or the server. */
+  get metaPixelId(): string | null {
+    return process.env.NEXT_PUBLIC_META_PIXEL_ID || null;
+  },
   /** `production` only on stashh.me; tags every event so a wrong token shows up at once. */
   get appEnv(): string {
     return process.env.NEXT_PUBLIC_APP_ENV || "development";
