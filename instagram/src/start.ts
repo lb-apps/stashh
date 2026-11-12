@@ -1,3 +1,4 @@
+import { createAnalytics } from "./analytics/mixpanel.ts";
 import { loadConfig } from "./config.ts";
 import { outboundMode } from "./conversation/outbound.ts";
 import { MessageProcessor } from "./conversation/processor.ts";
@@ -27,7 +28,17 @@ const log = createLogger(config);
 // Which environment this instance is to the hooks relay, and whom it may write to (docs/webhook-relay.md).
 const environment = instanceEnvironment(config.NODE_ENV);
 const outbound = outboundMode(environment, config.META_OUTBOUND);
-log.info({ environment, outbound, relay: Boolean(config.HOOKS_RELAY_SECRET) }, "instagram channel environment");
+log.info(
+  { environment, outbound, relay: Boolean(config.HOOKS_RELAY_SECRET), analytics: Boolean(config.MIXPANEL_TOKEN) },
+  "instagram channel environment",
+);
+
+// Product events carry `app_env` in the web's words, so both interfaces read the same in Mixpanel.
+const analytics = createAnalytics({
+  token: config.MIXPANEL_TOKEN,
+  appEnv: environment === "prod" ? "production" : "development",
+  log: log.child({ component: "analytics" }),
+});
 
 const db = createDb({ url: config.SUPABASE_URL, secretKey: config.SUPABASE_SECRET_KEY });
 const store = new SupabaseMessageStore(db, { environment });
@@ -47,6 +58,7 @@ const processor = new MessageProcessor({
   log: log.child({ component: "processor" }),
   outbound,
   suggestedReplies: config.RECOGNITION_SUGGESTED_REPLIES === "on",
+  analytics,
 });
 const worker = new MessageWorker({
   store,
@@ -106,6 +118,7 @@ const shutdown = async (signal: NodeJS.Signals) => {
   clearInterval(profileTimer);
   server.close();
   await worker.stop();
+  await analytics.flush();
   process.exit(0);
 };
 process.once("SIGTERM", (signal) => void shutdown(signal));

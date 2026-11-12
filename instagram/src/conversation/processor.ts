@@ -1,10 +1,12 @@
+import type { RecognitionFailure, RecognitionProps } from "../analytics/events.ts";
+import { NoopAnalytics, type Analytics } from "../analytics/mixpanel.ts";
 import type { Logger } from "../lib/logger.ts";
 import { GraphApiError, type InstagramProfile, type Messenger, type OutboundMessage, type ProfileReader, type SenderAction } from "../meta/graph-client.ts";
 import { composeRecognitionReply, mapLinkMessage, renderPlan } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
-import { RECOGNITION_QUOTA, StashhApiError, TERMINAL_STATUSES, type StashhApi } from "../stashh/client.ts";
+import { RECOGNITION_QUOTA, StashhApiError, TERMINAL_STATUSES, type Recognition, type StashhApi } from "../stashh/client.ts";
 import { commandReply } from "../webhooks/core/commands.ts";
-import { interpret } from "./intent.ts";
+import { interpret, type Intent } from "./intent.ts";
 import { mayMessage, OUTBOUND_BLOCKED, type OutboundMode } from "./outbound.ts";
 import type { MessageStatus, MessageStore, Settlement, StoredMessage } from "./store.ts";
 import type { TurnMessage } from "../stashh/client.ts";
@@ -37,7 +39,14 @@ export interface ProcessorDeps {
   outbound?: OutboundMode;
   /** Quick replies under a finished recognition (`RECOGNITION_SUGGESTED_REPLIES`). */
   suggestedReplies?: boolean;
+  /** Product events for the conversation (`analytics/`); without it nothing is sent. */
+  analytics?: Analytics;
   now?: () => Date;
+}
+
+/** What one processing step learned that its failure handler needs: the user behind a share. */
+interface StepContext {
+  userId: string | null;
 }
 
 /**
@@ -58,6 +67,10 @@ export interface ProcessorDeps {
  * Every step is safe to repeat: identity resolution and recognition creation are
  * idempotent on the backend, and delivered replies are counted so a retry resumes
  * where it stopped. Every exit settles the message, which releases the claim.
+ *
+ * Product events (`analytics/events.ts`) follow the share as the person lives it: started when
+ * it is taken in, and its outcome once the answer is delivered and the message has settled for
+ * good, so a settled message, never processed again, reports its outcome exactly once.
  */
 export class MessageProcessor {
   private readonly store: MessageStore;
@@ -67,6 +80,7 @@ export class MessageProcessor {
   private readonly log: Logger;
   private readonly outbound: OutboundMode;
   private readonly suggestedReplies: boolean;
+  private readonly analytics: Analytics;
   private readonly now: () => Date;
 
   constructor(deps: ProcessorDeps) {
@@ -77,6 +91,7 @@ export class MessageProcessor {
     this.log = deps.log;
     this.outbound = deps.outbound ?? "live";
     this.suggestedReplies = deps.suggestedReplies ?? false;
+    this.analytics = deps.analytics ?? new NoopAnalytics();
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -86,6 +101,8 @@ export class MessageProcessor {
     if (this.now().getTime() - message.sentAt.getTime() > REPLY_WINDOW_MS) {
       log.warn("reply window closed; message expired");
       await this.settle(message, { status: "expired" });
+      // A share already under way ends here unanswered: for the person, it timed out.
+      if (message.status === "submitted" && message.userId) this.recognitionEnded(message, message.userId, { reason: "timed_out" });
       return;
     }
 
@@ -96,15 +113,16 @@ export class MessageProcessor {
       return;
     }
 
+    const step: StepContext = { userId: message.status === "submitted" ? message.userId : null };
     try {
       if (message.status === "submitted") await this.poll(message);
-      else await this.start(message);
+      else await this.start(message, step);
     } catch (error) {
-      await this.fail(message, error, log);
+      await this.fail(message, error, log, step);
     }
   }
 
-  private async start(message: StoredMessage): Promise<void> {
+  private async start(message: StoredMessage, step: StepContext): Promise<void> {
     const intent = interpret(message);
 
     switch (intent.kind) {
@@ -115,26 +133,33 @@ export class MessageProcessor {
       case "unsupported":
         return this.reply(message, [text(copy.unsupported)]);
       case "link": {
-        const { userId } = await this.stashh.resolveInstagramUser(message.senderId);
+        const userId = await this.resolveUser(message);
         const { url } = await this.stashh.mintSignInLink(userId);
         return this.reply(message, [mapLinkMessage(copy.mapLink, url)]);
       }
-      case "erase":
-        await this.stashh.eraseInstagramUser(message.senderId);
+      case "erase": {
+        const { userId } = await this.stashh.eraseInstagramUser(message.senderId);
+        // Their analytics profile goes with the rest; past events keep only the bare user id.
+        this.analytics.deleteProfile(userId);
         await this.reply(message, [text(copy.erased)]);
         await this.store.deleteBySender(message.senderId);
         return;
+      }
       case "chat":
         return this.chat(message);
       case "recognize": {
         const profile = await this.greet(message);
-        const { userId } = await this.stashh.resolveInstagramUser(message.senderId, profile);
+        const userId = await this.resolveUser(message, profile);
+        // Timed at the share, so a retried step repeats the same event, which Mixpanel keeps once.
+        this.analytics.track("recognition_started", recognitionProps(intent), { userId, time: message.sentAt, key: message.mid });
+        step.userId = userId;
         let recognitionId: string;
         try {
           ({ recognitionId } = await this.stashh.createRecognition({ userId, source: intent.source, idempotencyKey: message.mid }));
         } catch (error) {
           if (error instanceof StashhApiError && error.code === RECOGNITION_QUOTA) {
-            return this.reply(message, [text(copy.dailyLimit)], "failed", "daily recognition cap reached");
+            await this.reply(message, [text(copy.dailyLimit)], "failed", "daily recognition cap reached");
+            return this.recognitionEnded(message, userId, { reason: "daily_limit" });
           }
           throw error;
         }
@@ -223,7 +248,7 @@ export class MessageProcessor {
     }
 
     const profile = await this.greet(message);
-    const { userId } = await this.stashh.resolveInstagramUser(message.senderId, profile);
+    const userId = await this.resolveUser(message, profile);
     const plan = await this.whileTyping(message, () => this.stashh.assistantTurn({ userId, messages: turn.map(toTurnMessage) }));
     return this.reply(message, renderPlan(plan));
   }
@@ -240,19 +265,23 @@ export class MessageProcessor {
       // A list post shared from the feed reaches us as its cover only (Meta sends no other
       // slide and no permalink); the link, once pasted, is read in full.
       if (places.length === 0 && recognition.names_elsewhere && this.isSharedPost(message)) {
-        return this.reply(message, [text(copy.listNeedsLink)]);
+        await this.reply(message, [text(copy.listNeedsLink)]);
+        return this.recognitionEnded(message, message.userId, { reason: "needs_link" });
       }
       const mapUrl = places.length > 0 ? await this.mapUrl(message.userId, message.mid) : null;
-      return this.reply(message, composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies }));
+      await this.reply(message, composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies }));
+      return this.recognitionEnded(message, message.userId, places.length > 0 ? { places: places.length } : { reason: "no_places" });
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
-      return this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
+      await this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
+      return this.recognitionEnded(message, message.userId, { reason: failureReason(recognition.error_code) });
     }
 
     const now = this.now();
     const elapsed = now.getTime() - message.submittedAt.getTime();
     if (elapsed > RECOGNITION_TIMEOUT_MS) {
-      return this.reply(message, [text(copy.failed(kind))], "failed", `recognition timed out after ${Math.round(elapsed / 1000)}s`);
+      await this.reply(message, [text(copy.failed(kind))], "failed", `recognition timed out after ${Math.round(elapsed / 1000)}s`);
+      return this.recognitionEnded(message, message.userId, { reason: "timed_out" });
     }
     // Still working: the typing bubble stays up for as long as the recognition takes.
     await this.presence(message, "typing_on");
@@ -286,7 +315,7 @@ export class MessageProcessor {
     await this.settle(message, { status, repliesSent: Math.max(replies.length, message.repliesSent), lastError });
   }
 
-  private async fail(message: StoredMessage, error: unknown, log: Logger): Promise<void> {
+  private async fail(message: StoredMessage, error: unknown, log: Logger, step: StepContext): Promise<void> {
     const attempts = message.attempts + 1;
     const lastError = error instanceof Error ? error.message : String(error);
     const chat = interpret(message).kind === "chat";
@@ -307,6 +336,29 @@ export class MessageProcessor {
       });
     }
     await this.settle(message, { status: "failed", attempts, lastError });
+    if (step.userId) this.recognitionEnded(message, step.userId, { reason: "error" });
+  }
+
+  /** The sender's Stashh user. The call that creates it is their sign-up, named with the profile Instagram gave. */
+  private async resolveUser(message: StoredMessage, profile?: InstagramProfile | null): Promise<string> {
+    const { userId, created } = await this.stashh.resolveInstagramUser(message.senderId, profile);
+    if (created) {
+      const now = this.now();
+      this.analytics.setProfile(userId, { name: profile?.name ?? null, instagramUsername: profile?.username ?? null, createdAt: now });
+      this.analytics.track("user_signed_up", {}, { userId, time: now, key: userId });
+    }
+    return userId;
+  }
+
+  /** A share's outcome as the person got it; called once its message has settled for good. */
+  private recognitionEnded(message: StoredMessage, userId: string, outcome: { places: number } | { reason: RecognitionFailure }): void {
+    const intent = interpret(message);
+    if (intent.kind !== "recognize") return;
+    const now = this.now();
+    const props = { ...recognitionProps(intent), duration_ms: now.getTime() - message.sentAt.getTime() };
+    const at = { userId, time: now, key: message.mid };
+    if ("reason" in outcome) this.analytics.track("recognition_failed", { ...props, reason: outcome.reason }, at);
+    else this.analytics.track("recognition_completed", { ...props, place_count: outcome.places }, at);
   }
 
   /** Settles with the message's intent, so every outcome is attributed to what was asked. */
@@ -327,6 +379,20 @@ export class MessageProcessor {
 }
 
 const text = (value: string): OutboundMessage => ({ kind: "text", text: value });
+
+/** How a share was handed over and what it is, as the analytics catalog names them. */
+function recognitionProps(intent: Extract<Intent, { kind: "recognize" }>): RecognitionProps {
+  const kind = sourceKindOf(intent.source);
+  return { entry: intent.via === "share" ? "dm_share" : "dm_link", source_type: kind === "video" ? "tiktok" : kind };
+}
+
+/** The reason the person read, from the backend's failure code; no code means our side failed. */
+function failureReason(code: Recognition["error_code"]): RecognitionFailure {
+  if (code === "private") return "private";
+  if (code === "temporarily_unavailable") return "unavailable";
+  if (code === "unreadable") return "unreadable";
+  return "error";
+}
 
 /** A stored message as the assistant reads it: the typed text, or the tapped title with its payload. */
 function toTurnMessage(message: StoredMessage): TurnMessage {

@@ -213,6 +213,11 @@ when it resumes). Backend, worker, DM service and ops carry no Mixpanel code; th
 the ops SQL functions. A state change is tracked in the client when the server confirms it (the
 mutation's `onSuccess`), so one action is one event.
 
+**2026-11-12, the owner widened it:** "analiz eventleri de çok önemli". The Instagram DM conversation
+is an interface people use too, so the DM service sends what the person lives there (sign-up, a share
+taken in, its answer), once the message has settled. The point of the rule stands: no event describes
+how the system worked. Backend, worker, relay and ops still send none.
+
 ## 2026-11-08 — UI previews run in the Instagram in-app browser simulator
 
 **Correction:** "UI calisirken hep instagram in app browser simulator'de calisacagiz" — I opened a

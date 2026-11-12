@@ -1,13 +1,15 @@
 /**
  * Every product event the web sends to Mixpanel, and the properties each one
- * carries. This is the only place an event name is coined: a wrong name, or a
- * missing or extra property, is a compile error at the call site.
+ * carries. A web event's name is coined here and nowhere else: a wrong name, or
+ * a missing or extra property, is a compile error at the call site. The DM
+ * conversation's events have their own catalog,
+ * `instagram/src/analytics/events.ts`; no name is in both.
  *
  * Rules (docs/analytics-plan.md):
  * - snake_case, `object_action`, past tense: what happened, never a component.
  * - Fired where a person acts, from the interface they see. Writes are tracked
  *   once the server confirms them (a mutation's `onSuccess`), so one action is
- *   one event. The backend, the worker and the DM service send nothing.
+ *   one event. The backend and the worker send nothing.
  * - Booleans start with `is_`/`has_`; durations carry their unit.
  * - No personal data in properties: no usernames, note text or source URLs.
  */

@@ -155,6 +155,7 @@ plan — events only from the interfaces people use, never from the worker/backe
 - [x] Vercel env: production token + `NEXT_PUBLIC_APP_ENV=production`; staging token for preview/development
 - [ ] Lexicon (display names, descriptions, verified) in both projects once events land in production — the Mixpanel MCP is signed in to the My Dora account and cannot see the Little Big Apps org; reconnect it or do it in the UI
 - [ ] Privacy: effective date and Mixpanel retention / erase-on-"sil" (the DM erase does not delete Mixpanel data yet) — owner's call
+      → 2026-11-12: "sil" deletes the Mixpanel profile (see "Analysis events from the Instagram DM")
 
 ## Review
 
@@ -255,7 +256,8 @@ Owner: "Sil". Reels reach Stashh only through the Instagram DM; the backend and 
 - [x] Empty library links to the DM (`ig.me/m/stashh.me`, "@stashh.me’ye yaz")
 - [x] Analytics: five events no longer sent (`recognition_*`, `places_saved`, `clipboard_watch_toggled`) left
       `events.ts`; `docs/analytics-plan.md` lists them as retired
-- [ ] Hide those five events in Lexicon in both Mixpanel projects (owner's go-ahead: it is a write to Mixpanel)
+- [ ] Hide `places_saved` and `clipboard_watch_toggled` in Lexicon in both Mixpanel projects (owner's go-ahead: it is a
+      write to Mixpanel). Not the three `recognition_*`: the DM sends them since 2026-11-12.
 
 # /app: details open as iOS page sheets, over the current screen
 
@@ -296,3 +298,27 @@ half-width tile at 393pt, so that line wraps instead of being cut. Language: no 
 persists across a reload, back to Turkish works. Thumbnails use Mapbox `streets-v12` because the Static Images API
 cannot draw the live map's Standard style, so they are a little more colourful than the map above them. Not
 confirmed by Mapbox: whether `logo=false` is acceptable when the wordmark is only on the live map.
+
+# Analysis events from the Instagram DM (Mixpanel)
+
+Owner (2026-11-12): "analiz eventleri de çok önemli". Analyses arrive only through the DM, and Mixpanel had no step
+for them. The DM service now sends the analysis journey to the same user profile as the web. Branch
+`feature/dm-analysis-events` → PR to `develop`. Plan: decisions in docs/analytics-plan.md, "The Instagram DM
+conversation".
+
+- [x] Backend: erasing a channel identity returns `{ user_id, erased }` (was `204`), so the DM can delete the
+      Mixpanel profile too; the backend still sends nothing to Mixpanel
+- [x] `instagram/src/analytics/`: DM catalog (`user_signed_up`, `recognition_started` / `_completed` / `_failed`)
+      and the Ingestion API client (EU host, `ip=0`, `$insert_id` from the message, fire and forget, no-op without
+      `MIXPANEL_TOKEN`)
+- [x] `MessageProcessor`: started when a share is taken in (at the share's time, so retries collapse); outcome once
+      the answer was delivered and the message settled; sign-up + profile on the call that creates the user;
+      profile deleted on "sil"; `via` (share / link) on the recognize intent
+- [x] Tests: processor analytics (every reason, retries, half-sent reply, expiry, no events for other intents) and
+      the client payloads (host, IP lookup off, insert id, logs without token or id)
+- [x] Docs: CLAUDE.md, docs/analytics-plan.md (DM section, catalog, funnels, events back in use), deploy.md, web
+      catalog header, lesson note on the 2026-11-06 rule
+- [ ] Privacy policy and data-deletion page: Mixpanel also measures the conversation; "sil" deletes the profile
+- [ ] Staging check: `/env dev`, a Reel, a private post, a TikTok link → Staging events on the right profile, no city
+- [ ] PR → CI → merge; `MIXPANEL_TOKEN` (Production) in the production host's `instagram.env` (owner's go-ahead)
+- [ ] Production check with a real share; Lexicon for the four events in both projects

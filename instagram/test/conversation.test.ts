@@ -80,6 +80,7 @@ describe("interpret", () => {
   it("recognizes a shared Reel by its permalink", () => {
     expect(interpret(reel("https://www.instagram.com/reel/Dd31ojZOgKL/"))).toEqual({
       kind: "recognize",
+      via: "share",
       source: { kind: "url", url: "https://www.instagram.com/reel/Dd31ojZOgKL/", caption: null },
     });
   });
@@ -87,6 +88,7 @@ describe("interpret", () => {
   it("sends a shared Reel's caption with its permalink", () => {
     expect(interpret(reel("https://www.instagram.com/reel/DfAfig_IlO9/", "📍Ali Ustanın Yeri : Üçkuyular İzmir\n"))).toEqual({
       kind: "recognize",
+      via: "share",
       source: { kind: "url", url: "https://www.instagram.com/reel/DfAfig_IlO9/", caption: "📍Ali Ustanın Yeri : Üçkuyular İzmir" },
     });
   });
@@ -103,7 +105,7 @@ describe("interpret", () => {
     ["https://instagram.com/someone/reel/C0de123", "a Reel under a username"],
     ["https://vm.tiktok.com/ZMabc123/", "a TikTok short link"],
   ])("finds %s in text (%s)", (url) => {
-    expect(interpret({ text: `şuna bak ${url} çok iyi`, attachments: [] })).toEqual({ kind: "recognize", source: { kind: "url", url } });
+    expect(interpret({ text: `şuna bak ${url} çok iyi`, attachments: [] })).toEqual({ kind: "recognize", source: { kind: "url", url }, via: "link" });
   });
 
   it.each(["sil", "SİL", " Sil ", "delete"])("reads %j as an erase request", (text) => {
@@ -137,6 +139,7 @@ describe("interpret", () => {
     const [message] = extractInboundMessages(fixture("ig-post-share.json"));
     expect(interpret(message!)).toEqual({
       kind: "recognize",
+      via: "share",
       source: {
         kind: "instagram_media",
         format: "post",
@@ -160,6 +163,7 @@ describe("interpret", () => {
     const attachments = [{ type: "ig_story", payload: { story_media_id: "18094747109404940", story_media_url: STORY_URL } }];
     expect(interpret({ text: null, attachments })).toEqual({
       kind: "recognize",
+      via: "share",
       source: { kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null },
     });
   });
@@ -167,6 +171,7 @@ describe("interpret", () => {
   it("recognizes a story mention, taking the id from the media link", () => {
     expect(interpret({ text: null, attachments: [{ type: "story_mention", payload: { url: STORY_URL } }] })).toEqual({
       kind: "recognize",
+      via: "share",
       source: { kind: "instagram_media", format: "story", mediaId: "18094747109404940", mediaUrl: STORY_URL, caption: null },
     });
   });

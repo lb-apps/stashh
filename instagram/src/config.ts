@@ -65,6 +65,13 @@ const envSchema = z.object({
   RECOGNITION_SUGGESTED_REPLIES: z.enum(["on", "off"]).default("off"),
 
   /**
+   * Mixpanel project token for the conversation's product events (docs/analytics-plan.md):
+   * "Stashh - Production" on the production host, "Stashh - Staging" anywhere else.
+   * Unset or empty → no events.
+   */
+  MIXPANEL_TOKEN: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(16).optional()),
+
+  /**
    * Development only: when set, every verified webhook body is written here verbatim
    * so real payloads can be turned into test fixtures. Refused in production.
    */

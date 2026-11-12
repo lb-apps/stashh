@@ -15,6 +15,8 @@ const envelopeSchema = z.object({
 
 const channelIdentitySchema = z.object({ user_id: z.string().uuid(), created: z.boolean() });
 
+const erasedIdentitySchema = z.object({ user_id: z.string().uuid(), erased: z.boolean() });
+
 const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
@@ -120,13 +122,17 @@ export class StashhApiError extends Error {
 }
 
 export interface StashhApi {
-  /** Resolves (or creates) the user; a `profile` overwrites the stored username and name. */
-  resolveInstagramUser(igsid: string, profile?: InstagramProfile | null): Promise<{ userId: string }>;
+  /**
+   * Resolves (or creates) the user; a `profile` overwrites the stored username and name.
+   * `created` is true only for the call that created the user: the person's first message.
+   */
+  resolveInstagramUser(igsid: string, profile?: InstagramProfile | null): Promise<{ userId: string; created: boolean }>;
   /** Refreshes an existing user's profile; false when the user no longer exists (never creates one). */
   updateInstagramProfile(igsid: string, profile: InstagramProfile): Promise<boolean>;
   /** One page of senders whose profile is missing or was last fetched before `syncedBefore`. */
   listProfileStaleInstagramUsers(params: { syncedBefore: Date; after?: string; limit: number }): Promise<string[]>;
-  eraseInstagramUser(igsid: string): Promise<void>;
+  /** Erases the user and everything they own; idempotent. Returns their id, whether or not anything existed. */
+  eraseInstagramUser(igsid: string): Promise<{ userId: string }>;
   createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }): Promise<{ recognitionId: string }>;
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
   /** A personal link that signs the user in to the web app, for good; for their DM only. */
@@ -150,7 +156,7 @@ export class HttpStashhApi implements StashhApi {
     const data = await this.request("PUT", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}`, channelIdentitySchema, {
       body: profile ? { profile } : {},
     });
-    return { userId: data.user_id };
+    return { userId: data.user_id, created: data.created };
   }
 
   async updateInstagramProfile(igsid: string, profile: InstagramProfile) {
@@ -171,7 +177,8 @@ export class HttpStashhApi implements StashhApi {
   }
 
   async eraseInstagramUser(igsid: string) {
-    await this.request("DELETE", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}`, null);
+    const data = await this.request("DELETE", `/internal/v1/channel-identities/instagram/${encodeURIComponent(igsid)}`, erasedIdentitySchema);
+    return { userId: data.user_id };
   }
 
   async createRecognition({ userId, source, idempotencyKey }: { userId: string; source: RecognitionSource; idempotencyKey: string }) {
