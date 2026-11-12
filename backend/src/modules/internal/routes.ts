@@ -119,8 +119,8 @@ internalRouter.delete("/channel-identities/:provider/:externalId", async (req, r
   }
 
   try {
-    await createChannelIdentityService().erase(params.data.provider, params.data.externalId);
-    sendNoContent(res);
+    const { userId, erased } = await createChannelIdentityService().erase(params.data.provider, params.data.externalId);
+    sendSuccess(res, req, 200, { user_id: userId, erased });
   } catch (error) {
     next(error);
   }

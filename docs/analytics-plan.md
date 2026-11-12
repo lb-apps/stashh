@@ -4,28 +4,35 @@ What people do in the interfaces they see and touch, measured in Mixpanel. The
 conventions follow the My Dora website's setup (typed catalog, snake_case past
 tense, EU residency, one copy of each event, Lexicon kept current).
 
-**The code is the source of truth.** The catalog lives in
-[`web/lib/analytics/events.ts`](../web/lib/analytics/events.ts); where this file
-disagrees with it, this file is wrong.
+**The code is the source of truth.** Each interface has one catalog:
+[`web/lib/analytics/events.ts`](../web/lib/analytics/events.ts) for the web and
+[`instagram/src/analytics/events.ts`](../instagram/src/analytics/events.ts) for the DM
+conversation. Where this file disagrees with them, this file is wrong.
 
 ## Scope
 
-- **Measured:** the interfaces people use — stashh.me (landing) and the map app at
-  `/app`. iOS is paused; when it resumes it sends the same catalog, the same names and
-  the same user id.
-- **Not measured here:** the backend, the recognition worker, the Instagram DM service,
-  the hooks relay and `ops/` carry no Mixpanel code. Their numbers (recognition runs,
-  DM intents, assistant turns, cost) stay in the ops SQL functions behind the dashboard.
+- **Measured:** the interfaces people use.
+  - stashh.me (landing) and the map app at `/app`.
+  - The Instagram DM conversation, where people share posts to analyse (owner's call,
+    2026-11-12: the analyses matter, and the conversation is an interface people use). The
+    DM service sends what the person lives there: sign-up, a share taken in, its answer.
+  - iOS is paused; when it resumes it sends the web's catalog, the same names and the same
+    user id.
+- **Not measured here:** the backend, the recognition worker, the hooks relay and `ops/`
+  carry no Mixpanel code. How the system did its work (recognition runs and their steps,
+  DM intents, assistant turns, cost) stays in the ops SQL functions behind the dashboard.
 
 ## Projects
 
 | Project | Token in | `app_env` |
 |---|---|---|
-| Stashh - Production (EU) | Vercel production env | `production` |
-| Stashh - Staging (EU) | `web/.env.local`, Vercel preview env | `development` |
+| Stashh - Production (EU) | Vercel production env; `MIXPANEL_TOKEN` in the production host's `instagram.env` | `production` |
+| Stashh - Staging (EU) | `web/.env.local`, Vercel preview env; `MIXPANEL_TOKEN` in `instagram/.env` on the dev Mac | `development` |
 
 Both live in the **Little Big Apps** Mixpanel organisation. Without
-`NEXT_PUBLIC_MIXPANEL_TOKEN` every call is a no-op.
+`NEXT_PUBLIC_MIXPANEL_TOKEN` (web) or `MIXPANEL_TOKEN` (DM service) every call is a no-op.
+The dev DM instance shares the database with production, so the same person has the same
+user id in both projects.
 
 ## How it is wired
 
@@ -52,6 +59,34 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
   [`web/lib/stashh/mutations.ts`](../web/lib/stashh/mutations.ts). That gives one place
   per action, whichever screen started it, and a failed request sends nothing.
 
+## The Instagram DM conversation
+
+- [`instagram/src/analytics/mixpanel.ts`](../instagram/src/analytics/mixpanel.ts) is the
+  only module that talks to Mixpanel from the DM service: plain `fetch` to the Ingestion
+  API (`/track`, `/engage` on `api-eu.mixpanel.com`, `verbose=1`), 5 s timeout. It never
+  throws and never holds up a reply; a failed send is logged with the event name and HTTP
+  status only. Sends in flight are awaited on shutdown.
+- **Fired from `MessageProcessor`** (`instagram/src/conversation/processor.ts`), the DM's
+  equivalent of `onSuccess`: an outcome goes out once the answer was delivered and the
+  message settled for good. A settled message is never processed again, so it reports its
+  outcome exactly once.
+- **`recognition_started` may be sent again** when a step is retried. It carries the
+  share's own time and an `$insert_id` derived from the message id, so Mixpanel keeps one
+  (it dedupes on event, `distinct_id`, `time` and `$insert_id`).
+- **Every share that started ends** in `recognition_completed` or `recognition_failed`,
+  including the daily limit, a timeout, a closed reply window and a permanent failure on
+  our side (`error`). The one gap: a share whose last retry fails before the user is known
+  again reports no end. Rare.
+- **Not sent:** an attachment Stashh cannot read (`unsupported`), chat, help, the map link
+  request and `/env`. The ops SQL counts those intents.
+- **No device, browser, location or UTM** on DM events: the conversation brings none of
+  them, and none is made up. Mixpanel would place everyone at the server's IP, so events
+  and profile updates go out with the IP lookup off (`ip=0`, `$ip: "0"`). Break DM events
+  down by location through the profile, which the web fills in when the person opens their
+  map.
+- **`app_env`** on every event, from the instance (`production` on the production host,
+  `development` elsewhere). There is no `channel` property: every DM event comes from the
+  DM.
 ## Identity
 
 - The **Supabase user id is the Mixpanel user id**, on every surface. The id is the same
@@ -73,6 +108,13 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
     Most visits come from Instagram's in-app browser.
 - **Profile** (the only place personal data goes), from `/me` once per session:
   `$name`, `instagram_username`, `$created`.
+- **The DM side** sends `distinct_id` and `$user_id` set to the same Supabase user id, so
+  a share and the later map visit land on one profile. A new DM user's profile is started
+  at sign-up: `$created` (set once) and, when Instagram gave them, `$name` and
+  `instagram_username`. Erasing data ("sil") deletes the profile too; past events keep
+  only the bare user id. A deletion asked for by e-mail goes through the backend's erase
+  route, which does not reach Mixpanel: delete the profile by hand in both projects
+  (Users → the profile → Delete), as the privacy policy promises.
 
 ## Naming rules
 
@@ -81,8 +123,9 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 - Booleans start with `is_` or `has_`. Durations carry their unit (`duration_ms`).
 - A property with only one possible value is not a property.
 - No personal data in properties: no usernames, note text or source URLs.
-- A name is coined only in `events.ts`. Title Case lives in Lexicon as the display name.
-  It is never the name in code.
+- A name is coined in exactly one catalog, the one of the interface where the person
+  acts (web or DM). Title Case lives in Lexicon as the display name. It is never the name
+  in code.
 - Retire an event by hiding it in Lexicon in both projects; never delete it.
 
 ## Catalog
@@ -105,13 +148,32 @@ Both live in the **Little Big Apps** Mixpanel organisation. Without
 | `location_permission_answered` | location asked for from profile or home | `is_granted`, `surface` |
 | `user_signed_out` | sign-out confirmed | — |
 
-**Retired (2026-11-10):** `recognition_started`, `recognition_completed`,
-`recognition_failed`, `places_saved`, `clipboard_watch_toggled`. `/app` no longer
-recognises pasted links: Reels arrive only through the Instagram DM, whose numbers live
-in the ops SQL functions. Hide these five in Lexicon in both projects.
+**From the DM conversation** (`instagram/src/analytics/events.ts`):
+
+| Event | Fired when | Properties |
+|---|---|---|
+| `user_signed_up` | the person's first message created their account | — |
+| `recognition_started` | a share or a pasted link is taken in | `entry`: dm_share, dm_link; `source_type`: reel, post, story, tiktok |
+| `recognition_completed` | the places reached the person (already on their map) | `place_count`, `duration_ms`, `entry`, `source_type` |
+| `recognition_failed` | the person got an answer without places | `reason`: private, unavailable, unreadable, no_places, needs_link, timed_out, daily_limit, error; `duration_ms`, `entry`, `source_type` |
+
+`duration_ms` is the person's wait: from their message to the answer.
+
+**Back in use (2026-11-12):** `recognition_started`, `recognition_completed` and
+`recognition_failed` were the web's paste flow until 2026-11-10 (`entry`: clipboard,
+paste, retry) and now come from the DM (`entry`: dm_share, dm_link). Same meaning, except
+that a DM `recognition_completed` also means the places were saved: the DM saves them
+without a step of its own.
+
+**Retired (2026-11-10):** `places_saved`, `clipboard_watch_toggled`. Hide these two in
+Lexicon in both projects.
 
 ## Funnels
 
+- **Activation:** `user_signed_up` → `recognition_completed` → `map_link_opened` →
+  `place_viewed`.
+- **Analysis:** `recognition_started` → `recognition_completed`, broken down by
+  `source_type`; `recognition_failed` by `reason`.
 - **Arrival:** `map_link_opened` → `place_viewed`.
 - **Going:** `place_viewed` → `directions_opened`.
 - **Landing:** `$mp_web_page_view` (path `/`) → `instagram_cta_clicked`.
@@ -148,8 +210,10 @@ second analytics tool. Today that is one event: `map_link_opened`, sent as
 
 ## Adding an event
 
-1. Add it to `EventCatalog` in `events.ts`, following the rules above.
-2. Fire it where the person acts. For a write, fire it in the mutation's `onSuccess`.
+1. Add it to the catalog of the interface where the person acts (`EventCatalog` in the
+   web's `events.ts`, `DmEventCatalog` in the DM service's), following the rules above.
+2. Fire it where the person acts. For a web write, fire it in the mutation's `onSuccess`;
+   in the DM, once the message has settled.
 3. Add it to the catalog table here.
 4. Once it arrives, give it a Lexicon display name, a description and `verified` in both
    projects.

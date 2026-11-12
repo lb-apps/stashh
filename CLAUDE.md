@@ -124,15 +124,21 @@ A frame cannot set `env()`, so a bottom inset is always written
 ## Product analytics — Mixpanel
 
 Guide: [docs/analytics-plan.md](docs/analytics-plan.md). Events come only from the interfaces
-people use (web today, iOS when it resumes); backend, worker, DM service, relay and `ops/` send
-none — their numbers stay in the ops SQL functions.
+people use: the web (iOS when it resumes) and the Instagram DM conversation. Backend, worker,
+relay and `ops/` send none — how the system did its work stays in the ops SQL functions.
 
 - One module touches the SDK: `web/lib/analytics/analytics.ts` (core build, lazy-loaded, EU host,
-  no autocapture / replay / heatmaps). Names are coined only in `web/lib/analytics/events.ts`:
-  `snake_case`, `object_action`, past tense, typed props, no personal data in properties.
+  no autocapture / replay / heatmaps). Each interface coins its names in one catalog
+  (`web/lib/analytics/events.ts`, `instagram/src/analytics/events.ts`): `snake_case`,
+  `object_action`, past tense, typed props, no personal data in properties.
+- The DM service sends through `instagram/src/analytics/mixpanel.ts` only (Ingestion API, fire
+  and forget, never in a reply's way), from `MessageProcessor` once a message has settled, so a
+  share's outcome goes out once. No geolocation (`ip=0`: the DM has no IP of the person), no
+  device data; `MIXPANEL_TOKEN` in `instagram.env`.
 - A write is tracked in its mutation's `onSuccess` (`lib/stashh/mutations.ts`), once; a click that
   leaves the page passes `{ leavesPage: true }`.
-- Identity: the Supabase user id; `identify` only with a session, `reset` only on sign-out.
+- Identity: the Supabase user id, on the web and in the DM (`$user_id`); `identify` only with a
+  session, `reset` only on sign-out. "sil" deletes the Mixpanel profile with the rest.
 - Two projects in the Little Big Apps org: Stashh - Production (Vercel production) and Stashh -
   Staging (local, previews). A new event gets a Lexicon display name, description and `verified`
   in both.

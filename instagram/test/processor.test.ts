@@ -5,7 +5,7 @@ import { CHAT_DEBOUNCE_MS, MessageProcessor } from "../src/conversation/processo
 import { GraphApiError } from "../src/meta/graph-client.ts";
 import { copy } from "../src/replies/copy.tr.ts";
 import { StashhApiError, type Place, type Recognition } from "../src/stashh/client.ts";
-import { clock, FakeMessenger, FakeProfiles, FakeStashh, MemoryStore } from "./support/fakes.ts";
+import { clock, FakeAnalytics, FakeMessenger, FakeProfiles, FakeStashh, MemoryStore } from "./support/fakes.ts";
 
 const SENDER = "igsid-1";
 const REEL_URL = "https://www.instagram.com/reel/Dd31ojZOgKL/";
@@ -40,6 +40,7 @@ let store: MemoryStore;
 let stashh: FakeStashh;
 let messenger: FakeMessenger;
 let profiles: FakeProfiles;
+let analytics: FakeAnalytics;
 let processor: MessageProcessor;
 let seq = 0;
 
@@ -49,7 +50,8 @@ beforeEach(() => {
   stashh = new FakeStashh();
   messenger = new FakeMessenger();
   profiles = new FakeProfiles();
-  processor = new MessageProcessor({ store, stashh, messenger, profiles, log: pino({ level: "silent" }), now: time.now });
+  analytics = new FakeAnalytics();
+  processor = new MessageProcessor({ store, stashh, messenger, profiles, analytics, log: pino({ level: "silent" }), now: time.now });
 });
 
 async function deliver(message: Partial<Pick<InboundMessage, "text" | "attachments" | "sentAt" | "tapped">>): Promise<string> {
@@ -552,5 +554,197 @@ describe("talking to the assistant", () => {
     await next(mid);
     expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "text"]);
     expect(store.row(mid).status).toBe("replied");
+  });
+});
+
+describe("product analytics", () => {
+  const USER = "00000000-0000-4000-8000-000000000001";
+  const sharedPost = (mediaId: string) =>
+    deliver({ attachments: [{ type: "ig_post", payload: { url: `https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=${mediaId}`, title: "liste", ig_post_media_id: mediaId } }] });
+
+  /** Runs a shared Reel to the given recognition result. */
+  async function reelEndingWith(result: Recognition): Promise<string> {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(result);
+    await next(mid);
+    return mid;
+  }
+
+  it("follows a shared Reel from the share to the places, on the sender's user", async () => {
+    const sentAt = time.now();
+    const mid = await reel();
+    await tick();
+    expect(analytics.names()).toEqual(["user_signed_up", "recognition_started"]);
+    expect(analytics.of("recognition_started")[0]).toMatchObject({
+      props: { entry: "dm_share", source_type: "reel" },
+      userId: USER,
+      time: sentAt,
+      key: mid,
+    });
+
+    stashh.getSteps.push(recognition("processing"));
+    await next(mid);
+    stashh.getSteps.push(recognition("completed", [place(1), place(2)]));
+    time.advance(1_000);
+    await next(mid);
+
+    expect(analytics.names()).toEqual(["user_signed_up", "recognition_started", "recognition_completed"]);
+    const [completed] = analytics.of("recognition_completed");
+    expect(completed).toMatchObject({ props: { entry: "dm_share", source_type: "reel", place_count: 2 }, userId: USER, key: mid, time: time.now() });
+    expect(completed?.props.duration_ms).toBe(time.now().getTime() - sentAt.getTime());
+    // Reported once the places were delivered and the message settled.
+    expect(store.row(mid).status).toBe("replied");
+  });
+
+  it("names a pasted TikTok link as a link to a TikTok", async () => {
+    const mid = await deliver({ text: "bak https://www.tiktok.com/@someone/video/123" });
+    await tick();
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+
+    for (const name of ["recognition_started", "recognition_completed"] as const) {
+      expect(analytics.of(name)[0]?.props).toMatchObject({ entry: "dm_link", source_type: "tiktok" });
+    }
+  });
+
+  it("names a shared feed post and a shared story by what they are", async () => {
+    await sharedPost("7");
+    await tick();
+    const STORY_URL = "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18094747109404940&signature=x";
+    await deliver({ attachments: [{ type: "ig_story", payload: { story_media_id: "18094747109404940", story_media_url: STORY_URL } }] });
+    await tick();
+
+    expect(analytics.of("recognition_started").map((e) => e.props)).toEqual([
+      { entry: "dm_share", source_type: "post" },
+      { entry: "dm_share", source_type: "story" },
+    ]);
+  });
+
+  it.each([
+    ["no_places", recognition("completed", [])],
+    ["private", recognition("failed", null, "login page", "private")],
+    ["unavailable", recognition("failed", null, "throttled", "temporarily_unavailable")],
+    ["unreadable", recognition("failed", null, "parse error", "unreadable")],
+    ["error", recognition("cancelled")],
+  ])("reports %s when the reply carries no places", async (reason, result) => {
+    const mid = await reelEndingWith(result);
+
+    expect(analytics.names().filter((n) => n.startsWith("recognition_"))).toEqual(["recognition_started", "recognition_failed"]);
+    expect(analytics.of("recognition_failed")[0]).toMatchObject({ props: { reason, entry: "dm_share", source_type: "reel" }, key: mid });
+  });
+
+  it("reports needs_link when a shared list post shows none of its names", async () => {
+    const mid = await sharedPost("8");
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });
+    await next(mid);
+
+    expect(analytics.of("recognition_failed")[0]?.props).toMatchObject({ reason: "needs_link", source_type: "post" });
+  });
+
+  it("reports timed_out when the recognition never finishes", async () => {
+    const mid = await reel();
+    await tick();
+    for (let i = 0; i < 100 && store.row(mid).status === "submitted"; i++) {
+      stashh.getSteps.push(recognition("processing"));
+      await next(mid);
+    }
+
+    expect(analytics.names().filter((n) => n.startsWith("recognition_"))).toEqual(["recognition_started", "recognition_failed"]);
+    expect(analytics.of("recognition_failed")[0]?.props.reason).toBe("timed_out");
+  });
+
+  it("reports daily_limit, paired with its start, when the backend refuses with RECOGNITION_QUOTA", async () => {
+    stashh.createSteps.push(new StashhApiError(429, "RECOGNITION_QUOTA", "Daily recognition limit reached"));
+    await reel();
+    await tick();
+
+    expect(analytics.names()).toEqual(["user_signed_up", "recognition_started", "recognition_failed"]);
+    expect(analytics.of("recognition_failed")[0]?.props.reason).toBe("daily_limit");
+  });
+
+  it("repeats the start of a retried share at the same moment and key, so Mixpanel keeps one", async () => {
+    stashh.createSteps.push(new StashhApiError(503, null, "unavailable"));
+    const mid = await reel();
+    await tick();
+    await next(mid);
+
+    const started = analytics.of("recognition_started");
+    expect(started).toHaveLength(2);
+    expect(started[1]).toEqual(started[0]);
+    expect(analytics.of("recognition_failed")).toHaveLength(0);
+  });
+
+  it("reports error once a share fails for good on our side", async () => {
+    stashh.createSteps.push(new StashhApiError(400, "VALIDATION_ERROR", "bad url"));
+    const mid = await reel();
+    await tick();
+
+    expect(store.row(mid).status).toBe("failed");
+    expect(analytics.of("recognition_failed").map((e) => e.props.reason)).toEqual(["error"]);
+  });
+
+  it("reports one completion for a reply that was half sent and then resumed", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    messenger.sendSteps.push(undefined, new GraphApiError(500, 2, "temporarily unavailable"));
+    await next(mid);
+    expect(analytics.of("recognition_completed")).toHaveLength(0);
+
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+    expect(analytics.of("recognition_completed")).toHaveLength(1);
+  });
+
+  it("reports timed_out for a submitted share whose reply window closed", async () => {
+    const mid = await reel();
+    await tick();
+    time.advance(25 * 60 * 60 * 1000);
+    await tick();
+
+    expect(store.row(mid).status).toBe("expired");
+    expect(analytics.of("recognition_failed")[0]?.props.reason).toBe("timed_out");
+  });
+
+  it("sends nothing about a share that expired before it was taken in", async () => {
+    await reel();
+    time.advance(25 * 60 * 60 * 1000);
+    await tick();
+
+    expect(analytics.events).toEqual([]);
+  });
+
+  it("sends no recognition events for chat, links, help or unreadable shares", async () => {
+    await deliver({ text: "harita" });
+    await deliver({ text: "" });
+    await deliver({ attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] });
+    await tick();
+    await deliver({ text: "listelerim neler" });
+    time.advance(CHAT_DEBOUNCE_MS);
+    await tick();
+
+    expect(analytics.names()).toEqual(["user_signed_up"]);
+  });
+
+  it("signs a sender up once, naming the profile with what Instagram gave", async () => {
+    profiles.answers.set(SENDER, { username: "ayse.k", name: "Ayşe" });
+    await reel();
+    await tick();
+    await reel();
+    await tick();
+
+    expect(analytics.of("user_signed_up")).toEqual([{ name: "user_signed_up", props: {}, userId: USER, time: time.now(), key: USER }]);
+    expect(analytics.profiles).toEqual([{ userId: USER, profile: { name: "Ayşe", instagramUsername: "ayse.k", createdAt: time.now() } }]);
+  });
+
+  it("deletes the analytics profile when the sender erases their data", async () => {
+    await reel();
+    await tick();
+    await deliver({ text: "sil" });
+    await tick();
+
+    expect(analytics.deleted).toEqual([USER]);
   });
 });
