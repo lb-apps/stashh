@@ -4,8 +4,8 @@ import type { InboundAttachment, Tapped } from "./events.ts";
 
 /** What a person wants from a message, decided before any side effect. */
 export type Intent =
-  /** Find the places in a Reel, a shared post or story, or a pasted link. */
-  | { kind: "recognize"; source: RecognitionSource }
+  /** Find the places in a Reel, a shared post or story (`share`), or a pasted link (`link`). */
+  | { kind: "recognize"; source: RecognitionSource; via: "share" | "link" }
   /** Erase everything Stashh holds about the sender ("sil", or the confirming tap). */
   | { kind: "erase" }
   /** A fresh link to the sender's map on the web ("harita"). */
@@ -42,7 +42,7 @@ export function interpret(message: {
 
   for (const attachment of message.attachments) {
     const source = sharedSource(attachment);
-    if (source) return { kind: "recognize", source };
+    if (source) return { kind: "recognize", source, via: "share" };
   }
 
   const tapped = message.tapped ?? null;
@@ -56,7 +56,7 @@ export function interpret(message: {
   if (commands.some((c) => LINK_COMMANDS.has(c))) return { kind: "link" };
 
   const link = text.match(LINK_PATTERN)?.[0];
-  if (link) return { kind: "recognize", source: { kind: "url", url: link } };
+  if (link) return { kind: "recognize", source: { kind: "url", url: link }, via: "link" };
 
   const firstAttachment = message.attachments[0];
   if (firstAttachment) return { kind: "unsupported", attachmentType: firstAttachment.type };

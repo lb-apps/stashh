@@ -1,3 +1,5 @@
+import type { DmEventName, DmEventProps } from "../../src/analytics/events.ts";
+import type { Analytics, DmProfile, EventAt } from "../../src/analytics/mixpanel.ts";
 import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
 import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply, SenderAction } from "../../src/meta/graph-client.ts";
 import type { Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
@@ -123,6 +125,8 @@ type Step<T> = T | Error;
 export class FakeStashh implements StashhApi {
   resolved: string[] = [];
   resolvedProfiles: Array<InstagramProfile | null | undefined> = [];
+  /** Senders who already have a Stashh user; the first resolve creates one (`created: true`). */
+  accounts = new Set<string>();
   /** Users the backend knows, by IGSID, with their stored profile (null until one is stored). */
   users = new Map<string, InstagramProfile | null>();
   listCalls: Array<{ syncedBefore: Date; after?: string; limit: number }> = [];
@@ -140,7 +144,9 @@ export class FakeStashh implements StashhApi {
   async resolveInstagramUser(igsid: string, profile?: InstagramProfile | null) {
     this.resolved.push(igsid);
     this.resolvedProfiles.push(profile);
-    return { userId: "00000000-0000-4000-8000-000000000001" };
+    const created = !this.accounts.has(igsid);
+    this.accounts.add(igsid);
+    return { userId: "00000000-0000-4000-8000-000000000001", created };
   }
 
   async updateInstagramProfile(igsid: string, profile: InstagramProfile) {
@@ -162,6 +168,8 @@ export class FakeStashh implements StashhApi {
     const step = this.eraseSteps.shift();
     if (step instanceof Error) throw step;
     this.erased.push(igsid);
+    this.accounts.delete(igsid);
+    return { userId: "00000000-0000-4000-8000-000000000001" };
   }
 
   async createRecognition(params: { userId: string; source: RecognitionSource; idempotencyKey: string }) {
@@ -243,6 +251,36 @@ export class FakeProfiles implements ProfileReader {
     const answer = this.answers.get(igsid) ?? null;
     if (answer instanceof Error) throw answer;
     return answer;
+  }
+}
+
+/** Analytics that records every call instead of sending it. */
+export class FakeAnalytics implements Analytics {
+  events: Array<{ name: DmEventName; props: Record<string, unknown> } & EventAt> = [];
+  profiles: Array<{ userId: string; profile: DmProfile }> = [];
+  deleted: string[] = [];
+
+  track<N extends DmEventName>(name: N, props: DmEventProps<N>, at: EventAt): void {
+    this.events.push({ name, props: { ...props }, ...at });
+  }
+
+  setProfile(userId: string, profile: DmProfile): void {
+    this.profiles.push({ userId, profile });
+  }
+
+  deleteProfile(userId: string): void {
+    this.deleted.push(userId);
+  }
+
+  async flush(): Promise<void> {}
+
+  names(): DmEventName[] {
+    return this.events.map((event) => event.name);
+  }
+
+  /** The recorded events of one name. */
+  of(name: DmEventName) {
+    return this.events.filter((event) => event.name === name);
   }
 }
 

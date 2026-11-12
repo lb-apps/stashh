@@ -137,12 +137,12 @@ describe("channelProfileSchema", () => {
 });
 
 describe("ChannelIdentityService.erase", () => {
-  it("deletes the Auth user (cascading to their data) and reports whether anything existed", async () => {
+  it("deletes the Auth user (cascading to their data) and reports the user id and whether anything existed", async () => {
     const { auth, service } = setup();
-    await service.resolve("instagram", "5");
+    const { userId } = await service.resolve("instagram", "5");
 
-    expect(await service.erase("instagram", "5")).toBe(true);
+    expect(await service.erase("instagram", "5")).toEqual({ userId, erased: true });
     expect(auth.users.size).toBe(0);
-    expect(await service.erase("instagram", "5")).toBe(false);
+    expect(await service.erase("instagram", "5")).toEqual({ userId, erased: false });
   });
 });

@@ -68,10 +68,11 @@ export class ChannelIdentityService {
 
   /**
    * Erases a channel user and all of their data (identity, recognitions, saved places,
-   * lists) via the auth.users cascades. Returns false when nothing existed.
+   * lists) via the auth.users cascades. Returns the user id either way, so the channel can
+   * also erase what it keeps under that id elsewhere; `erased` is false when nothing existed.
    */
-  async erase(provider: ChannelProvider, externalId: string): Promise<boolean> {
+  async erase(provider: ChannelProvider, externalId: string): Promise<{ userId: string; erased: boolean }> {
     const userId = (await this.identities.find(provider, externalId))?.userId ?? channelUserId(provider, externalId);
-    return (await this.authAdmin.deleteUser(userId)) === "deleted";
+    return { userId, erased: (await this.authAdmin.deleteUser(userId)) === "deleted" };
   }
 }
