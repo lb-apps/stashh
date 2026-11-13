@@ -38,6 +38,27 @@ describe("buildUserText", () => {
     expect(text).toContain("on-screen for that venue in the slides");
   });
 
+  it("asks for the slides to be read as one post, whichever way the venues are spread", () => {
+    const text = buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 6, caption: "mekan önerisi" });
+    expect(text).toContain("as one post");
+    expect(text).toContain("one venue across all its slides or a different venue on each");
+  });
+
+  it("tells the model that a post shared in a DM is one item of it, and what is missing", () => {
+    const photo = buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 1, caption: "mekan önerisi", sharedItem: true });
+    expect(photo).toContain("this Instagram post.");
+    expect(photo).toContain("You were given one image of this post");
+    expect(photo).toContain("its other slides were not given, and neither were its location tag or its tagged accounts");
+    expect(buildUserText({ platform: "instagram", mediaKind: "video", slideCount: 1, caption: null, sharedItem: true })).toContain(
+      "You were given one video of this post",
+    );
+  });
+
+  it("says nothing about missing slides for a link or a carousel it has whole", () => {
+    expect(buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 1, caption: "x" })).not.toContain("were not given");
+    expect(buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 4, caption: "x", sharedItem: true })).not.toContain("were not given");
+  });
+
   it("describes a single photo or video as before", () => {
     expect(buildUserText({ platform: "instagram", mediaKind: "image", slideCount: 1, caption: null })).toContain("Instagram photo post");
     expect(buildUserText({ platform: "instagram", mediaKind: "video", slideCount: 1, caption: null })).not.toContain("slide");

@@ -220,3 +220,27 @@ describe("matchPlaces", () => {
     expect(matches.get("Nowhere")).toBeNull();
   });
 });
+
+describe("matchPlaces with the venue's @handle", () => {
+  const berryCoffee: TextSearchResult = {
+    id: "berry-coffee",
+    displayName: { text: "Berry Coffee Company" },
+    shortFormattedAddress: "Buca, İzmir",
+    // Listed with generic types only, so no category agreement lifts the post's own name for it.
+    types: ["point_of_interest", "establishment"],
+  };
+  const query = "Berry Cafe, Buca, İzmir, Türkiye";
+
+  it("takes the listing that matches the handle the caption tags when the post's own name for it does not", async () => {
+    const client = fakeClient({ [query]: [berryCoffee] });
+    const venue = { ...extracted("Berry Cafe", "Buca, İzmir, Türkiye", "cafe"), instagram_username: "berrycoffeecompany" };
+    const matches = await matchPlaces([venue], client);
+    expect(matches.get("Berry Cafe")?.google_place_id).toBe("berry-coffee");
+  });
+
+  it("still refuses that listing when the post tags no handle", async () => {
+    const client = fakeClient({ [query]: [berryCoffee] });
+    const matches = await matchPlaces([extracted("Berry Cafe", "Buca, İzmir, Türkiye", "cafe")], client);
+    expect(matches.get("Berry Cafe")).toBeNull();
+  });
+});

@@ -262,14 +262,19 @@ export class MessageProcessor {
 
     if (recognition.status === "completed" || recognition.status === "committed") {
       const places = recognition.places ?? [];
-      // A list post shared from the feed reaches us as its cover only (Meta sends no other
-      // slide and no permalink); the link, once pasted, is read in full.
-      if (places.length === 0 && recognition.names_elsewhere && this.isSharedPost(message)) {
-        await this.reply(message, [text(copy.listNeedsLink)]);
+      // A post shared from the feed reaches us as one of its pages (Meta sends no other page, no
+      // location tag and no permalink). When the model saw a venue whose name sits elsewhere, the
+      // person is asked for the link, which is read whole; whatever this page named is saved first.
+      const morePagesNeeded = recognition.names_elsewhere && this.isSharedPost(message);
+      if (places.length === 0 && morePagesNeeded) {
+        await this.reply(message, [text(copy.postNeedsLink)]);
         return this.recognitionEnded(message, message.userId, { reason: "needs_link" });
       }
       const mapUrl = places.length > 0 ? await this.mapUrl(message.userId, message.mid) : null;
-      await this.reply(message, composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies }));
+      await this.reply(
+        message,
+        composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies, morePagesNeeded }),
+      );
       return this.recognitionEnded(message, message.userId, places.length > 0 ? { places: places.length } : { reason: "no_places" });
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
