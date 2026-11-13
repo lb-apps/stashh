@@ -1,3 +1,52 @@
+# Posts and carousels: read the whole post, say when we could not
+
+Plan written 2026-11-13. Branch `fix/carousel-recognition` from `origin/develop`.
+
+**Findings (prod DB, external users, fresh runs since 1 Nov).**
+- A feed post shared in a DM reaches us as ONE image (or video) + its caption + a Graph media id.
+  Checked: the id does not resolve with Instagram Login (`100/33`), the lookaside link serves the
+  JPEG directly (no redirect, no post id), the Conversations API returns no `shares`/`attachments`
+  for the message, and 5 and 8 separate shares of the same post carried byte-identical images. Other
+  slides, the location tag and tagged accounts are unreachable from a DM share; the post's link is
+  the only way to read it whole.
+- DM-shared photo posts: 15 of 57 found a place (26%). Most misses are posts with no venue at all
+  (memes, school, selfies, ads), a few are venue posts whose name is not on the shared image (the
+  owner's own carousel: caption "mekan önerisi … #nişantaşı", no name) — these got the plain
+  "no places" reply, not a request for the link, because `names_elsewhere` only covered lists.
+- A list read from one slide that still names one venue returned that one and said nothing.
+- Link path: downloader lists slides, capped at 12; Instagram carousels hold 20.
+
+**Plan.**
+- [x] Analyzer prompt: read the post as one whole (a carousel may be one venue across slides or a
+      different venue per slide; a name may appear on any slide or once).
+- [x] `names_elsewhere` broadened: the post features a venue whose name is not in what was given —
+      a single-venue recommendation too, and true even when some venues were found.
+- [x] DM share told to the model: the one item Instagram passed on; the rest of the post (slides,
+      location tag, tags) was not given. Worker passes it for `supplied` posts.
+- [x] A venue named only by its @handle comes back as readable words; matching also scores the
+      tagged @handle against each listing.
+- [x] Slide cap 12 → 20.
+- [x] DM reply: no places + flag → ask for the link (copy covers one venue, not only lists);
+      places + flag → the places, and the summary asks for the link to read the other pages.
+- [x] Tests: buildUserText, handle matching, processor partial reply, copy.
+- [x] Eval: old vs new prompt on 23 real recent DM shares.
+- [x] `npm run security:redteam -- analyzer`; typecheck + tests in backend, instagram, ops.
+
+**Review.**
+- Eval (23 real DM shares, Gemini 3.8 Flash, three runs of the new prompt): no venue lost on any
+  post; `names_elsewhere` now true for the owner's unnamed "mekan önerisi" carousel (was a plain
+  "no places") and for the one-place Colmar route (was silent); false on all nine controls (family,
+  concert, political, pigeons, tour-agency ad, no caption…) after one wording fix for the ad.
+  @handle-only lists now come back as names ("Turshu Turşuları", not "turshutursulari").
+- Red-team analyzer: 0 of 10 attacks landed. Backend 256, instagram 154 tests; three typechecks clean.
+- Not verified: why "Berry Cafe" (Buca) went unmatched in production. The local Google key is
+  expired and production logs are not readable from this session; the handle scoring covers the
+  case where Google lists the venue under its handle's name, not the case where it returns nothing.
+- Limit that stays: a DM share can never carry other slides or the location tag; the reply asks for
+  the link. A single-photo post whose venue is only in its location tag still fails via the link,
+  because no route we have reads location tags.
+- Production: if `deploy/backend.env` on home-server sets `RECOGNITIONS_MAX_MEDIA=12`, raise it to 20.
+
 # AI safety: nobody steers the DM assistant or the recognition model
 
 Plan written 2026-11-04. Branch `fix/ai-input-safety` from `origin/develop`. Research (OWASP LLM01/LLM10

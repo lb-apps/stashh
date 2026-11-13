@@ -221,7 +221,7 @@ describe("recognizing a shared Reel", () => {
     expect(messenger.texts()).toEqual(["Bu gönderide 2 mekân var, hepsini haritana ekledik."]);
   });
 
-  it("asks for the post's link when a shared list post shows none of its names", async () => {
+  it("asks for the post's link when the shared page shows a venue but not its name", async () => {
     const mid = await deliver({
       attachments: [
         { type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=8", title: "15 mekan önerisi", ig_post_media_id: "8" } },
@@ -232,8 +232,33 @@ describe("recognizing a shared Reel", () => {
     await next(mid);
     expect(store.row(mid).status).toBe("replied");
     expect(messenger.texts()).toEqual([
-      "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+      "Instagram paylaşılan gönderinin bize yalnızca bir sayfasını gösteriyor ve o sayfada mekânın adı yok. Gönderinin linkini atarsan tüm sayfalarını okuyalım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
     ]);
+  });
+
+  it("saves what the shared page named and asks for the link to read the other pages", async () => {
+    const mid = await deliver({
+      attachments: [
+        { type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=9", title: "1 günlük rota", ig_post_media_id: "9" } },
+      ],
+    });
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", [place(1)]), names_elsewhere: true });
+    await next(mid);
+
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
+    expect(messenger.texts()).toEqual([
+      "Bu gönderide 1 mekân bulduk, haritana ekledik. Instagram paylaşılan gönderinin bize yalnızca bir sayfasını gösteriyor, diğer mekânlar kalan sayfalarda olabilir. Gönderinin linkini atarsan tüm sayfalarını okuyalım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+    ]);
+    expect(analytics.of("recognition_completed")[0]?.props).toMatchObject({ place_count: 1, source_type: "post" });
+  });
+
+  it("keeps the plain summary for a link that also says names are elsewhere: the link was read whole", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", [place(1)]), names_elsewhere: true });
+    await next(mid);
+    expect(messenger.texts()).toEqual(["Bu Reel'de 1 mekân var, hepsini haritana ekledik."]);
   });
 
   it("keeps the plain empty reply for a link whose post names nothing", async () => {
@@ -634,7 +659,7 @@ describe("product analytics", () => {
     expect(analytics.of("recognition_failed")[0]).toMatchObject({ props: { reason, entry: "dm_share", source_type: "reel" }, key: mid });
   });
 
-  it("reports needs_link when a shared list post shows none of its names", async () => {
+  it("reports needs_link when a shared post shows a venue but none of its names", async () => {
     const mid = await sharedPost("8");
     await tick();
     stashh.getSteps.push({ ...recognition("completed", []), names_elsewhere: true });

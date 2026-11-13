@@ -41,8 +41,15 @@ export const copy = {
       return `${platformOf(kind)} bu ${NOUN[kind].accusative} şu an bize açmıyor. Birkaç dakika sonra tekrar gönderir misin?`;
     return copy.failed(kind);
   },
-  listNeedsLink:
-    "Bu bir liste gönderisi, diğer sayfalarını göremiyoruz. Gönderinin linkini paylaşırsan hepsini çıkaralım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+  /**
+   * A feed post shared in a DM reaches us as one of its pages; the model saw a venue in it whose
+   * name is on the pages we were not given. The link is read whole.
+   */
+  postNeedsLink:
+    "Instagram paylaşılan gönderinin bize yalnızca bir sayfasını gösteriyor ve o sayfada mekânın adı yok. Gönderinin linkini atarsan tüm sayfalarını okuyalım: gönderide Paylaş, sonra Bağlantıyı kopyala.",
+  /** The same, when the page we got named some of the venues: they are saved, the rest may follow from the link. */
+  foundSomeNeedsLink: (count: number) =>
+    `Bu gönderide ${count} mekân bulduk, haritana ekledik. Instagram paylaşılan gönderinin bize yalnızca bir sayfasını gösteriyor, diğer mekânlar kalan sayfalarda olabilir. Gönderinin linkini atarsan tüm sayfalarını okuyalım: gönderide Paylaş, sonra Bağlantıyı kopyala.`,
   help: "Instagram'da gördüğün mekânları kaydedemiyorsun ya 😅 Bir Reel'i ya da postu arkadaşına atar gibi bana at, içindeki tüm mekânları bulup sana özel haritana koyayım. Sonra liste yap, şehre ya da türe göre filtrele, istediğin an buradan ulaş.",
   unsupported:
     "Bunu okuyamıyorum 😅 İçinde mekân geçen bir Reel, post ya da hikâye at, ya da bir Instagram / TikTok linki yapıştır; içindeki yerleri bulup haritana koyayım.",
