@@ -174,6 +174,16 @@ interface Attempt {
   candidates: Considered[];
 }
 
+/**
+ * The names a listing may go by: the one the post used and, when the caption tags the venue,
+ * its @handle. The handle is the venue's own spelling and often its listing's ("📍 Berry Cafe"
+ * in the text, @berrycoffeecompany tagged, "Berry Coffee Company" on Google); the analyzer
+ * keeps a handle only when the caption carries that exact @mention.
+ */
+function namesOf(extracted: ExtractedPlace): string[] {
+  return extracted.instagram_username ? [extracted.name, extracted.instagram_username] : [extracted.name];
+}
+
 function pickBest(
   extracted: ExtractedPlace,
   candidates: TextSearchResult[],
@@ -181,12 +191,13 @@ function pickBest(
   let best: TextSearchResult | null = null;
   let bestScore = 0;
   const considered: Considered[] = [];
+  const names = namesOf(extracted);
   for (const candidate of candidates) {
     const name = candidate.displayName?.text ?? "";
     const rejected = !isBusiness(candidate) ? "not a business" : isWrongKind(candidate, extracted.category) ? "wrong kind" : null;
     let score = 0;
     if (!rejected) {
-      score = nameSimilarity(extracted.name, name);
+      score = Math.max(...names.map((known) => nameSimilarity(known, name)));
       if (score > 0 && agreesWithCategory(candidate, extracted.category)) score += CATEGORY_AGREEMENT_BONUS;
       if (score > 0 && extracted.address && candidate.shortFormattedAddress) {
         score += ADDRESS_AGREEMENT_WEIGHT * nameSimilarity(extracted.address, candidate.shortFormattedAddress);

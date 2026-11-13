@@ -279,7 +279,7 @@ function Places({ run, status }: { run: Run | null; status: RecognitionStatus | 
         title={status.names_elsewhere ? "Names are on other slides" : "No places found"}
         description={
           status.names_elsewhere
-            ? "The post announces several venues but names none in what was read."
+            ? "The post features a venue whose name is not in what was read."
             : "Nothing in this post resolved to a business with a Google listing."
         }
       />

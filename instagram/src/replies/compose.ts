@@ -13,6 +13,8 @@ export interface RecognitionReplyOptions {
   recognitionId?: string | null;
   /** Quick replies under the summary (`RECOGNITION_SUGGESTED_REPLIES`); off, people write what they want. */
   suggestedReplies?: boolean;
+  /** A shared feed post read from one page while more venues sit on the others: the summary asks for its link. */
+  morePagesNeeded?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface RecognitionReplyOptions {
  */
 export function composeRecognitionReply(places: Place[], kind: SourceKind, options: RecognitionReplyOptions = {}): OutboundMessage[] {
   if (places.length === 0) return [{ kind: "text", text: copy.empty(kind) }];
-  const { mapUrl = null, recognitionId = null, suggestedReplies = false } = options;
+  const { mapUrl = null, recognitionId = null, suggestedReplies = false, morePagesNeeded = false } = options;
 
   const cards = places.map(toCard);
   const carousels: OutboundMessage[] = [];
@@ -34,7 +36,7 @@ export function composeRecognitionReply(places: Place[], kind: SourceKind, optio
   if (suggestedReplies && recognitionId) quickReplies.push({ title: copy.addToList, payload: ADD_TO_LIST_PAYLOAD(recognitionId) });
   if (suggestedReplies && !mapUrl) quickReplies.push({ title: copy.openMyMapQuick, payload: OPEN_MAP_PAYLOAD });
 
-  const text = copy.found(places.length, kind);
+  const text = morePagesNeeded ? copy.foundSomeNeedsLink(places.length) : copy.found(places.length, kind);
   const taps = quickReplies.length > 0 ? { quickReplies } : {};
   const summary: OutboundMessage = mapUrl
     ? { kind: "button", text, buttons: [{ type: "web_url", title: copy.openMyMap, url: mapUrl }], ...taps }

@@ -29,7 +29,7 @@ export type RecognitionFailure =
   | "unreadable"
   /** Read, but it names no place. */
   | "no_places"
-  /** A list post shared from the feed shows only its cover; the reply asked for its link. */
+  /** A post shared from the feed showed one page without the venue's name; the reply asked for its link. */
   | "needs_link"
   /** No result within the wait (5 minutes), or the reply window closed. */
   | "timed_out"

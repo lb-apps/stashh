@@ -37,7 +37,7 @@ export const recognitionStatusSchema = z
     places: z.unknown().nullable(),
     names_elsewhere: z
       .boolean()
-      .describe("The post presents several venues whose names were not in the media and caption read — a list post seen by its cover only. With an empty `places`, ask for the post's link."),
+      .describe("The post features a venue whose name was not in the media and caption read — a post shared in a DM arrives as one of its pages. True even when `places` holds some of its venues; ask for the post's link, which is read whole."),
     error_message: z.string().nullable(),
     error_code: z
       .enum(recognitionErrorCodes)

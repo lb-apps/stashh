@@ -237,3 +237,17 @@ claude-in-chrome to read claude.ai/design and kept retrying it after it timed ou
 **How to apply:** no `mcp__claude-in-chrome__*` and nothing that opens the default browser (`open <url>`,
 CLI logins). claude.ai goes through the built-in pane after the owner signs in there, or through files
 they download.
+
+## 2026-11-13 — A carousel is one post, not a list of one venue per slide
+
+**Correction:** "illa kaydırmalı diye her slide'da bir mekan olmak zorunda değil; slaytların
+içeriklerini de okumalı ve genel paylaşımı analiz etmeli."
+
+**What happened:** Working on the carousel bug I framed the failure as "a list post read from one
+slide", the same framing the old `names_elsewhere` rule and carousel instruction had. The owner's
+own failing post was one venue spread across slides, named nowhere on the shared page.
+
+**How to apply:** When a bug report names a content format (carousel, Reel, story), do not infer
+its structure from the most common example. List the shapes it takes (one subject across slides,
+one per slide, mixed) and check the fix and the eval set against each; ask for the reporter's own
+failing example early and test with it.
