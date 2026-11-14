@@ -116,6 +116,33 @@ Each container's CPU, memory, health and recent logs: the owner's Beszel hub on 
   The containers come back by themselves (`restart: unless-stopped`); expect about 20 s without
   the API or the channel, during which Meta retries its webhook deliveries.
 
+### The home line
+
+The stack needs more from the home line (Türk Telekom, behind the Deco at `192.168.68.1`) than
+the web ports:
+
+| Outbound | Used by | When it is closed |
+|---|---|---|
+| TCP and UDP 7844 to Cloudflare | the `tunnel` connector | `instagram.stashh.me` and `api.stashh.me` answer 530: no DM reaches prod, the web app has no API |
+| TCP 853 (DNS over TLS) | `unbound` on the Mac: the resolver of the whole LAN, so of the VM and the containers too | every lookup fails (SERVFAIL): deploys stop on `Could not resolve host: github.com`, the containers cannot reach Supabase or Meta |
+
+**An unpaid bill closes both.** In November 2026 Türk Telekom's restricted mode left only 80, 443
+and 53 open and redirected plain HTTP to its debt notice. Check from `home-server`:
+
+```bash
+curl -s -o /dev/null -w "%{redirect_url}\n" http://1.1.1.1/   # …/evde-internet/borc-bilgilendirme: restricted
+nc -z -G 4 198.41.200.63 7844 && echo "tunnel port open"
+```
+
+Paying lifts it, and the tunnel reconnects by itself. Until then the hooks relay holds every DM prod
+could not take for up to a day and delivers it once prod is back
+([webhook-relay.md](webhook-relay.md#how-it-works)).
+
+`unbound` forwards over TLS only, on purpose: no plaintext retry the ISP could tamper with. To keep
+the LAN resolving while 853 is closed, set `forward-tls-upstream: no` in the `forward-zone` of
+`/opt/homebrew/etc/unbound/unbound.conf`, drop the `@853#…` from each `forward-addr` (DNSSEC
+validation stays on), run `unbound-control reload`, and put both back once 853 is open again.
+
 ### A Linux host instead
 
 [`deploy/install.sh`](../deploy/install.sh) sets up the same pull-based deploy on a Linux host with

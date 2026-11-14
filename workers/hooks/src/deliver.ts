@@ -3,7 +3,7 @@ import type { Environment } from "../../../instagram/src/webhooks/core/environme
 import type { HookSourceId } from "../../../instagram/src/webhooks/core/sources/index.ts";
 import type { QueuedDelivery, Runtime } from "./runtime.ts";
 
-/** Meta wants an answer within seconds; prod gets this long before the relay gives up and Meta retries. */
+/** Meta wants an answer within seconds; prod gets this long before the relay queues the delivery. */
 export const DELIVERY_TIMEOUT_MS = 8_000;
 
 /**
@@ -17,7 +17,10 @@ export const DIRECT_ATTEMPTS = 2;
 /** A retry from the queue has nobody waiting on it at all. */
 export const QUEUED_TIMEOUT_MS = 20_000;
 
-/** A Queue message holds at most 128 KB; a larger delivery that did not land is lost, and logged. */
+/**
+ * A Queue message holds at most 128 KB. A larger delivery that did not land is not queued, and
+ * logged: dev loses it, prod leaves it to Meta's own retries.
+ */
 const QUEUE_LIMIT_BYTES = 120_000;
 
 /** A probe runs inside Meta's wait, so it gets less. */
@@ -97,8 +100,21 @@ export async function deliverDirect(rt: Runtime, delivery: QueuedDelivery): Prom
 }
 
 /**
- * One delivery from the queue: a retry of what `deliverDirect` could not land. Retried with backoff
- * and, past the queue's `max_retries`, left in the dead-letter queue.
+ * A prod delivery that prod did not take while Meta waited (unreachable, 429 or 5xx) goes to the
+ * queue, so Meta can have its 200 and the relay lands it the moment prod is back, instead of waiting
+ * on Meta's retries, which thin out over 36 hours. True when it is queued. A refusal (4xx) is not
+ * queued, nor is what the queue cannot hold: Meta's own retries remain for those.
+ */
+export async function queueForProd(rt: Runtime, delivery: QueuedDelivery, status: number): Promise<boolean> {
+  if (outcomeOf(status) !== "retry") return false;
+  rt.log("prod_queued", { source: delivery.source, status });
+  return enqueue(rt, delivery);
+}
+
+/**
+ * One delivery from the queue: a retry of what was not delivered at once (dev in the background,
+ * prod while Meta waited). Retried with backoff and, past the queue's `max_retries`, left in the
+ * dead-letter queue.
  */
 export async function deliverQueued(rt: Runtime, delivery: QueuedDelivery): Promise<QueuedOutcome> {
   const started = rt.now();
@@ -108,19 +124,26 @@ export async function deliverQueued(rt: Runtime, delivery: QueuedDelivery): Prom
   return outcome;
 }
 
-async function enqueue(rt: Runtime, delivery: QueuedDelivery): Promise<void> {
+/** True when the delivery is in the queue. */
+async function enqueue(rt: Runtime, delivery: QueuedDelivery): Promise<boolean> {
   if (delivery.body.length + JSON.stringify(delivery.headers).length > QUEUE_LIMIT_BYTES) {
     rt.log("oversized_delivery", { source: delivery.source, env: delivery.env });
-    return;
+    return false;
   }
   try {
     await rt.queue.send(delivery);
+    return true;
   } catch (error) {
     rt.log("enqueue_failed", { source: delivery.source, env: delivery.env, error: error instanceof Error ? error.message : String(error) });
+    return false;
   }
 }
 
-/** Seconds before the next try: 30 s, 1, 2, 4, 8 minutes — about a quarter of an hour in all. */
+/**
+ * Seconds before the next try: 30 s, 1, 2, 4, 8 minutes, then every 15 minutes. With the queue's
+ * 100 tries (`max_retries` in wrangler.jsonc) that holds a delivery for about a day: Instagram's
+ * reply window, after which a message can no longer be answered.
+ */
 export function retryDelaySeconds(attempts: number): number {
-  return Math.min(30 * 2 ** Math.max(attempts - 1, 0), 600);
+  return Math.min(30 * 2 ** Math.max(attempts - 1, 0), 900);
 }

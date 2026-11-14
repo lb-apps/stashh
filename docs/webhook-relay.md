@@ -60,12 +60,17 @@ English, typed as the whole message, open to any account:
    6. Seals the relay envelope over the exact body with `HOOKS_RELAY_SECRET`:
       `x-hooks-relay-env`, `x-hooks-relay-command`, `x-hooks-relay-signature`.
 2. **Delivery** (`workers/hooks/src/deliver.ts`)
-   - **Prod** is posted while Meta waits, and prod's status is Meta's answer. If prod is down,
-     Meta retries for up to 36 hours.
+   - **Prod** is posted while Meta waits (8 s). What prod does not take (unreachable, 429, 5xx:
+     a closed tunnel answers 530) goes to the `stashh-hooks-deliveries` queue and Meta gets 200.
+     The queue tries again after 30 s, 1, 2, 4, 8 minutes and then every 15 minutes, 100 times:
+     about a day, Instagram's reply window. So an outage at home loses no DM, and the backlog lands
+     within 15 minutes of prod coming back instead of on Meta's thinning 36-hour retries. A refusal
+     (4xx) and a delivery the queue cannot hold (over 120 KB, or the queue fails) stay Meta's
+     answer, and Meta retries those.
    - **Dev** is posted right after Meta has its 200, in `waitUntil` (two tries of 10 s). Only what
-     did not land goes to the `stashh-hooks-deliveries` queue: 5 retries from 30 s to 8 minutes,
-     then the dead-letter queue `stashh-hooks-deliveries-dlq`. Meta gets 200 either way, so a
-     closed tunnel never makes Meta unsubscribe the app. Dev never falls back to prod.
+     did not land goes to the same queue, on the same schedule, then the dead-letter queue
+     `stashh-hooks-deliveries-dlq`. Meta gets 200 either way, so a closed tunnel never makes Meta
+     unsubscribe the app. Dev never falls back to prod.
 3. **The instance** (`instagram/src/webhooks/routes.ts`)
    1. Checks Meta's signature, then the envelope. An envelope that does not hold gets 403. A
       delivery without one came straight from Meta and is accepted as before.
