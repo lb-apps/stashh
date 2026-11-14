@@ -16,7 +16,9 @@ interface Sent {
   init: RequestInit;
 }
 
-function harness(options: { prodStatus?: number | "down"; routes?: Record<string, string>; unreachable?: string[]; down?: string[] } = {}) {
+function harness(
+  options: { prodStatus?: number | "down"; routes?: Record<string, string>; unreachable?: string[]; down?: string[]; queueDown?: boolean } = {},
+) {
   const kv = new Map<string, string>(Object.entries(options.routes ?? {}));
   const queued: QueuedDelivery[] = [];
   const sent: Sent[] = [];
@@ -35,7 +37,12 @@ function harness(options: { prodStatus?: number | "down"; routes?: Record<string
       put: async (key, value) => void kv.set(key, value),
       delete: async (key) => void kv.delete(key),
     },
-    queue: { send: async (delivery) => void queued.push(delivery) },
+    queue: {
+      send: async (delivery) => {
+        if (options.queueDown) throw new Error("queue unavailable");
+        queued.push(delivery);
+      },
+    },
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("?relay=probe")) {
@@ -109,9 +116,30 @@ describe("routing", () => {
     expect(await opened(delivery!)).toEqual({ env: "prod", command: null });
   });
 
-  it("lets Meta retry when prod refuses or cannot be reached", async () => {
-    expect((await harness({ prodStatus: 503 }).post("/meta/instagram", igDelivery(igMessage(USER, "Merhaba")))).status).toBe(503);
-    expect((await harness({ prodStatus: "down" }).post("/meta/instagram", igDelivery(igMessage(USER, "Merhaba")))).status).toBe(503);
+  it("queues what prod cannot take now, exactly as posted, and Meta gets its 200", async () => {
+    for (const prodStatus of [503, 530, 429, "down"] as const) {
+      const h = harness({ prodStatus });
+      const response = await h.post("/meta/instagram", igDelivery(igMessage(USER, "Merhaba")));
+      expect(response.status).toBe(200);
+      expect(h.queued).toHaveLength(1);
+      const [held] = h.queued;
+      expect(held).toEqual({ env: "prod", source: "instagram", ...prodPosts(h.sent)[0] });
+      expect(await opened(held!)).toEqual({ env: "prod", command: null });
+      expect(h.logs.find(({ event }) => event === "relayed")?.fields).toMatchObject({ prod: 1, queued: 1, status: 200 });
+    }
+  });
+
+  it("lets Meta retry a refusal, and what the queue cannot hold", async () => {
+    const refused = harness({ prodStatus: 403 });
+    expect((await refused.post("/meta/instagram", igDelivery(igMessage(USER, "Merhaba")))).status).toBe(403);
+    expect(refused.queued).toEqual([]);
+
+    const queueDown = harness({ prodStatus: "down", queueDown: true });
+    expect((await queueDown.post("/meta/instagram", igDelivery(igMessage(USER, "Merhaba")))).status).toBe(503);
+
+    const oversized = harness({ prodStatus: 530 });
+    expect((await oversized.post("/meta/instagram", igDelivery(igMessage(USER, "x".repeat(130_000))))).status).toBe(530);
+    expect(oversized.queued).toEqual([]);
   });
 
   it("cuts a delivery between environments: a routed sender is posted to dev in the background, the rest to prod", async () => {
@@ -302,7 +330,14 @@ describe("queued deliveries", () => {
     expect(await deliverQueued(down, delivery)).toBe("retry");
   });
 
-  it("back off from 30 seconds to 8 minutes", () => {
-    expect([1, 2, 3, 4, 5, 9].map(retryDelaySeconds)).toEqual([30, 60, 120, 240, 480, 600]);
+  it("back off from 30 seconds to every 15 minutes", () => {
+    expect([1, 2, 3, 4, 5, 6, 9, 100].map(retryDelaySeconds)).toEqual([30, 60, 120, 240, 480, 900, 900, 900]);
+  });
+
+  it("hold a delivery for about a day, Instagram's reply window, over the queue's 100 tries", () => {
+    // 100 is `max_retries` of both consumers in wrangler.jsonc.
+    const held = Array.from({ length: 100 }, (_, i) => retryDelaySeconds(i + 1)).reduce((sum, s) => sum + s, 0);
+    expect(held / 3600).toBeGreaterThan(23.5);
+    expect(held / 3600).toBeLessThan(24.5);
   });
 });

@@ -24,7 +24,10 @@ export interface RouteStore {
   delete(key: string): Promise<void>;
 }
 
-/** A delivery to dev, waiting in the queue: exactly the request the instance will receive. */
+/**
+ * A delivery waiting in the queue (dev's that missed, prod's that prod did not take): exactly the
+ * request the instance will receive.
+ */
 export interface QueuedDelivery {
   env: Environment;
   source: HookSourceId;

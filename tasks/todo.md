@@ -1,3 +1,25 @@
+# Prod outage 2026-11-14: no DM answered — the home line was restricted
+
+Branch `fix/relay-holds-prod-deliveries` from `origin/develop`.
+
+**Found.** `instagram.stashh.me` and `api.stashh.me` answered 530 from 00:23 (TR); `unbound` on
+`home-server` answered SERVFAIL, so the LAN, the VM and the containers resolved nothing. Türk Telekom
+had put the line in restricted mode for an unpaid bill: only 80, 443 and 53 out (portquiz.net shut on
+853, 7844, 8443, 1194, 51820, 22, 587, 993), plain HTTP redirected to `…/borc-bilgilendirme`. The
+tunnel needs 7844, `unbound` forwards over DoT on 853. Same window the night before (00:02 → 11:43).
+The Instagram account's webhook subscription survived (`subscribed_apps`: messages, postbacks).
+
+**Plan.**
+- [x] 1. `unbound`: plain 53 forwarders with DNSSEC while 853 is closed (backup
+      `unbound.conf.dot-backup-20261114`); host, VM and containers resolve again.
+- [x] 2. Relay: what prod cannot take (0, 429, 5xx) waits in the queue and Meta gets 200; a 4xx and
+      what the queue cannot hold stay Meta's answer. Queue: 100 tries, backoff capped at 15 min ≈ a
+      day, Instagram's reply window. Tests for queued, refused, queue down, oversized, the horizon.
+- [x] 3. Docs: the line's outbound needs and the restricted-mode check (`deploy.md`), prod delivery
+      (`webhook-relay.md`, `CLAUDE.md`).
+- [ ] 4. Owner: pay the bill. Then the tunnel reconnects, the queue lands the backlog, `unbound` goes
+      back to DoT.
+
 # Posts and carousels: read the whole post, say when we could not
 
 Plan written 2026-11-13. Branch `fix/carousel-recognition` from `origin/develop`.

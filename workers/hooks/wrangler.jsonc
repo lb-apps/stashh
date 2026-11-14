@@ -24,7 +24,7 @@
   "queues": {
     "producers": [{ "binding": "DELIVERIES", "queue": "stashh-hooks-deliveries-local" }],
     "consumers": [
-      { "queue": "stashh-hooks-deliveries-local", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 5 }
+      { "queue": "stashh-hooks-deliveries-local", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 100 }
     ]
   },
   "env": {
@@ -46,7 +46,7 @@
             "queue": "stashh-hooks-deliveries",
             "max_batch_size": 10,
             "max_batch_timeout": 1,
-            "max_retries": 5,
+            "max_retries": 100,
             "dead_letter_queue": "stashh-hooks-deliveries-dlq"
           }
         ]
