@@ -3,7 +3,7 @@ import { sealEnvelope } from "../../../instagram/src/webhooks/core/envelope.ts";
 import type { Environment } from "../../../instagram/src/webhooks/core/environments.ts";
 import { signMetaPayload, verifyMetaPayload } from "../../../instagram/src/webhooks/core/signature.ts";
 import { hookSource, type HookSource } from "../../../instagram/src/webhooks/core/sources/index.ts";
-import { DELIVERY_TIMEOUT_MS, deliverDirect, postDelivery, probeTarget, targetUrl } from "./deliver.ts";
+import { DELIVERY_TIMEOUT_MS, deliverDirect, postDelivery, probeTarget, queueForProd, targetUrl } from "./deliver.ts";
 import { routeStore, type Routes } from "./routes.ts";
 import type { QueuedDelivery, Runtime } from "./runtime.ts";
 
@@ -15,10 +15,11 @@ import type { QueuedDelivery, Runtime } from "./runtime.ts";
  *                         sender's environment → apply chat commands → re-sign each part → deliver.
  *   GET  /health          "ok", for uptime checks.
  *
- * Prod is delivered while Meta waits and its answer is Meta's answer, so Meta's own retries keep
- * protecting it. Dev is posted right after that answer, in the background, and only what could not
- * be delivered waits in the queue; Meta gets its 200 regardless: a closed tunnel must never make
- * Meta unsubscribe the app.
+ * Prod is delivered while Meta waits. What prod does not take (unreachable, 429 or 5xx) waits in the
+ * queue for up to a day and Meta gets its 200, so an outage at home loses no message and ends the
+ * moment prod is back; a refusal (4xx) stays Meta's answer. Dev is posted right after that answer,
+ * in the background, and only what could not be delivered waits in the queue; Meta gets its 200
+ * regardless: a closed tunnel must never make Meta unsubscribe the app.
  */
 export async function handleRequest(request: Request, rt: Runtime): Promise<Response> {
   const url = new URL(request.url);
@@ -154,18 +155,24 @@ async function relay(source: HookSource, request: Request, rt: Runtime): Promise
   const background = prepared.filter((delivery) => delivery.env !== "prod");
   if (background.length > 0) rt.waitUntil(Promise.all(background.map((delivery) => deliverDirect(rt, delivery))));
 
-  const statuses = await Promise.all(now.map((delivery) => postDelivery(rt, delivery)));
-  const failed = statuses.find((status) => status < 200 || status >= 300);
+  const results = await Promise.all(
+    now.map(async (delivery) => {
+      const status = await postDelivery(rt, delivery);
+      return { status, queued: await queueForProd(rt, delivery, status) };
+    }),
+  );
+  const failed = results.find(({ status, queued }) => !queued && (status < 200 || status >= 300))?.status;
   rt.log("relayed", {
     source: source.id,
     slices: slices?.length ?? null,
     prod: now.length,
+    queued: results.filter(({ queued }) => queued).length,
     background: background.length,
     status: failed ?? 200,
     ms: rt.now() - started,
   });
   if (failed === undefined) return new Response(null, { status: 200 });
-  // Prod did not take it: Meta delivers the whole batch again. Parts already delivered elsewhere
-  // arrive twice, and every instance drops a repeat by its message id.
+  // Prod refused it, or the queue could not hold it: Meta delivers the whole batch again. Parts
+  // already delivered elsewhere arrive twice, and every instance drops a repeat by its message id.
   return new Response("not delivered", { status: failed === 0 ? 503 : failed });
 }

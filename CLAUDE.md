@@ -227,7 +227,8 @@ One Meta app, one Instagram account, no test app: Meta's Instagram callback is
   by path. Commands and their replies live in `core/commands.ts` only, in English.
 - **The envelope** (`x-hooks-relay-*`, sealed with `HOOKS_RELAY_SECRET`) is trusted like Meta's
   signature. No envelope = straight from Meta, still valid (that is the rollback); a broken one = 403.
-  Prod is delivered while Meta waits; dev in the background, then the queue, then the DLQ.
+  Prod is delivered while Meta waits, and what prod cannot take waits in the queue for up to a day
+  (Instagram's reply window); dev in the background, then the queue, then the DLQ.
 - **Prod and dev share the database.** Every `instagram_messages` row carries its `environment` and
   each worker claims only its own. Outside production only `relay_routed` messages are answered
   (`conversation/outbound.ts`, `META_OUTBOUND`); every outbound path stays inside
