@@ -1,0 +1,30 @@
+{
+  "name": "stashh-menus",
+  "version": "0.1.0",
+  "description": "Stashh menu discovery — finds, scrapes, parses and stores venue menus",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch src/start.ts",
+    "start": "node src/start.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "cheerio": "^1.0.0",
+    "express": "^5.3.0",
+    "pdf-parse": "^1.1.1",
+    "pino": "^10.4.0",
+    "sharp": "^0.33.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.0.0",
+    "pino-pretty": "^13.2.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -62,6 +62,32 @@ services:
           memory: 256m
     logging: *logging
 
+  menus:
+    build: ./menus
+    image: stashh/menus
+    container_name: menus
+    restart: unless-stopped
+    init: true
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file: ${STASHH_ENV_DIR:-./deploy}/menus.env
+    environment:
+      NODE_ENV: production
+      PORT: "3004"
+    ports:
+      - "3004:3004"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
   # The public hostnames → this connector → the containers, by deploy/tunnel/config.yml:
   # https://instagram.stashh.me → instagram (Meta's webhook), https://api.stashh.me → backend
   # (the web app). The tunnel is named for the environment that runs the connector
