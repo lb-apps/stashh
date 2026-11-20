@@ -5,9 +5,18 @@ import { isKnownMenuPlatform, isMenuRelatedLink, isMenuRelatedUrl } from "../pat
 
 export interface MenuCandidate {
   url: string;
-  source: "website_link" | "website_redirect" | "known_platform";
+  source: "website_link" | "website_redirect" | "website_probe" | "known_platform";
   confidence: number;
 }
+
+const COMMON_MENU_PATHS = [
+  "/menu", "/menü", "/menu/", "/menus",
+  "/yemekler", "/yemek-menusu",
+  "/fiyat", "/fiyat-listesi",
+  "/our-menu", "/food-menu",
+  "/drinks", "/bar-menu", "/cocktails",
+  "/menu.pdf",
+];
 
 export async function discoverFromWebsite(
   websiteUrl: string,
@@ -71,10 +80,57 @@ export async function discoverFromWebsite(
         }
       });
     }
+
+    if (candidates.length === 0) {
+      const probed = await probeCommonMenuPaths(response.url || websiteUrl, httpClient, log);
+      candidates.push(...probed);
+    }
   } catch (error) {
     log.debug({ url: websiteUrl, err: error }, "website crawl error");
   }
 
   candidates.sort((a, b) => b.confidence - a.confidence);
+  return candidates;
+}
+
+async function probeCommonMenuPaths(
+  baseUrl: string,
+  httpClient: HttpClient,
+  log: Logger,
+): Promise<MenuCandidate[]> {
+  const candidates: MenuCandidate[] = [];
+  const origin = new URL(baseUrl).origin;
+
+  for (const path of COMMON_MENU_PATHS) {
+    if (candidates.length >= 3) break;
+
+    const url = `${origin}${path}`;
+    try {
+      const res = await httpClient.fetch(url);
+      if (!res.ok) continue;
+
+      const ct = res.headers.get("content-type") ?? "";
+      if (ct.includes("application/pdf")) {
+        log.debug({ url }, "menu PDF probe hit");
+        candidates.push({ url, source: "website_probe", confidence: 0.75 });
+        continue;
+      }
+
+      if (!ct.includes("text/html")) continue;
+
+      const html = await res.text();
+      if (html.length < 500) continue;
+      if (res.url !== url && new URL(res.url).pathname === new URL(baseUrl).pathname) continue;
+
+      const hasMenuContent = /\b(menu|menü|fiyat|price|₺|TL)\b/i.test(html);
+      if (hasMenuContent) {
+        log.debug({ url }, "menu path probe hit");
+        candidates.push({ url, source: "website_probe", confidence: 0.65 });
+      }
+    } catch {
+      // probe failed, skip
+    }
+  }
+
   return candidates;
 }

@@ -13,9 +13,14 @@ interface SerperResult {
 export async function discoverFromSearch(
   placeName: string,
   city: string | undefined,
-  apiKey: string,
+  apiKey: string | undefined,
   log: Logger,
 ): Promise<MenuCandidate[]> {
+  if (!apiKey) {
+    log.debug("no SERPER_API_KEY, skipping search discovery");
+    return [];
+  }
+
   const query = city ? `${placeName} ${city} menü` : `${placeName} menü`;
 
   try {
