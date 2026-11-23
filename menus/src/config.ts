@@ -9,7 +9,8 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
   OPENROUTER_API_KEY: z.string().min(1),
-  SERPER_API_KEY: z.string().min(1).optional(),
+  GOOGLE_API_KEY: z.string().min(1).optional(),
+  GOOGLE_CSE_ID: z.string().min(1).optional(),
 
   INTERNAL_API_TOKENS: z
     .string()

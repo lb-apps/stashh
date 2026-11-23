@@ -2,8 +2,8 @@ import type { Logger } from "../../lib/logger.ts";
 import { isKnownMenuPlatform, isMenuRelatedUrl } from "../patterns.ts";
 import type { MenuCandidate } from "./website.ts";
 
-interface SerperResult {
-  organic?: Array<{
+interface GoogleSearchResponse {
+  items?: Array<{
     title: string;
     link: string;
     snippet?: string;
@@ -14,35 +14,39 @@ export async function discoverFromSearch(
   placeName: string,
   city: string | undefined,
   apiKey: string | undefined,
+  cseId: string | undefined,
   log: Logger,
 ): Promise<MenuCandidate[]> {
-  if (!apiKey) {
-    log.debug("no SERPER_API_KEY, skipping search discovery");
+  if (!apiKey || !cseId) {
+    log.debug("no GOOGLE_API_KEY or GOOGLE_CSE_ID, skipping search discovery");
     return [];
   }
 
   const query = city ? `${placeName} ${city} menü` : `${placeName} menü`;
 
   try {
-    const response = await fetch("https://google.serper.dev/search", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ q: query, gl: "tr", hl: "tr", num: 10 }),
+    const params = new URLSearchParams({
+      key: apiKey,
+      cx: cseId,
+      q: query,
+      gl: "tr",
+      hl: "tr",
+      num: "10",
+    });
+
+    const response = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`, {
       signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
-      log.warn({ status: response.status, query }, "Serper search failed");
+      log.warn({ status: response.status, query }, "Google Custom Search failed");
       return [];
     }
 
-    const data = (await response.json()) as SerperResult;
+    const data = (await response.json()) as GoogleSearchResponse;
     const candidates: MenuCandidate[] = [];
 
-    for (const result of data.organic ?? []) {
+    for (const result of data.items ?? []) {
       const platform = isKnownMenuPlatform(result.link);
       if (platform) {
         candidates.push({ url: result.link, source: "known_platform", confidence: 0.85 });
@@ -63,7 +67,7 @@ export async function discoverFromSearch(
     candidates.sort((a, b) => b.confidence - a.confidence);
     return candidates.slice(0, 5);
   } catch (error) {
-    log.warn({ err: error, query }, "Serper search error");
+    log.warn({ err: error, query }, "Google Custom Search error");
     return [];
   }
 }

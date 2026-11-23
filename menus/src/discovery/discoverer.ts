@@ -2,7 +2,7 @@ import type { Config } from "../config.ts";
 import type { HttpClient } from "../lib/http-client.ts";
 import type { Logger } from "../lib/logger.ts";
 import { discoverFromWebsite, type MenuCandidate } from "./strategies/website.ts";
-import { discoverFromSearch } from "./strategies/serper.ts";
+import { discoverFromSearch } from "./strategies/google-search.ts";
 import { discoverFromInstagram } from "./strategies/instagram.ts";
 
 export interface DiscoveryContext {
@@ -32,7 +32,7 @@ export async function discoverMenuUrl(
     }
   }
 
-  const searchCandidates = await discoverFromSearch(ctx.name, ctx.city, config.SERPER_API_KEY, log);
+  const searchCandidates = await discoverFromSearch(ctx.name, ctx.city, config.GOOGLE_API_KEY, config.GOOGLE_CSE_ID, log);
   if (searchCandidates.length > 0) {
     log.info({ placeId: ctx.placeId, count: searchCandidates.length }, "menu candidates from search");
     return { candidates: searchCandidates, source: "search" };
