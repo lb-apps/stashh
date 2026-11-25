@@ -159,25 +159,40 @@ export function dedupeDownloaderItems(items: DownloaderItem[]): DownloaderItem[]
 
 const DOWNLOADER_LINK_KEYS = ["url", "download_url", "downloadUrl", "src", "link", "video", "image", "media"];
 const DOWNLOADER_THUMBNAIL_KEYS = ["thumbnail", "thumb", "cover", "poster"];
+const HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 
-/** The first http link under any of the keys, as a string or inside an array; the service's field names drift. */
+/**
+ * An http(s) link a fetch can reach. The service sometimes answers with a link it built wrong,
+ * `https://snapsave.app&dl=1`, which parses with `snapsave.app&dl=1` as its host and fails the
+ * task at the download; such a link counts as no link, so the caption is still read.
+ */
+function isFetchableLink(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && HOSTNAME.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** The first fetchable link under any of the keys, as a string or inside an array; the service's field names drift. */
 function firstLink(item: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = item[key];
     const candidates = Array.isArray(value) ? value : [value];
-    const link = candidates.find((v): v is string => typeof v === "string" && /^https?:\/\//.test(v));
+    const link = candidates.find(isFetchableLink);
     if (link) return link;
   }
   return null;
 }
 
-async function askDownloader(postUrl: string): Promise<DownloaderItem[]> {
-  const result = await igdl(postUrl);
-  const raw: unknown[] = Array.isArray(result) ? result : (result?.result ?? []);
+/** The downloader's answer as one item per fetchable link, before deduplication. */
+export function parseDownloaderAnswer(raw: unknown[]): DownloaderItem[] {
   const items: DownloaderItem[] = [];
   for (const item of raw) {
     if (typeof item === "string") {
-      if (/^https?:\/\//.test(item)) items.push({ url: item, thumbnail: null });
+      if (isFetchableLink(item)) items.push({ url: item, thumbnail: null });
       continue;
     }
     if (!item || typeof item !== "object") continue;
@@ -185,11 +200,18 @@ async function askDownloader(postUrl: string): Promise<DownloaderItem[]> {
     const url = firstLink(record, DOWNLOADER_LINK_KEYS);
     if (url) items.push({ url, thumbnail: firstLink(record, DOWNLOADER_THUMBNAIL_KEYS) });
   }
-  const slides = dedupeDownloaderItems(items);
+  return items;
+}
+
+async function askDownloader(postUrl: string): Promise<DownloaderItem[]> {
+  const result = await igdl(postUrl);
+  const raw: unknown[] = Array.isArray(result) ? result : (result?.result ?? []);
+  const slides = dedupeDownloaderItems(parseDownloaderAnswer(raw));
   if (slides.length === 0) {
     // The library returns its failures (`status: false`) instead of throwing them. Throttled, the
-    // service answers in under a second with `status: true` and a page of blank `{ url: "" }` items.
-    if (raw.length > 0) throw new Error(`throttled: ${raw.length} blank items`);
+    // service answers in under a second with `status: true` and a page of blank `{ url: "" }` items;
+    // at other times with links it built wrong.
+    if (raw.length > 0) throw new Error(`no usable link in ${raw.length} items (throttled or malformed)`);
     const status = Array.isArray(result) ? null : (result as { status?: unknown; message?: unknown } | undefined);
     throw new Error(`no media (status ${String(status?.status ?? null)}): ${String(status?.message ?? "no message")}`);
   }
