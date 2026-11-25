@@ -62,7 +62,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Validate compose.yaml
         run: |
-          mkdir -p /tmp/stashh-env && touch /tmp/stashh-env/{backend,instagram,tunnel}.env
+          mkdir -p /tmp/stashh-env && touch /tmp/stashh-env/{backend,instagram,menus,tunnel}.env
           STASHH_ENV_DIR=/tmp/stashh-env docker compose config --quiet
       - run: docker build backend
       - run: docker build instagram
+      - run: docker build menus
