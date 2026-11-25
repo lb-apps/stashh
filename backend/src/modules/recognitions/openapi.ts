@@ -44,6 +44,14 @@ export const recognitionStatusSchema = z
       .nullable()
       .describe("Set when `status` is `failed`: `private` (behind a private account), `temporarily_unavailable` (the media could not be fetched; sending it again later usually works) or `unreadable` (anything else). Word the reply from this; `error_message` is the precise reason, for operators."),
     retry_count: z.number().int(),
+    charge: z
+      .enum(["allowance", "credit"])
+      .nullable()
+      .describe("What pays for the analysis: the plan's daily allowance or one credit. Null for recognitions from before billing."),
+    charge_status: z
+      .enum(["reserved", "charged", "released"])
+      .nullable()
+      .describe("`reserved` while it runs; `charged` once it found at least one place; `released` when it failed or found none, so it cost nothing."),
     started_at: z.string().nullable(),
     finished_at: z.string().nullable(),
     created_at: z.string().datetime(),
@@ -97,7 +105,9 @@ registry.registerPath({
   summary: "Enqueue recognition",
   description: `Submit an Instagram URL (Reel, Post, or Story) to identify places mentioned or shown in the content.
 
-The job runs asynchronously. Use GET /recognitions/{id} to poll for completion, or subscribe to the \`recognition_tasks\` Supabase Realtime channel for push updates.
+The job runs asynchronously. Use GET /recognitions/{id} to poll for completion.
+
+It is paid for by the plan's daily allowance or, once that is used up, one credit — and only if it finds at least one place (see GET /billing). With neither left it is refused with \`429 RECOGNITION_QUOTA\`.
 
 Once the job reaches \`completed\` status, the full result (extracted places, caption, video URL) is accessible via GET /recognitions/result?id={result_id} — the \`result_id\` is included in the status response.`,
   request: {

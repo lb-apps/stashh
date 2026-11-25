@@ -31,6 +31,9 @@ function createWorkerIdentifier(): string {
   return randomUUID().slice(0, 8);
 }
 
+/** The Realtime topic `wake_recognition_worker()` broadcasts on. */
+const RECOGNITION_WORKER_TOPIC = "recognition-worker";
+
 function wakeWorkerLoop(): void {
   hasPendingWakeSignal = true;
   if (!wakeResolver) return;
@@ -302,13 +305,11 @@ async function runWorker(): Promise<void> {
   let realtimeChannel: RealtimeChannel | null = null;
 
   if (realtimeClient) {
+    // The database broadcasts an empty "queued" message whenever a task becomes claimable
+    // (`wake_recognition_worker`); no row ever travels, so the channel can stay public.
     realtimeChannel = realtimeClient
-      .channel(`recognitions-worker-${workerIdentifier}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "recognition_tasks" },
-        () => wakeWorkerLoop(),
-      )
+      .channel(RECOGNITION_WORKER_TOPIC)
+      .on("broadcast", { event: "queued" }, () => wakeWorkerLoop())
       .subscribe((status, err) => {
         workerLog.info({ status, err: err?.message }, "realtime");
       });

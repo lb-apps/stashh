@@ -3,6 +3,7 @@
 import type { Config, Mixpanel } from "mixpanel-browser";
 import { publicEnv } from "@/lib/env";
 import { detectInAppBrowser, type InAppBrowser } from "@/lib/platform/in-app-browser";
+import type { Plan } from "@/lib/stashh/types";
 import { metaEvents, type EventName, type EventProps, type MetaEventName } from "./events";
 import { sendPixelEvent } from "./meta-pixel";
 
@@ -125,13 +126,15 @@ export function identify(userId: string) {
 
 /**
  * Profile fields, the only place personal data goes. Missing values are left
- * out so they never blank an existing one.
+ * out so they never blank an existing one. `plan` is the plan in force now
+ * (`free` | `premium`), so every report can split by it.
  */
-export function setProfile(profile: { name: string | null; instagramUsername: string | null; createdAt: string | null }) {
+export function setProfile(profile: { name?: string | null; instagramUsername?: string | null; createdAt?: string | null; plan?: Plan }) {
   const fields: Record<string, string> = {};
   if (profile.name) fields.$name = profile.name;
   if (profile.instagramUsername) fields.instagram_username = profile.instagramUsername;
   if (profile.createdAt) fields.$created = profile.createdAt;
+  if (profile.plan) fields.plan = profile.plan;
   if (Object.keys(fields).length) run((mixpanel) => mixpanel.people.set(fields));
 }
 

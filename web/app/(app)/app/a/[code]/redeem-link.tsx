@@ -7,11 +7,16 @@ import { BrandMoment } from "@/lib/discovery/components/BrandMoment";
 import { GlossyObject } from "@/lib/discovery/components/GlossyObject";
 import { signInWithTokenHash } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n/provider";
+import { rewardEarned } from "@/lib/stashh/rewards";
 import { SignedOut } from "../../../_components/signed-out";
+import { appPath, type EntrySheet } from "../../../_features/shell/entry";
 import { redeem } from "./actions";
 
-/** Turns a DM link's code into a session, then opens the map. */
-export function RedeemLink({ code }: { code: string }) {
+/**
+ * Turns a DM link's code into a session, then opens the map — with `next`'s
+ * screen presented over it when the link asked for one.
+ */
+export function RedeemLink({ code, next }: { code: string; next: EntrySheet | null }) {
   const t = useT();
   const router = useRouter();
   const [failed, setFailed] = React.useState(false);
@@ -29,13 +34,15 @@ export function RedeemLink({ code }: { code: string }) {
         // device may still carry the previous account's id.
         identify(userId);
         track("map_link_opened", {}, { meta: { eventId: result.eventId, userId } });
-        router.replace("/app");
+        // Told once the app is up: the reward outlives this navigation.
+        if (result.reward) rewardEarned(result.reward);
+        router.replace(appPath(next));
       } else {
         track("map_link_failed", {});
         setFailed(true);
       }
     })();
-  }, [code, router]);
+  }, [code, next, router]);
 
   if (failed) return <SignedOut variant="invalid" />;
   return <BrandMoment object={<GlossyObject tint="cobalt" size={160} />} headline={t.auth.signingIn} style={{ height: "100%" }} />;

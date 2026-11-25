@@ -151,6 +151,72 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_accounts: {
+        Row: {
+          created_at: string
+          credit_balance: number
+          plan: string
+          plan_expires_at: string | null
+          plan_source: string
+          store: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_balance?: number
+          plan?: string
+          plan_expires_at?: string | null
+          plan_source?: string
+          store?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_balance?: number
+          plan?: string
+          plan_expires_at?: string | null
+          plan_source?: string
+          store?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_settings: {
+        Row: {
+          created_at: string
+          first_list_credits: number
+          first_web_visit_credits: number
+          free_daily_analyses: number
+          id: boolean
+          mock_purchases: boolean
+          premium_daily_analyses: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          first_list_credits?: number
+          first_web_visit_credits?: number
+          free_daily_analyses?: number
+          id?: boolean
+          mock_purchases?: boolean
+          premium_daily_analyses?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          first_list_credits?: number
+          first_web_visit_credits?: number
+          free_daily_analyses?: number
+          id?: boolean
+          mock_purchases?: boolean
+          premium_daily_analyses?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_identities: {
         Row: {
           created_at: string
@@ -178,6 +244,36 @@ export type Database = {
           provider?: string
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      credit_ledger: {
+        Row: {
+          balance_after: number
+          created_at: string
+          delta: number
+          id: number
+          reason: string
+          ref: string
+          user_id: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          delta: number
+          id?: number
+          reason: string
+          ref: string
+          user_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          delta?: number
+          id?: number
+          reason?: string
+          ref?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -420,6 +516,27 @@ export type Database = {
         }
         Relationships: []
       }
+      recognition_quota_denials: {
+        Row: {
+          created_at: string
+          id: number
+          plan: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          plan: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          plan?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       recognition_results: {
         Row: {
           caption: string | null
@@ -563,6 +680,8 @@ export type Database = {
       recognition_tasks: {
         Row: {
           available_at: string
+          charge: string | null
+          charge_status: string | null
           created_at: string
           error_message: string | null
           finished_at: string | null
@@ -581,6 +700,8 @@ export type Database = {
         }
         Insert: {
           available_at?: string
+          charge?: string | null
+          charge_status?: string | null
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -599,6 +720,8 @@ export type Database = {
         }
         Update: {
           available_at?: string
+          charge?: string | null
+          charge_status?: string | null
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -1002,6 +1125,59 @@ export type Database = {
       }
       assistant_ops_stats: {
         Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
+      billing_effective_plan: {
+        Args: { p_expires_at: string; p_plan: string }
+        Returns: string
+      }
+      billing_ops_ledger: {
+        Args: { p_limit: number }
+        Returns: Json
+      }
+      billing_ops_people: {
+        Args: { p_limit: number; p_query: string }
+        Returns: Json
+      }
+      billing_ops_stats: {
+        Args: { p_bucket: string; p_since: string }
+        Returns: Json
+      }
+      billing_status: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      claim_task_reward: {
+        Args: { p_task: string; p_user_id: string }
+        Returns: Json
+      }
+      create_recognition_task: {
+        Args: {
+          p_idempotency_key: string | null
+          p_options: Json
+          p_owner_user_id: string
+          p_source_media: Json | null
+          p_source_url: string
+        }
+        Returns: Json
+      }
+      grant_credits: {
+        Args: {
+          p_delta: number
+          p_reason: string
+          p_ref: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      set_billing_plan: {
+        Args: {
+          p_expires_at: string | null
+          p_plan: string
+          p_source: string
+          p_store: string | null
+          p_user_id: string
+        }
         Returns: Json
       }
       claim_instagram_messages: {

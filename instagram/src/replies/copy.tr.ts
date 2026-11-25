@@ -27,6 +27,13 @@ export function sourceKindOf(source: RecognitionSource): SourceKind {
 }
 
 const ratingFormat = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const relativeFormat = new Intl.RelativeTimeFormat("tr-TR", { numeric: "always" });
+
+/** "3 saat sonra", "40 dakika sonra": when the next free analysis comes back, rounded up. */
+export function untilText(at: Date, now: Date): string {
+  const minutes = Math.max(1, Math.ceil((at.getTime() - now.getTime()) / 60_000));
+  return minutes < 60 ? relativeFormat.format(minutes, "minute") : relativeFormat.format(Math.ceil(minutes / 60), "hour");
+}
 
 export const copy = {
   found: (count: number, kind: SourceKind) => `Bu ${NOUN[kind].locative} ${count} mekân var, hepsini haritana ekledik.`,
@@ -54,8 +61,20 @@ export const copy = {
   unsupported:
     "Bunu okuyamıyorum 😅 İçinde mekân geçen bir Reel, post ya da hikâye at, ya da bir Instagram / TikTok linki yapıştır; içindeki yerleri bulup haritana koyayım.",
   erased: "Stashh'teki verilerini sildik.",
-  /** A share past the daily recognition cap (`RECOGNITION_QUOTA`). */
-  dailyLimit: "Bugünlük çok paylaşım yaptın 😅 Yarın yeni Reel'leri okumaya devam ederim, kaydettiklerin haritanda duruyor.",
+  /**
+   * A share with nothing left to pay for it (`RECOGNITION_QUOTA`): the day's free analyses are
+   * used up and there are no credits. `until` is when the next free one comes back.
+   */
+  quotaReached: (limit: number | null, until: string | null) =>
+    `Bugünkü ${limit === null ? "" : `${limit} `}ücretsiz analizin bitti, kredin de kalmadı 😅 ` +
+    (until ? `Yenisi ${until} açılıyor. ` : "Yarın yenileri açılıyor. ") +
+    "Kaydettiklerin haritanda duruyor.",
+  /** Free plan only: what Premium changes, under the button to the paywall. */
+  quotaPremium: "Premium'da her gün çok daha fazla analiz hakkın olur.",
+  /** The button to the paywall, through the person's sign-in link. */
+  seePremium: "Premium'a göz at",
+  /** After places paid for with a credit. */
+  creditUsed: (left: number) => (left > 0 ? `Bunun için 1 kredi kullandık, ${left} kredin kaldı.` : "Bunun için son kredini kullandık."),
   /** With a fresh sign-in link, when someone writes "harita". */
   mapLink: "Kaydettiğin mekânlar haritanda. Bu link sadece sana özel, yedi gün içinde bir kez açılır.",
   /** The personal sign-in link to the web map. */

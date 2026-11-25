@@ -302,3 +302,16 @@ exactly day N, only users who completed day N) and unbounded Dn+ return, cohort 
 week, DAU/WAU and stickiness, core-KPI frequency. Headlines state the metric and its value. In a
 `lang="tr"` page, uppercase English labels in code per word, never with CSS `text-transform`
 ("SİGNUPS").
+
+## Never source an env file to read one secret (2026-11-25)
+
+**What happened:** to send a test webhook I ran `set -a; . ./backend/.env; set +a`. One value was
+`Bearer <hex>`; the shell split it at the space, ran the hex as a command, and the "command not found"
+error printed the secret into the transcript. It had to be rotated.
+
+**Why:** a shell is not a dotenv parser. Unquoted values with spaces, `#`, `$` or quotes break, and the
+breakage is printed — with the value in it.
+
+**How to apply:** read a single key with `grep '^KEY=' file | cut -d= -f2-` into a variable and pass it
+on; never source a whole env file. Generate secrets without spaces (`openssl rand -hex 32`). Print only
+lengths, prefixes or status codes.

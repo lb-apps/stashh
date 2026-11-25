@@ -93,6 +93,23 @@ sources, since an @handle on TikTok is a TikTok handle.
 
 Task status lifecycle: `queued → processing → completed → committed` (also `failed/expired/cancelled`). While `processing`, `stage` moves `fetching → analyzing → matching → saving`; the web app's four progress steps map onto it.
 
+**Paying for it.** Step 1 reserves the plan's daily allowance or, once that is used up, one credit (`charge`, `charge_status` on the task). With neither left it is `429 RECOGNITION_QUOTA` and nothing is created; `error.details` says the plan, the limit and `next_free_at`. When the task ends it is `charged` only if it found a place, otherwise `released` (free).
+
+## Plan and credits
+
+| Need | Caller | Route |
+|---|---|---|
+| Plan, free analyses left today, next free one, credits, tasks; each plan's allowance | web (profile, Premium sheet) | `GET /billing` |
+| Premium without payment, while the owner allows it | web (Premium sheet) | `POST /billing/mock-purchase` |
+| The plan right after a Paddle purchase (re-read from RevenueCat) | web (Premium sheet) | `POST /billing/sync` |
+| A subscription bought, renewed, cancelled or expired | RevenueCat (its webhook `Authorization`) | `POST /webhooks/revenuecat` (outside `/api`) |
+| Credits left after a credit-paid analysis | DM service (service token) | `GET /internal/v1/users/:userId/billing` |
+| Numbers, settings, a person's plan and credits | ops dashboard (service token) | `/internal/v1/ops/billing/*` |
+
+Rules live in the database (`supabase/migrations/…_billing.sql`): `billing_settings` (one row, from ops), `billing_accounts` (plan, balance), `credit_ledger` (append-only, idempotent per `(user, reason, ref)`). The first list (anywhere) and the first visit to the web app earn their task's credits once.
+
+A bought Premium has one writer: `BillingService.syncFromRevenueCat`, which reads the person's subscriptions from RevenueCat API v2 and writes the plan they give now. The web calls it through `/billing/sync` when a purchase resolves; RevenueCat's webhook calls it for every change after that. Prices come from RevenueCat's `default` offering through `@revenuecat/purchases-js`, only where `NEXT_PUBLIC_REVENUECAT_API_KEY` is set; elsewhere the Premium sheet stays the fake door (or the owner's mock purchase).
+
 ## Profile
 
 | Need | Swift builder | Route |
@@ -101,7 +118,7 @@ Task status lifecycle: `queued → processing → completed → committed` (also
 
 ## Web sign-in (DM link)
 
-Everyone who writes to @stashh.me on Instagram is a Supabase user already (`channel_identities`). The web app signs them in with a personal link the DM service sends: `<WEB_APP_URL>/a/<code>` (default `https://stashh.me/app/a/<code>`). It never expires and opens the map every time, until the person is erased.
+Everyone who writes to @stashh.me on Instagram is a Supabase user already (`channel_identities`). The web app signs them in with a personal link the DM service sends: `<WEB_APP_URL>/a/<code>` (default `https://stashh.me/app/a/<code>`). It never expires and opens the map every time, until the person is erased. `?next=premium` opens the Premium sheet instead (the DM's reply when the free analyses run out). The redeem response's `reward` is set on the first visit, which earns the `first_web_visit` task.
 
 | Step | Caller | Route |
 |---|---|---|

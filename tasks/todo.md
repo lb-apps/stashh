@@ -1,3 +1,234 @@
+# Credits, a daily allowance and RevenueCat (Free + Premium)
+
+Plan written 2026-11-25; owner's go-ahead the same day ("best practice, 2026 architecture, separate branch"). Branch `feat/credits` from `origin/develop`, in a
+worktree (`.claude/worktrees/feat-credits`): this checkout holds someone else's uncommitted `menus/` work.
+
+**Decisions (owner, 2026-11-25).**
+- Every plan has a daily allowance of analyses (rolling 24 h, as the cap is today). When it is used up, an
+  analysis spends 1 credit. Credits come from in-product tasks and, later, credit packs. Bought credits never
+  expire (App Store 3.1.1).
+- Only an analysis that finds at least one place uses the allowance or a credit. A failure or an empty result
+  is free. A cache hit with places counts.
+- Plans: Free and Premium (monthly + yearly). Premium = a larger daily allowance. The numbers live in ops.
+- Following @stashh.me earns nothing: Meta's spam standard bans "exchanging for engagement, such as … follows".
+  The follow is asked for without a reward. Credit tasks live in the product: first list, first visit to the
+  web app, inviting a friend (the inviter earns).
+- Payments: RevenueCat with Paddle as the web billing engine (merchant of record, TRY checkout, payouts in
+  USD/EUR). App Store later, in the same RevenueCat project, on the same `premium` entitlement.
+
+**One user id everywhere — already true, kept true.** The Supabase `auth.users.id` is the Supabase id, the
+Mixpanel `$user_id` (web `identify`, DM `distinct_id`), and the DM sender's id (UUIDv5 through
+`channel_identities`; the DM link signs the web into that same user). RevenueCat's App User ID becomes the same
+id: on the web `Purchases.configure({ appUserId })` only once a session exists, never anonymous; on iOS
+`Purchases.configure(appUserID:)`. A webhook for any other id is logged and ignored. No `$mixpanelDistinctId`,
+no aliases.
+
+## Phase 1 — credits and a mock paywall, no payments
+
+Data — two migrations: `…_recognition_tasks_lockdown.sql` (found while building: an anon policy let anyone with the public key read every task, and people could insert their own tasks past the allowance; the worker now wakes on an empty broadcast) and the additive `…_billing.sql` (service role only: RLS on, no policies; cascades from
+`auth.users`, so "sil" wipes it; `npm run db:types` after):
+- [x] `billing_settings`, one row like `assistant_settings`: `free_daily_analyses` (default 100 = today's cap,
+      lowered from ops when the paywall goes live), `premium_daily_analyses`, task rewards (`first_list`,
+      `first_web_visit`, `invite`), `mock_purchases` (false). Defaults are placeholders.
+- [x] `billing_accounts` (`user_id` pk): `plan` free|premium, `plan_source` default|mock|admin|revenuecat,
+      `plan_expires_at`, `store`, `credit_balance int check (>= 0)`. The row is the lock for every charge.
+- [x] `credit_ledger`, append-only: `user_id, delta, reason (task|purchase|recognition|admin), ref`,
+      `unique (user_id, reason, ref)`, so every grant and spend is idempotent.
+- [x] `recognition_tasks.charge` (allowance|credit) and `charge_status` (reserved|charged|released).
+- [x] RPCs (`security invoker`, `search_path = ''`, service_role only):
+  - `create_recognition_task(…)`: locks the account, counts allowance reserved + charged in the last 24 h,
+    reserves the allowance or a credit (balance minus open credit reservations), inserts the task; otherwise
+    raises the quota error with `next_free_at`. Replaces the count-then-insert at
+    `backend/src/modules/recognitions/service.ts:148-163` and closes its race.
+  - `settle_recognition_charge(task, found_places)`: reserved → charged (a credit writes ledger −1, ref = task
+    id) or released. A second call does nothing.
+  - `grant_credits(user, delta, reason, ref)`, `set_billing_plan(user, plan, source, expires_at, store)`,
+    `billing_status(user)` (plan, used/limit, `next_free_at`, credits, tasks done), `billing_ops_stats/_list`.
+
+Backend — `backend/src/modules/billing/`, laid out like `modules/me/`:
+- [x] `settings.ts` on the pattern of `modules/assistant/settings.ts` (zod patch, 15 s cache, `forget…`).
+- [x] Recognitions: `enqueueRecognition` calls `create_recognition_task` after the idempotency replay (a
+      replay never charges); `processRecognitionSuccess` settles with `places.length > 0`; the give-up branch
+      of `processRecognitionFailure` releases. Retries and stale recovery leave the reservation as it is.
+      `RECOGNITIONS_DAILY_CAP` and `countRecognitionsSince` go.
+- [x] The quota error carries `details: { plan, limit, next_free_at, credits }`; the recognition DTO carries
+      `charge`, so the DM can say a credit was used.
+- [x] Public: `GET /api/v1/me/billing`; `POST /api/v1/billing/mock-purchase` only while `mock_purchases` is on
+      (owner testing, source `mock`).
+- [x] Task credits granted where the act happens: first list in the lists service, first web visit in the
+      sign-in-link redeem route. The response carries `reward: { task, credits }`.
+- [x] Ops: `GET/PUT /internal/v1/ops/billing/settings`, `GET /internal/v1/ops/billing`, and grant credits / set a
+      plan for one user (source `admin`). The ops test user gets Premium so `/recognize` keeps working.
+- [x] OpenAPI for every route; tests beside `recognition-enqueue.test.ts` and `assistant-settings.test.ts`.
+
+DM — `instagram/`:
+- [x] On the quota error: new copy with the limit, when the next free analysis comes, and a button to the
+      paywall through a sign-in link (`/app/a/<code>?next=premium`).
+- [x] After a credit-charged result: one line with the credits left.
+- [x] Analytics: `recognition_completed` gets `charge`; `recognition_failed` (`daily_limit`) gets `credits`.
+- [x] Copy meets the owner's bar for the assistant's language (lessons 2026-11-04); Turkish now, in
+      `copy.tr.ts`.
+
+Web — `/app`, built and checked in `/app/dev/iab`:
+- [x] Design first: ui-ux-pro-max, the Discovery design project (look for a plan or paywall screen), 21st for
+      the paywall (a pricing surface), rebuilt in Discovery components.
+- [x] Profile sheet: plan, today's allowance, credits, tasks (done or not), a "follow @stashh.me" link with no
+      reward, the Premium button.
+- [x] `premium` sheet route (`shell/sheet-state.tsx`): Free vs Premium, monthly/yearly `SegmentedControl`. The
+      CTA is a fake door ("yakında") unless `mock_purchases` is on.
+- [x] `?next=premium` opens the sheet after the link is redeemed (allow-listed values, no open redirect).
+- [x] A reward toast when a response carries `reward`.
+- [x] Analytics (`lib/analytics/events.ts`): `paywall_viewed {source}`, `premium_plan_selected {period}`,
+      `credits_earned {task, credits}`; profile property `plan` in `analytics-session.tsx`. Lexicon entries in
+      both projects (owner's go-ahead), `docs/analytics-plan.md` updated.
+
+Ops — `ops/`:
+- [x] Billing page: settings panel (the pattern of `components/ops/assistant-settings.tsx`), stats (Premium
+      users, people who hit the limit, credits earned by task and spent), a user lookup to grant credits or
+      set a plan.
+
+Docs: `docs/api-screen-map.md`; a billing section in `CLAUDE.md` (one id, the ledger, where settings live);
+the cap line in `docs/security/ai-safety.md`.
+
+## Phase 2 — RevenueCat + Paddle sandbox
+
+- [x] RevenueCat project "Stashh" (`4bee9680`, 2026-11-25, Little Big Apps Chrome window): entitlement
+      `premium`; offering `default` with monthly and yearly packages; Test Store products `premium_monthly`
+      and `premium_yearly` attached to both. No secret key or webhook yet.
+- [x] Paddle sandbox account "Little Big Apps" (2026-11-25). Checkout: `stashh.me` and `pay.rev.cat`
+      approved, default payment link `https://pay.rev.cat`, checkout recovery emails off. Product "Stashh
+      Premium" `pro_01m89t9j4bcczzha1kd4qaqgd2` (Standard digital goods), tax by location:
+      - "Premium · Aylık" `pri_01m89tb2zp086es5db2cek4xm0`: $3.99/month, Turkey ₺129.99;
+      - "Premium · Yıllık" `pri_01m89tbzwm1hepzb5ysxgtedjm`: $29.99/year, Turkey ₺999.99.
+      Prices are placeholders, not decided; the owner sets them before Phase 3.
+- [x] Paddle Billing connected in RevenueCat: web config "Stashh (Paddle)" `app6e836d09cf` (Sandbox),
+      automatic purchase tracking, inline checkout in purchases-js. Paddle API key "RevenueCat" (never expires,
+      RevenueCat's 17 minimum permissions) lives only in that config. Both prices imported as
+      `premium_monthly` / `premium_yearly`, attached to `premium`, and added to the `default` offering
+      (`ofrngdf93253d5d`) next to the Test Store products (`$rc_monthly`, `$rc_annual`).
+- [ ] Credit packs later as Paddle one-time products (supported; check a repeat purchase in the sandbox).
+- [ ] Live (Phase 3) needs a second Paddle config in RevenueCat with the live account's key, and
+      `stashh.me` approved there (Paddle reviews it).
+### Phase 2 code (design, 2026-11-25)
+
+One path decides Premium: **sync from RevenueCat**. It reads the person's subscriptions from RevenueCat
+API v2 and writes the plan; the webhook and the web both call it, so every entry point is idempotent by
+construction (it re-reads the state, never applies a delta). That makes an events table unnecessary: a
+duplicate or late event just syncs again. (Changed from the first plan, which stored events by id.)
+
+- [x] Backend `lib`/billing: a RevenueCat v2 client (`GET …/customers/{id}/subscriptions`, paginated;
+      `DELETE …/customers/{id}`), bounded by a timeout. `BillingService.syncFromRevenueCat(userId)`: Premium
+      while a subscription `gives_access`, is in an allowed environment and carries entitlement `premium`
+      (until the latest `ends_at`, store from the subscription); otherwise a plan whose source is `revenuecat`
+      falls back to Free, and admin / mock plans stay untouched. An unknown person (FK 23503) is skipped.
+- [x] Backend `POST /webhooks/revenuecat` (outside `/internal` and `/api`): `Authorization` compared as
+      SHA-256 digests with `timingSafeEqual` against `REVENUECAT_WEBHOOK_AUTH`; every UUID among `app_user_id`,
+      `original_app_user_id`, `aliases`, `transferred_from/_to` is synced; `200` after the sync, an error
+      status if it fails so RevenueCat retries. `TEST` events answer `200` without work.
+- [x] Backend `POST /api/v1/billing/sync`: the web calls it when a purchase resolves, so Premium shows
+      before the webhook lands.
+- [x] Config, all optional (unset → sync/webhook `503 PURCHASES_UNAVAILABLE`): `REVENUECAT_PROJECT_ID`,
+      `REVENUECAT_SECRET_KEY` (v2; customers read_write, subscriptions read), `REVENUECAT_WEBHOOK_AUTH`
+      (≥ 32 chars), `REVENUECAT_ENVIRONMENTS` (default `production`; `sandbox,production` while testing).
+- [x] "sil": the internal erase also deletes the RevenueCat customer (`404` = nothing there); a failure
+      fails the erase, which is idempotent, so a retry finishes it.
+- [x] Web: `NEXT_PUBLIC_REVENUECAT_API_KEY` (the Paddle config's public key). Unset → today's fake door /
+      mock purchase, so production stays a fake door until Phase 3. Set → prices from the `default`
+      offering; `@revenuecat/purchases-js` loaded on demand and configured with the Supabase user id; the
+      purchase opens Paddle's checkout; on success `/billing/sync`; a renewal note under the button;
+      someone on a `revenuecat` plan gets "Manage subscription" (`customerInfo.managementURL`). Check the
+      checkout, 3-D Secure included, in the IAB simulator, then on a real phone (not yet).
+- [x] Analytics: `premium_purchased.store` gains `paddle`; `premium_plan_selected.available` is true when the
+      purchase can happen. RevenueCat's Mixpanel integration stays off (events stay in the interfaces);
+      renewals and cancellations are read in RevenueCat and ops.
+- [x] RevenueCat setup (2026-11-25): v2 project id `proj4bee9680`; secret key "Stashh backend" (v2,
+      customers read_write + subscriptions read, nothing else); webhook "Stashh backend"
+      (`whintgr791267996884412fabc2a0d9a99fd559`) → `https://api.stashh.me/webhooks/revenuecat`, both
+      environments, all events, **Disabled** until production runs this code. Keys reached the env files
+      from the clipboard, never printed. On this Mac (`backend/.env`, `web/.env.local`, gitignored):
+      `REVENUECAT_*` with `sandbox,production`, and `NEXT_PUBLIC_REVENUECAT_API_KEY`.
+      Incident, same day: sourcing `backend/.env` in a shell split the first webhook value ("Bearer <hex>")
+      at its space and printed the hex in an error, so it was rotated at once; values now carry no spaces
+      (`.env.example` says so). Read single values with `grep '^KEY=' | cut -d= -f2-`, never `. ./.env`.
+- [x] Sandbox purchase end to end on this Mac (IAB simulator, iPhone frame): price ₺129,99 / ay and
+      ₺999,99 / yıl from the offering; Paddle checkout in Turkish with VAT shown (₺108,33 + ₺21,66);
+      test card → "Ödeme tamamlandı" → `/billing/sync` 200 → "Premium’dasın, 25 Aralık 2026 tarihine kadar"
+      and "Aboneliği yönet" (Paddle sandbox portal, 48 px). Row: premium / revenuecat / PADDLE /
+      2026-12-25. Local webhook: right value syncs (anonymous alias skipped), wrong 401, TEST 200.
+- [ ] Deploy, after the PR merges into `develop`: on `home-server`, `~/HomeServer/stashh/env/backend.env`
+      gets `REVENUECAT_PROJECT_ID`, `REVENUECAT_SECRET_KEY`, `REVENUECAT_WEBHOOK_AUTH` (the value in
+      RevenueCat) and `REVENUECAT_ENVIRONMENTS` (`sandbox,production` while Phase 2 is tested, then
+      `production`); restart the backend; set the webhook Active and send RevenueCat's test event (expect 200).
+      Vercel: `NEXT_PUBLIC_REVENUECAT_API_KEY` on Preview only, never Production before Phase 3.
+- [ ] Cancel in the sandbox portal → access until the period ends → the webhook (`EXPIRATION`) drops to Free.
+- [ ] Optional: Paddle checkout in Discovery colours (RevenueCat → Web → Stashh (Paddle) → Appearance:
+      cobalt button instead of Paddle's green); HMAC webhook signing as a second check.
+- [ ] Sandbox test user `05cd2fe2-…` is on a sandbox Premium until 2026-12-25; set back to Free from ops
+      (or cancel in the portal) once testing ends.
+- [ ] Moved to Phase 3: the data-deletion page's note that Paddle keeps invoices by law (nobody can pay in
+      production before then).
+- [ ] `mock_purchases` off; `mock` plans reset.
+
+## Phase 3 — Paddle live
+
+- [ ] Owner: Paddle live account as a şahıs şirketi (identity check, a few days); domain review of stashh.me.
+- [ ] Web: Terms of Service and Refund Policy pages (with the sole proprietorship's legal name), linked from
+      the footer and `legal-page.tsx`; the privacy policy adds Paddle and RevenueCat. Drafted with
+      content-writer, checked by the owner.
+- [ ] Owner: mali müşavir on invoicing Paddle and foreign-currency income.
+- [x] Allowances set by the owner, 2026-11-25: Free 3, Premium 50 analyses a day (`billing_settings`, through
+      the ops settings route; was 100 / 300). Production enforces them from this branch's deploy on; until then
+      its old code keeps `RECOGNITIONS_DAILY_CAP` (100). Nobody had used more than 3 that day.
+
+## Phase 4 — iOS, when it resumes
+
+- [ ] App Store subscriptions on the same `premium` entitlement; packs as consumable IAPs (never expire);
+      `Purchases.configure(appUserID:)` with the Supabase id; the same webhook.
+
+## Invite a friend — its own step after phase 1
+
+- [ ] Each user gets `ig.me/m/stashh.me?ref=<code>`. A new sender arriving with that ref (Instagram
+      `messaging_referral`) is tied to the inviter, who earns once the friend's first analysis finds a place.
+      A cap per inviter in settings. Check first that the relay and the DM service pass referral events.
+
+**Changes to the plan while building.** Public route is `GET /api/v1/billing` (own module), not
+`/me/billing`. The first-list reward is a trigger on `user_lists` (lists come from the web and the DM
+assistant alike), backfilled for people who already had a list. Settlement is a trigger on the task's
+status change, in the same write. `billing_status` also returns `plan_limits` for the paywall.
+Migrations: `apply_migration` was declined on the shared database; the owner runs both files in the SQL
+editor. SQL verified on a local Postgres 17 with a Supabase stand-in (18 scenarios + a two-session race).
+
+**Verification.**
+- Backend: `npm test`, `npm run typecheck`. New tests: allowance → credit → quota, empty result and failure
+  release, retry keeps the reservation, an idempotent replay never charges, two enqueues at once, settle twice,
+  webhook auth and duplicate events, settings patch.
+- SQL: the migration is additive (if `apply_migration` is declined, the owner runs it in the SQL editor), then
+  `execute_sql` checks on a test user: allowance, credit, quota, settle twice, the balance never below 0.
+- DM end to end with `/env dev`: lower the limit in ops, hit it, get the new reply and button, open the
+  paywall, earn a task credit, spend it, read the credits left.
+- Web: profile, paywall and reward toast in `/app/dev/iab`; `npm run build && npm run typecheck`.
+- Mixpanel Staging: web and DM events land on the same user id (Live view).
+- Phase 2: a Paddle sandbox purchase → the RevenueCat customer id is the Supabase id → webhook → Premium →
+  larger allowance; cancel → expiry → Free.
+
+**Review (2026-11-25).**
+- Migrations run by the owner in the SQL editor (one transaction, recorded in the history) and checked
+  live: tables, 13 functions, 5 triggers, one read-own policy on tasks, nothing granted to clients,
+  the table out of the Realtime publication, 3 people credited for an existing list.
+- Backend from the branch on :3000: a cached Reel enqueued through the RPC, the worker woke within a
+  second on the broadcast, completed, the allowance was charged (used 1/100); mock purchase 403 while off.
+- Web in `/app/dev/iab`: profile plan card (99/100, 3 credits, open task, Premium entry), the Premium
+  sheet, the fake door ("Premium çok yakında geliyor"), and — with the switch on — the mock purchase
+  ("Premium'dasın", end date). `/app/a/<code>?next=premium` signed in and opened the Premium sheet; the
+  first visit's 3 credits were granted. The reward toast itself was not seen (it fired during the dev
+  compile).
+- Ops `/billing`: live numbers, settings saved (mock switch on, then off), the person lookup by user id
+  and its sheet. The test user is back on Free; `mock_purchases` is off.
+- Left for the owner: Mixpanel Lexicon entries (a write to Mixpanel); production deploy after the PR.
+
+**Rollout (prod and dev share the database):** migration → backend (default allowance 100, same as today) →
+DM → web → ops. The free allowance comes down only when the paywall is ready to show.
+
 # Prod outage 2026-11-14: no DM answered — the home line was restricted
 
 Branch `fix/relay-holds-prod-deliveries` from `origin/develop`.

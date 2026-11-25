@@ -14,8 +14,13 @@
  * - No personal data in properties: no usernames, note text or source URLs.
  */
 
+import type { BillingTask, PremiumPeriod } from "@/lib/stashh/types";
+
 /** Where a saved place's card was opened from. */
 export type PlaceEntry = "map_pin" | "home" | "list" | "library" | "search";
+
+/** How the reader reached the Premium sheet: the DM's link, or the profile's button. */
+export type PaywallSource = "dm" | "profile";
 
 export type EventCatalog = {
   /** The DM's Instagram button, on the landing page or a signed-out app screen. */
@@ -38,6 +43,18 @@ export type EventCatalog = {
 
   location_permission_answered: { is_granted: boolean; surface: "profile" | "home_prompt" };
   user_signed_out: Record<string, never>;
+
+  /** The Premium sheet came up: from the DM's quota reply, or from the profile. */
+  paywall_viewed: { source: PaywallSource };
+  /** Premium's button was tapped. `available` is false while it can't be bought here (the fake door). */
+  premium_plan_selected: { period: PremiumPeriod; available: boolean };
+  /**
+   * A purchase went through: `paddle` through Paddle's checkout (RevenueCat), `mock` when the owner
+   * grants Premium from the paywall while payments are off.
+   */
+  premium_purchased: { period: PremiumPeriod; store: "paddle" | "mock" };
+  /** A task's credits were earned, seen by the reader as they came in. */
+  credits_earned: { task: BillingTask; credits: number };
 };
 
 export type EventName = keyof EventCatalog;

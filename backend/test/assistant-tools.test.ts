@@ -17,6 +17,7 @@ function services(overrides: Partial<ToolServices> = {}): ToolServices {
     placesRepo: { searchSavedPlaces: fail, getSavedPlacesByPlaceIds: fail, getPlacesByGoogleIds: fail, countSavedPlaces: fail },
     recognitions: { listRecentRecognitionsWithPlaces: fail },
     signInLinks: { mint: fail },
+    billing: { status: fail },
     ...overrides,
   } as ToolServices;
 }
@@ -181,5 +182,57 @@ describe("recentRecognitions", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("get_plan", () => {
+  const status = {
+    plan: "free" as const,
+    plan_source: "default" as const,
+    plan_expires_at: null,
+    store: null,
+    daily_limit: 3,
+    used_today: 3,
+    plan_limits: { free: 3, premium: 50 },
+    next_free_at: new Date(Date.now() + 90 * 60_000).toISOString(),
+    credits: 2,
+    mock_purchases: false,
+    tasks: [
+      { task: "first_list" as const, credits: 3, done: true },
+      { task: "first_web_visit" as const, credits: 3, done: false },
+    ],
+  };
+
+  it("reads the person's plan, allowance and credits, and only the tasks still open, in words the model can say", async () => {
+    const result = await executeTool(ctx({ billing: { status: async (userId: string) => (userId === USER ? status : Promise.reject(new Error("wrong user"))) } }), "get_plan", {});
+    expect(result).toEqual({
+      plan: "free",
+      premium_until: null,
+      free_analyses_per_24h: 3,
+      used_in_last_24h: 3,
+      next_free_analysis_in_minutes: expect.any(Number),
+      credits: 2,
+      daily_analyses_by_plan: { free: 3, premium: 50 },
+      credit_tasks_open: [{ how: "open their map on the web for the first time", credits: 3 }],
+    });
+  });
+
+  it("says when the next free analysis comes back in minutes, never as a clock time", async () => {
+    const result = (await executeTool(ctx({ billing: { status: async () => status } }), "get_plan", {})) as { next_free_analysis_in_minutes: number };
+    expect(result.next_free_analysis_in_minutes).toBeGreaterThanOrEqual(89);
+    expect(result.next_free_analysis_in_minutes).toBeLessThanOrEqual(90);
+    expect(await executeTool(ctx({ billing: { status: async () => ({ ...status, next_free_at: null }) } }), "get_plan", {})).toMatchObject({ next_free_analysis_in_minutes: null });
+  });
+
+  it("says until when Premium runs only for someone on it", async () => {
+    const premium = { ...status, plan: "premium" as const, plan_source: "revenuecat" as const, plan_expires_at: "2026-12-25T17:32:49+00:00", daily_limit: 50 };
+    expect(await executeTool(ctx({ billing: { status: async () => premium } }), "get_plan", {})).toMatchObject({ plan: "premium", premium_until: "2026-12-25T17:32:49+00:00" });
+    const lapsed = { ...status, plan_expires_at: "2026-10-01T00:00:00+00:00" };
+    expect(await executeTool(ctx({ billing: { status: async () => lapsed } }), "get_plan", {})).toMatchObject({ plan: "free", premium_until: null });
+  });
+
+  it("has no way to change a plan or credits", () => {
+    const names = toolDefinitions().map((definition) => definition.function.name);
+    expect(names.filter((name) => /plan|credit|billing|premium|purchase/i.test(name))).toEqual(["get_plan"]);
   });
 });

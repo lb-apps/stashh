@@ -2,6 +2,8 @@ import { z } from "zod/v4";
 import { AppHttpError } from "../../errors/appHttpError.js";
 import type { ToolDefinition } from "../../lib/openrouter.js";
 import type { Json } from "../../types/database.js";
+import type { BillingService } from "../billing/service.js";
+import type { BillingTask } from "../billing/types.js";
 import type { ListsService } from "../lists/service.js";
 import type { PlacesRepository, SavedPlaceRecord } from "../places/repository.js";
 import { toSavedPlaceDto, type PlacesService, type SavedPlaceDto } from "../places/service.js";
@@ -87,6 +89,10 @@ export const replySchema = z.object({
     .optional()
     .describe("Swipeable cards sent before your text: saved places (photo, rating, map link) or lists. Use them instead of listing names in text."),
   map_link: z.boolean().optional().describe("Attach the button that opens the person's own map and lists on the web, signed in. Only when they want to see or open their places."),
+  premium_link: z
+    .boolean()
+    .optional()
+    .describe("Attach the button that opens Premium on the web (the plans, and the price once it can be bought), signed in. Only when the person asks about Premium or more analyses; never for someone already on Premium."),
   confirm: z
     .discriminatedUnion("action", [
       z.object({ action: z.literal("delete_list"), list_id: uuid }),
@@ -109,6 +115,7 @@ export interface ToolServices {
   placesRepo: Pick<PlacesRepository, "searchSavedPlaces" | "getSavedPlacesByPlaceIds" | "getPlacesByGoogleIds" | "countSavedPlaces">;
   recognitions: Pick<RecognitionRepository, "listRecentRecognitionsWithPlaces">;
   signInLinks: Pick<SignInLinkService, "mint">;
+  billing: Pick<BillingService, "status">;
 }
 
 export interface ToolContext {
@@ -136,6 +143,12 @@ interface ToolSpec<Schema extends z.ZodType> {
 function tool<Schema extends z.ZodType>(spec: ToolSpec<Schema>): ToolSpec<Schema> {
   return spec;
 }
+
+/** What a one-time credit task asks of the person, as the model can say it. */
+const TASK_HOW: Record<BillingTask, string> = {
+  first_list: "create their first list",
+  first_web_visit: "open their map on the web for the first time",
+};
 
 /** A saved place as the model sees it in lists and search results. */
 export interface PlaceBrief {
@@ -371,6 +384,27 @@ export const TOOLS = [
       if (refused) return refused;
       await ctx.services.places.deleteSavedPlace(ctx.userId, place_id);
       return { place_id, deleted: true };
+    },
+  }),
+  tool({
+    name: "get_plan",
+    description:
+      "The person's plan and what it allows now: free analyses per rolling 24 hours and how many are used, in how many minutes the next one comes back, their credits, each plan's daily analyses, and the tasks that still earn credits. Read-only.",
+    schema: z.object({}),
+    async execute(ctx) {
+      const status = await ctx.services.billing.status(ctx.userId);
+      // Minutes, not a timestamp: the model does not know the person's time zone and would say a clock time in UTC.
+      const nextInMinutes = status.next_free_at ? Math.max(1, Math.ceil((Date.parse(status.next_free_at) - Date.now()) / 60_000)) : null;
+      return {
+        plan: status.plan,
+        premium_until: status.plan === "premium" ? status.plan_expires_at : null,
+        free_analyses_per_24h: status.daily_limit,
+        used_in_last_24h: status.used_today,
+        next_free_analysis_in_minutes: nextInMinutes,
+        credits: status.credits,
+        daily_analyses_by_plan: status.plan_limits,
+        credit_tasks_open: status.tasks.filter((task) => !task.done).map((task) => ({ how: TASK_HOW[task.task], credits: task.credits })),
+      };
     },
   }),
   tool({

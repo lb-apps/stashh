@@ -1,8 +1,8 @@
-import { Activity, LayoutDashboard, Link2, MessageCircle, MessagesSquare, ScanSearch, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { Activity, LayoutDashboard, Link2, MessageCircle, MessagesSquare, ScanSearch, UtensilsCrossed, Wallet, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   title: string;
-  href: "/" | "/recognitions" | "/recognize" | "/instagram" | "/assistant" | "/menus" | "/api-health";
+  href: "/" | "/recognitions" | "/recognize" | "/instagram" | "/assistant" | "/menus" | "/api-health" | "/billing";
   icon: LucideIcon;
 }
 
@@ -14,4 +14,5 @@ export const NAV: NavItem[] = [
   { title: "Instagram", href: "/instagram", icon: MessageCircle },
   { title: "Assistant", href: "/assistant", icon: MessagesSquare },
   { title: "API health", href: "/api-health", icon: Activity },
+  { title: "Billing", href: "/billing", icon: Wallet },
 ];

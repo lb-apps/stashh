@@ -37,8 +37,6 @@ const envSchema = z.object({
   RECOGNITIONS_WORKER_CONCURRENCY: z.coerce.number().int().min(1).default(2),
   RECOGNITIONS_CLAIM_BATCH_SIZE: z.coerce.number().int().min(1).default(2),
   RECOGNITIONS_MAX_RETRIES: z.coerce.number().int().min(0).default(3),
-  /** Recognitions one user may start in 24 hours; each is a model call plus Google Places calls. */
-  RECOGNITIONS_DAILY_CAP: z.coerce.number().int().min(1).default(100),
   RECOGNITIONS_POLL_MIN_MS: z.coerce.number().int().min(500).default(1500),
   /** Max sleep when idle if Realtime wake is missed (fallback polling). */
   RECOGNITIONS_POLL_MAX_MS: z.coerce.number().int().min(1000).default(5000),
@@ -71,6 +69,25 @@ const envSchema = z.object({
     .string()
     .default("https://stashh.me,https://www.stashh.me,http://localhost:3001")
     .transform((value) => value.split(",").map((origin) => origin.trim().replace(/\/$/, "")).filter(Boolean)),
+  /**
+   * RevenueCat, the source of truth for purchases. The project id as API v2 names it and a v2
+   * secret key (customers read_write for erasing, subscriptions read for syncing); both set, or
+   * purchases are off and `/billing/sync` answers `503`. The key never leaves the server.
+   */
+  REVENUECAT_PROJECT_ID: z.string().optional(),
+  REVENUECAT_SECRET_KEY: z.string().optional(),
+  /** The exact `Authorization` value RevenueCat sends with each webhook (set in its dashboard). Unset → webhook `503`. */
+  REVENUECAT_WEBHOOK_AUTH: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim() || undefined)
+    .refine((value) => value === undefined || value.length >= 32, "REVENUECAT_WEBHOOK_AUTH must be ≥ 32 chars"),
+  /** Store environments whose subscriptions grant Premium: production only, unless sandbox is being tested. */
+  REVENUECAT_ENVIRONMENTS: z
+    .string()
+    .default("production")
+    .transform((value) => value.split(",").map((env) => env.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(["sandbox", "production"])).min(1)),
   /** The web app's base URL; DM sign-in links open `<WEB_APP_URL>/a/<code>`. */
   WEB_APP_URL: z
     .string()
@@ -102,10 +119,18 @@ const supabasePublishableKey =
 
 const supabaseSecretKey = trimOrUndefined(raw.SUPABASE_SECRET_KEY);
 
+const revenueCatProjectId = trimOrUndefined(raw.REVENUECAT_PROJECT_ID);
+const revenueCatSecretKey = trimOrUndefined(raw.REVENUECAT_SECRET_KEY);
+
 export const config = {
   ...raw,
   supabasePublishableKey,
   supabaseSecretKey,
+  /** RevenueCat API access, or null while purchases are not set up. */
+  revenueCat:
+    revenueCatProjectId && revenueCatSecretKey
+      ? { projectId: revenueCatProjectId, secretKey: revenueCatSecretKey, environments: new Set(raw.REVENUECAT_ENVIRONMENTS) }
+      : null,
 };
 
 export type Config = typeof config;
