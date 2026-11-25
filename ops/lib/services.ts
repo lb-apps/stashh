@@ -111,6 +111,43 @@ async function sendJson(config: ServiceConfig, method: string, path: string, bod
   return envelope.data;
 }
 
+/** Menus: menu discovery summaries for a set of places, keyed by google_place_id. */
+export async function fetchMenusForPlaces(googlePlaceIds: string[]): Promise<Record<string, unknown[]>> {
+  if (googlePlaceIds.length === 0) return {};
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return {};
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  const param = encodeURIComponent(googlePlaceIds.join(","));
+  const body = (await getJson(config, `/internal/v1/ops/menus?google_place_ids=${param}`)) as { data: Record<string, unknown[]> };
+  return body.data ?? {};
+}
+
+/** Menus: one menu's full detail — categories and items. */
+export async function fetchMenuDetail(menuId: string): Promise<unknown | null> {
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return null;
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  let response: Response;
+  try {
+    response = await fetch(`${config.url}/internal/v1/ops/menus/${encodeURIComponent(menuId)}`, {
+      headers: { authorization: `Bearer ${config.token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return null;
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) return null;
+  return ((await response.json()) as { data: unknown }).data;
+}
+
 /** Instagram channel: DM ops snapshot. */
 export async function fetchInstagramOps(range: OpsRange): Promise<unknown> {
   return getJson(service("Instagram", "INSTAGRAM_API_URL", "INSTAGRAM_OPS_TOKEN"), `/ops/stats?range=${range}`);

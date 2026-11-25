@@ -242,6 +242,62 @@ export interface RecognitionDetail {
   source: { caption: string | null; thumbnail_url: string | null; video_url: string | null; source_type: string | null; result_created_at: string } | null;
   places: RecognitionPlace[];
   runs: RecognitionRunDetail[];
+  menus?: Record<string, PlaceMenuSummary[]>;
+}
+
+/* ── Menu discovery: from the menus service ops endpoint ────────────────────── */
+
+export type MenuDiscoveryStatus = "queued" | "discovering" | "scraping" | "parsing" | "verifying" | "done" | "failed" | "not_found";
+
+export interface PlaceMenuSummary {
+  id: string;
+  status: MenuDiscoveryStatus;
+  menu_type: string;
+  language: string;
+  source_url: string;
+  source_type: string;
+  error_message: string | null;
+  categories_count: number;
+  items_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MenuDetailItem {
+  id: string;
+  category_id: string;
+  name: string;
+  name_en: string | null;
+  description: string | null;
+  description_en: string | null;
+  price: number | null;
+  currency: string;
+  image_url: string | null;
+  is_available: boolean;
+  sort_order: number;
+  tags: string[];
+  portion_info: string | null;
+}
+
+export interface MenuDetailCategory {
+  id: string;
+  menu_id: string;
+  name: string;
+  name_en: string | null;
+  description: string | null;
+  description_en: string | null;
+  sort_order: number;
+  menu_items: MenuDetailItem[];
+}
+
+export interface MenuDetail {
+  id: string;
+  source_url: string;
+  source_type: string;
+  menu_type: string;
+  language: string;
+  status: MenuDiscoveryStatus;
+  menu_categories: MenuDetailCategory[];
 }
 
 export type DmContent = "reel" | "post" | "link" | "text" | "other";

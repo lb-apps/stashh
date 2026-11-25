@@ -1,5 +1,5 @@
 import type { BadgeVariantName } from "@/components/ui/badge";
-import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, FetchMethod, MenuDiscoveryStatus, RunOutcome, SourceType, TaskStatus } from "./ops-types";
 
 type DependencyKey = DependencyHealth["key"];
 
@@ -97,3 +97,26 @@ export const ASSISTANT_TOOL: Record<string, string> = {
   get_map_link: "Map link",
 };
 export const toolLabel = (name: string) => ASSISTANT_TOOL[name] ?? name;
+
+export const MENU_STATUS: Record<MenuDiscoveryStatus, { label: string; variant: BadgeVariantName }> = {
+  queued: { label: "Queued", variant: "warning" },
+  discovering: { label: "Discovering", variant: "info" },
+  scraping: { label: "Scraping", variant: "info" },
+  parsing: { label: "Parsing", variant: "info" },
+  verifying: { label: "Verifying", variant: "info" },
+  done: { label: "Done", variant: "success" },
+  failed: { label: "Failed", variant: "danger" },
+  not_found: { label: "Not found", variant: "secondary" },
+};
+
+const MENU_TYPES: Record<string, string> = {
+  food: "Food",
+  drinks: "Drinks",
+  desserts: "Desserts",
+  hookah: "Hookah",
+  services: "Services",
+  room_service: "Room service",
+  unknown: "Menu",
+};
+
+export const menuTypeLabel = (type: string) => MENU_TYPES[type] ?? type;
