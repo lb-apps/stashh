@@ -17,6 +17,9 @@ export type PlanSource = (typeof PLAN_SOURCES)[number];
 export const BILLING_TASKS = ["first_list", "first_web_visit"] as const;
 export type BillingTask = (typeof BILLING_TASKS)[number];
 
+/** The RevenueCat entitlement that is Premium, on the web (Paddle) and later in the App Store. */
+export const PREMIUM_ENTITLEMENT = "premium";
+
 export const MOCK_PERIODS = ["monthly", "yearly"] as const;
 export type MockPeriod = (typeof MOCK_PERIODS)[number];
 

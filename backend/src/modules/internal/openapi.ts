@@ -95,7 +95,7 @@ registry.registerPath({
   path: "/channel-identities/{provider}/{externalId}",
   summary: "Erase channel identity",
   description:
-    "Deletes the Stashh user behind the identity and everything they own (identity mapping, recognitions, saved places, lists). Idempotent: `200` whether or not anything existed, with the user id so the channel can erase what it keeps under that id elsewhere (the product-analytics profile); `erased` is false when there was nothing to delete.",
+    "Deletes the Stashh user behind the identity and everything they own (identity mapping, recognitions, saved places, lists, plan and credits), and their RevenueCat customer. Idempotent: `200` whether or not anything existed, with the user id so the channel can erase what it keeps under that id elsewhere (the product-analytics profile); `erased` is false when there was nothing to delete.",
   request: { params: channelIdentityParamsSchema },
   responses: {
     200: {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { commonErrorResponses, registry, successEnvelope } from "../../lib/openapi.js";
+import { commonErrorResponses, errorEnvelopeSchema, registry, successEnvelope } from "../../lib/openapi.js";
 import { BILLING_TASKS, MOCK_PERIODS, PLANS, PLAN_SOURCES } from "./types.js";
 
 export const billingStatusOpenApiSchema = z
@@ -35,6 +35,20 @@ registry.registerPath({
     "The signed-in person's plan, how many free analyses are left today and when the next one comes back, their credits, and the tasks that earn credits. Only an analysis that finds at least one place uses the allowance or a credit.",
   responses: {
     200: { description: "Plan and credits", content: { "application/json": { schema: successEnvelope(billingStatusOpenApiSchema, "GetBilling") } } },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/billing/sync",
+  tags: ["Billing"],
+  summary: "Sync plan from RevenueCat",
+  description:
+    "Reads the signed-in person's subscriptions from RevenueCat and writes the plan they give now, then returns it. The web calls it when a purchase resolves, so Premium shows before RevenueCat's webhook arrives; calling it again changes nothing. `503 PURCHASES_UNAVAILABLE` while purchases are not set up on this server.",
+  responses: {
+    200: { description: "The plan RevenueCat gives now", content: { "application/json": { schema: successEnvelope(billingStatusOpenApiSchema, "SyncBilling") } } },
+    503: { description: "Purchases are not set up", content: { "application/json": { schema: errorEnvelopeSchema } } },
     ...commonErrorResponses,
   },
 });

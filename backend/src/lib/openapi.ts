@@ -45,7 +45,7 @@ const apiErrorBodySchema = z
   })
   .openapi("ApiErrorBody");
 
-const errorEnvelopeSchema = z
+export const errorEnvelopeSchema = z
   .object({
     ok: z.literal(false),
     data: z.null(),

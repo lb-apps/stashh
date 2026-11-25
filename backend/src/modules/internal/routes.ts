@@ -112,7 +112,10 @@ internalRouter.put("/channel-identities/:provider/:externalId/profile", async (r
   }
 });
 
-/** Erase the user behind a channel identity and everything they own. Idempotent. */
+/**
+ * Erase the user behind a channel identity and everything they own, their RevenueCat customer
+ * included. Idempotent: if RevenueCat fails, the call fails and a retry finishes the job.
+ */
 internalRouter.delete("/channel-identities/:provider/:externalId", async (req, res, next) => {
   const params = channelIdentityParamsSchema.safeParse(req.params);
   if (!params.success) {
@@ -122,6 +125,7 @@ internalRouter.delete("/channel-identities/:provider/:externalId", async (req, r
 
   try {
     const { userId, erased } = await createChannelIdentityService().erase(params.data.provider, params.data.externalId);
+    await createBillingService().eraseRevenueCatCustomer(userId);
     sendSuccess(res, req, 200, { user_id: userId, erased });
   } catch (error) {
     next(error);
