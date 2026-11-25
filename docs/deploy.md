@@ -55,7 +55,8 @@ Production runs on `home-server`, the Mac mini on the home LAN (Apple silicon, m
 `192.168.68.60`, Tailscale `home-server`). It took over from the Raspberry Pi 5 on 2026-10-21,
 along with the Pi's LAN address. It deploys itself: a LaunchDaemon runs
 [`deploy/update.sh`](../deploy/update.sh) every minute, which fetches the tracked branch and, when
-its commit moved, checks it out, rebuilds the images and restarts the stack. A push to `develop`
+its commit moved, checks it out, rebuilds the images and restarts the stack. It tracks `master`,
+the release branch, as Vercel does for the web: a release merged there (a `develop` → `master` PR)
 is live within about a minute plus the build.
 
 Why pull, not push: the host sits behind NAT with no inbound port but the tunnel; the repo is
@@ -80,7 +81,7 @@ Layout on `home-server` (user `emirerdo`, `ssh home-server`):
 |---|---|
 | `~/HomeServer/stashh/repo` | the clone the job deploys from (never edit; it is reset to the branch) |
 | `~/HomeServer/stashh/env/backend.env`, `instagram.env`, `tunnel.env` | the compose env files, mode 600 |
-| `~/HomeServer/stashh/env/deploy.env` | `STASHH_BRANCH` (`develop`), `STASHH_REPO_DIR`, `STASHH_ENV_DIR` |
+| `~/HomeServer/stashh/env/deploy.env` | `STASHH_BRANCH` (`master`), `STASHH_REPO_DIR`, `STASHH_ENV_DIR` |
 | `~/HomeServer/bin/stashh-update.sh` | loads `deploy.env`, points `DOCKER_HOST` at the VM, runs the repo's `deploy/update.sh`; exits quietly while the VM is still booting |
 | `/Library/LaunchDaemons/com.homeserver.stashh-update.plist` | runs that script every 60 s as `emirerdo` (copy in `~/HomeServer/launchd/`) |
 | `~/HomeServer/logs/com.homeserver.stashh-update.log` | what each deploy did |

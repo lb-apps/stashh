@@ -7,14 +7,14 @@
 # To roll back, revert on the branch: the next run deploys the revert.
 # Settings (the scheduler loads them from the host's deploy.env; see docs/deploy.md):
 #   STASHH_REPO_DIR   checkout to deploy from   default: the repo this script is in
-#   STASHH_BRANCH     branch to follow           default: develop
+#   STASHH_BRANCH     branch to follow           default: master
 #   STASHH_ENV_DIR    where the *.env files are  default: <repo>/deploy
 set -euo pipefail
 
 main() {
   local repo branch current target
   repo=${STASHH_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
-  branch=${STASHH_BRANCH:-develop}
+  branch=${STASHH_BRANCH:-master}
   export STASHH_ENV_DIR=${STASHH_ENV_DIR:-$repo/deploy}
   cd "$repo"
 

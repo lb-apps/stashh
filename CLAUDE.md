@@ -21,7 +21,7 @@ A change is only done when it satisfies **both**: solid engineering AND on-brand
 | `instagram/` | Instagram DM channel: Meta webhooks → durable queue → backend `/internal/v1` → carousel reply (Node 24, Express 5) |
 | `workers/hooks/` | `hooks.stashh.me`, the Cloudflare Worker in front of Meta's one Instagram callback: routes each sender to prod or dev (`/env`) |
 | `ops/` | **Local-only** ops dashboard (Next.js 16 + shadcn on Discovery tokens): queue, durations, cache, failures, cost, DMs |
-| `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel; `home-server` (Mac mini) auto-deploys `develop` ([docs/deploy.md](docs/deploy.md)) |
+| `compose.yaml`, `deploy/` | Production as containers: backend + instagram + Cloudflare tunnel; `home-server` (Mac mini) auto-deploys `master` ([docs/deploy.md](docs/deploy.md)) |
 | `supabase/migrations/` | Postgres schema, PostGIS, aggregation RPCs, RLS |
 | `docs/` | Product + engineering docs ([api-screen-map.md](docs/api-screen-map.md)) |
 
@@ -290,7 +290,7 @@ post tips). The boundary is code after the model, not the prompt — [docs/secur
 - **iOS:** build in Xcode. Configs in `ios/Configurations/*.xcconfig`; runtime values (API base URL, Supabase keys) in `ios/Config/*.plist` per environment (Testing/Staging/Production).
   `ios/Config/*.plist` holds real credentials and is **gitignored** — on a fresh clone, copy each `ios/Config/<Env>.plist.example` to `ios/Config/<Env>.plist` and fill in the values before building.
 - **Backend dev:** `cd backend && npm run dev` — API **and** recognition worker (`src/start.ts`) on `:3000`; `src/index.ts` alone starts the API without the worker, so recognitions stay queued. OpenAPI at `localhost:3000/openapi.json`. Models are called through OpenRouter (`OPENROUTER_API_KEY`). `npm start` runs the compiled `dist/` (`npm run build` first), which is what the image does.
-- **Production:** containers from the root `compose.yaml` — `docker compose up -d --build --wait` on any Docker host with `deploy/*.env` filled in. `home-server`, the Mac mini on the home LAN (`ssh home-server`), follows `develop`: a push is live within about a minute (`deploy/update.sh` every minute from a LaunchDaemon; Docker runs in a Lima VM). Runbook: [docs/deploy.md](docs/deploy.md). Nothing runs in production on the development Mac.
+- **Production:** containers from the root `compose.yaml` — `docker compose up -d --build --wait` on any Docker host with `deploy/*.env` filled in. `home-server`, the Mac mini on the home LAN (`ssh home-server`), follows `master`: a release merged there is live within about a minute (`deploy/update.sh` every minute from a LaunchDaemon; Docker runs in a Lima VM). Runbook: [docs/deploy.md](docs/deploy.md). Nothing runs in production on the development Mac.
 - **Web dev:** `cd web && npm run dev` → `localhost:3001`. The backend owns `:3000`, so the web app is pinned to `:3001` in `package.json` and `.claude/launch.json`. `npm run build` / `npm run typecheck` before calling web work done.
 - **Hooks relay:** `cd workers/hooks && npm run hooks:typecheck && npm run hooks:test`; `npm run hooks:dev` runs it locally on `:8787`. The Worker `stashh-hooks` deploys itself from `develop` (Cloudflare Workers Builds; docs/webhook-relay.md).
 - **Ports are fixed, in every session:** backend `3000`, web `3001`, instagram `3002`, ops `3003` (127.0.0.1 only), hooks relay `8787` (local only). Never start a service on another port and never add an alternate-port entry to `.claude/launch.json`: the dev chain is wired to these numbers (`ig-dev.stashh.me` → `127.0.0.1:3002` → backend at `localhost:3000`), and a backend on 3010 is invisible to it. If the port is taken by the same service, reuse it; if by something else, stop and ask.
@@ -299,7 +299,7 @@ post tips). The boundary is code after the model, not the prompt — [docs/secur
 
 ## Conventions
 
-- Branches: `develop` (integration; `home-server` deploys it), `master` (releases; Vercel serves stashh.me from it). Match commit style from `git log`.
+- Branches: `develop` (integration), `master` (releases: `home-server` deploys it, Vercel serves stashh.me from it). Production gets a change through a `develop` → `master` release PR. Match commit style from `git log`.
 - Small, root-cause changes — no drive-by refactors, no backwards-compat shims, no speculative abstractions.
 - Never commit secrets (`.env*`, plists with real keys).
 - Don't reimplement what the platform or the existing abstraction already gives you — extend the chain, theme the native control.
