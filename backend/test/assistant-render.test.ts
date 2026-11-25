@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildContextBlock } from "../src/modules/assistant/context.js";
-import { MAP_BUTTON_TITLE, renderReply } from "../src/modules/assistant/render.js";
+import { MAP_BUTTON_TITLE, PREMIUM_BUTTON_TITLES, renderReply } from "../src/modules/assistant/render.js";
 import type { ListSummaryDto } from "../src/modules/lists/service.js";
 import type { SavedPlaceDto } from "../src/modules/places/service.js";
 
@@ -89,6 +89,18 @@ describe("renderReply", () => {
 
     const without = renderReply({ reply: { text: "Haritan:", map_link: true }, places: [], lists: [], mapUrl: null });
     expect(without.messages).toEqual([{ kind: "text", text: "Haritan:" }]);
+  });
+
+  it("draws the Premium button with a fixed title in the reply's language, next to the map's when both are asked", () => {
+    const premiumUrl = "https://stashh.me/app/a/abc?next=premium";
+    const tr = renderReply({ reply: { text: "Detaylar burada.", premium_link: true }, places: [], lists: [], mapUrl: null, premiumUrl });
+    expect(tr.messages).toEqual([{ kind: "button", text: "Detaylar burada.", buttons: [{ type: "web_url", title: PREMIUM_BUTTON_TITLES.tr, url: premiumUrl }] }]);
+
+    const both = renderReply({ reply: { text: "Here.", map_link: true, premium_link: true }, places: [], lists: [], mapUrl: "https://stashh.me/app/a/abc", premiumUrl, buttonLanguage: "en" });
+    expect(both.messages[0]).toMatchObject({ kind: "button", buttons: [{ title: MAP_BUTTON_TITLE }, { title: "See Premium", url: premiumUrl }] });
+
+    expect(renderReply({ reply: { text: "Detaylar burada.", premium_link: true }, places: [], lists: [], mapUrl: null, premiumUrl: null }).messages).toEqual([{ kind: "text", text: "Detaylar burada." }]);
+    expect(PREMIUM_BUTTON_TITLES.tr.length).toBeLessThanOrEqual(20);
   });
 
   it("sends only the text when the cards resolved to nothing", () => {

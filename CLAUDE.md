@@ -266,7 +266,10 @@ credit. Only an analysis that finds a place counts. Guide: [docs/api-screen-map.
   subscriptions and writes the plan; `/billing/sync` (web, after a purchase) and
   `/webhooks/revenuecat` both call it, so neither ever applies a delta. Owner and mock plans are left
   alone. The web sells only where `NEXT_PUBLIC_REVENUECAT_API_KEY` is set (never in production before
-  Paddle is live); the backend grants only from `REVENUECAT_ENVIRONMENTS`. Bought credits never expire (App Store 3.1.1). Following @stashh.me earns nothing
+  Paddle is live); the backend grants only from `REVENUECAT_ENVIRONMENTS`.
+- **The DM assistant reads the plan, never changes it:** `get_plan` (allowance, credits, open tasks,
+  next free analysis in minutes) and `premium_link` (a minted sign-in link to the Premium sheet).
+  Buying, cancelling and credits stay on the web and in the database. Bought credits never expire (App Store 3.1.1). Following @stashh.me earns nothing
   (Meta's spam standard bans exchanging anything for follows); credit tasks live in the product.
 - **Only the backend writes recognition tasks.** People read their own through RLS and nothing else;
   the worker wakes on an empty Realtime broadcast (`recognition-worker`), never on table changes.

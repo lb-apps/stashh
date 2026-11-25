@@ -8,6 +8,7 @@ import { createPlacesServiceWithServiceRole } from "../places/factory.js";
 import { PlacesRepository } from "../places/repository.js";
 import { RecognitionRepository } from "../recognitions/repository.js";
 import { createSignInLinkService } from "../sign-in-links/factory.js";
+import { createBillingService } from "../billing/factory.js";
 import { AssistantRepository } from "./repository.js";
 import { AssistantService } from "./service.js";
 import { AssistantSettingsRepository, resolveAssistantSettings, systemPromptOf } from "./settings.js";
@@ -35,6 +36,7 @@ export async function createAssistantService(): Promise<AssistantService> {
       placesRepo: new PlacesRepository(serviceSb, serviceSb),
       recognitions: new RecognitionRepository(serviceSb),
       signInLinks: createSignInLinkService(),
+      billing: createBillingService(),
     },
     identities: new ChannelIdentityRepository(serviceSb),
     maxSteps: settings.maxSteps,
