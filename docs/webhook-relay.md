@@ -116,14 +116,14 @@ production through `stashh-prod`. So `ig-dev` moves to the dev Mac only **after*
 moved to the relay (step 10): moved first, it would send every production DM to the Mac.
 
 1. **Database.** Apply `supabase/migrations/20261101140000_instagram_messages_relay.sql` to the
-   Supabase project **before** the code reaches `develop` (home-server deploys within a minute and
+   Supabase project **before** the code reaches `master` (home-server deploys within a minute and
    the new code writes the new columns). It is additive: the running service keeps working on it.
 2. **Relay secret.** Generate one value (`openssl rand -hex 32`) and put it, as
    `HOOKS_RELAY_SECRET`, in:
    - home-server's `~/HomeServer/stashh/env/instagram.env`;
    - the dev Mac's `instagram/.env`;
    - the Worker (step 5).
-3. **Deploy the instance.** Merge to `develop`; home-server deploys it. If only the env file
+3. **Deploy the instance.** Release to `master`; home-server deploys it. If only the env file
    changed: `ssh home-server ~/HomeServer/bin/stashh-update.sh --force`. Check:
    ```bash
    curl -i https://instagram.stashh.me/webhooks?relay=probe   # 204

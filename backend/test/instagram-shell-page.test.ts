@@ -55,7 +55,7 @@ describe("fetchInstagramContent when the downloader is throttled", () => {
   it("names the throttle instead of counting blank items as media", async () => {
     vi.useFakeTimers();
     igdl.mockResolvedValue({ status: true, result: Array.from({ length: 28 }, () => ({ thumbnail: "", url: "" })) });
-    const pending = expect(fetchInstagramContent("https://instagram.com/reel/DfAfig_IlO9", log)).rejects.toThrow(/Downloader: throttled: 28 blank items/);
+    const pending = expect(fetchInstagramContent("https://instagram.com/reel/DfAfig_IlO9", log)).rejects.toThrow(/Downloader: no usable link in 28 items \(throttled or malformed\)/);
     await vi.runAllTimersAsync();
     await pending;
     vi.useRealTimers();
@@ -79,7 +79,7 @@ describe("fetchInstagramContent with the channel's caption", () => {
     const content = await pending;
     vi.useRealTimers();
     expect(content).toMatchObject({ media: [], fetch_method: "caption", caption: "📍Ali Ustanın Yeri", source_type: "reel" });
-    expect(content.media_error).toMatch(/Could not fetch Instagram page.*Downloader: throttled: 28 blank items/);
+    expect(content.media_error).toMatch(/Could not fetch Instagram page.*Downloader: no usable link in 28 items \(throttled or malformed\)/);
   });
 
   it("prefers the channel's caption to the page's", async () => {
