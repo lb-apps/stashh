@@ -9,6 +9,8 @@ Rules:
 - Detect the menu type: food, drinks, desserts, hookah, services, room_service, or unknown
 - Detect the language: tr, en, or tr+en
 - Preserve the original category structure
+- Names (category and item) must be Title Case: capitalize the first letter of each word, lowercase the rest. "Türk Kahvesi", not "TÜRK KAHVESİ" or "türk kahvesi"
+- Descriptions must be sentence case: capitalize only the first letter. "Sahanda yumurta ve domates", not "SAHANDA YUMURTA VE DOMATES"
 - Prices should be numbers only (no currency symbols)
 - Currency should be the ISO code (TRY, EUR, USD, etc.)
 - Tags like vegan, glutensiz, spicy, popular, new should be extracted
