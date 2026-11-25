@@ -1,5 +1,6 @@
 import type { BadgeVariantName } from "@/components/ui/badge";
 import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, FetchMethod, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+import type { BillingTask, CreditReason, Plan, PlanSource } from "./billing-types";
 
 type DependencyKey = DependencyHealth["key"];
 
@@ -97,3 +98,29 @@ export const ASSISTANT_TOOL: Record<string, string> = {
   get_map_link: "Map link",
 };
 export const toolLabel = (name: string) => ASSISTANT_TOOL[name] ?? name;
+
+/* ── Plans and credits ───────────────────────────────────────────────────── */
+
+export const PLAN: Record<Plan, { label: string; variant: BadgeVariantName }> = {
+  free: { label: "Free", variant: "secondary" },
+  premium: { label: "Premium", variant: "default" },
+};
+
+/** Who set a person's plan. */
+export const PLAN_SOURCE: Record<PlanSource, string> = {
+  default: "never changed",
+  mock: "test paywall",
+  admin: "set by hand",
+  revenuecat: "store purchase",
+};
+
+export const BILLING_TASK: Record<BillingTask, string> = { first_list: "First list", first_web_visit: "First web visit" };
+
+const CREDIT_REASON: Record<CreditReason, string> = { task: "Task", purchase: "Purchase", recognition: "Analysis", admin: "By hand" };
+
+/** What credits moved for: the task's name for a reward, the reason otherwise. */
+export const creditReasonLabel = (reason: CreditReason, ref: string) =>
+  reason === "task" ? (BILLING_TASK[ref as BillingTask] ?? ref) : CREDIT_REASON[reason];
+
+/** A person as the billing views name them: the Instagram handle, or the start of their user id. */
+export const personLabel = (username: string | null, userId: string) => (username ? `@${username}` : `User ${userId.slice(0, 8)}`);

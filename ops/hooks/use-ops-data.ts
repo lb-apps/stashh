@@ -3,6 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useOpsControls } from "@/components/ops/ops-provider";
 import type { AssistantOps, InstagramOps, OpsRange, RecognitionOps } from "@/lib/ops-types";
+import type { BillingOps } from "@/lib/billing-types";
 
 /** Live panels refresh every 5 s; the payload carries live state and aggregates together. */
 const LIVE_INTERVAL_MS = 5_000;
@@ -14,7 +15,7 @@ async function getOps<T>(path: string, range: OpsRange): Promise<T> {
   return body as T;
 }
 
-function useOps<T>(service: "recognitions" | "instagram" | "assistant") {
+function useOps<T>(service: "recognitions" | "instagram" | "assistant" | "billing") {
   const { range, live } = useOpsControls();
   return useQuery({
     queryKey: ["ops", service, range],
@@ -28,3 +29,4 @@ function useOps<T>(service: "recognitions" | "instagram" | "assistant") {
 export const useRecognitionOps = () => useOps<RecognitionOps>("recognitions");
 export const useInstagramOps = () => useOps<InstagramOps>("instagram");
 export const useAssistantOps = () => useOps<AssistantOps>("assistant");
+export const useBillingOps = () => useOps<BillingOps>("billing");
