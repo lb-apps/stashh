@@ -61,7 +61,7 @@ export async function parseMenuContent(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-sonnet-4.5",
+        model: "anthropic/claude-sonnet-5.5",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -70,7 +70,7 @@ export async function parseMenuContent(
         max_tokens: 16_000,
         response_format: { type: "json_object" },
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(300_000),
     });
 
     if (!response.ok) {

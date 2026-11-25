@@ -142,7 +142,7 @@ Return ONLY the JSON array, no other text.`;
         model: "anthropic/claude-haiku-5.5",
         messages: [{ role: "user", content: prompt }],
         temperature: 0,
-        max_tokens: 500,
+        max_tokens: 1000,
       }),
     });
 

@@ -50,10 +50,11 @@ export async function verifyMenuBelongsToPlace(
     const raw = data.choices[0]?.message?.content;
     if (!raw) return true;
 
-    const result = JSON.parse(raw) as { belongs: boolean; confidence: number; reason: string };
-    log.debug({ ...result, place: ctx.placeName }, "menu verification");
+    const result = JSON.parse(raw) as { belongs: boolean; confidence?: number; reason?: string };
+    const confidence = result.confidence ?? (result.belongs ? 0.9 : 0.1);
+    log.info({ belongs: result.belongs, confidence, reason: result.reason, place: ctx.placeName }, "menu verification");
 
-    return result.belongs && result.confidence >= 0.5;
+    return result.belongs && confidence >= 0.5;
   } catch {
     return true;
   }
