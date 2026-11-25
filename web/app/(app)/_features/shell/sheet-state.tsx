@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import type { PaywallSource } from "@/lib/analytics/events";
 import { NO_FILTERS, type PlaceFilters } from "@/lib/stashh/selectors";
+import type { EntrySheet } from "./entry";
 
 /** What a list picker / new list files: one saved place, or nothing yet. */
 export type ListTarget = { kind: "place"; placeId: string } | { kind: "empty" };
@@ -14,7 +16,8 @@ export type SheetRoute =
   | { name: "library" }
   | { name: "listdetail"; listId: string }
   | { name: "filter" }
-  | { name: "profile" };
+  | { name: "profile" }
+  | { name: "premium"; source: PaywallSource };
 
 /** One presented screen. The id tells it apart from a screen presented later at the same depth. */
 export interface Presented {
@@ -43,6 +46,11 @@ export type SheetAction =
   | { type: "filters"; filters: PlaceFilters };
 
 export const initialSheetState: SheetState = { stack: [], nextId: 0, filters: NO_FILTERS };
+
+/** Home, with the screen a link asked for already presented over it. */
+export function sheetStateFor(entry: EntrySheet | null): SheetState {
+  return entry === "premium" ? reduceSheet(initialSheetState, { type: "present", route: { name: "premium", source: "dm" } }) : initialSheetState;
+}
 
 const sameRoute = (a: SheetRoute | undefined, b: SheetRoute) => JSON.stringify(a) === JSON.stringify(b);
 

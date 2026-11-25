@@ -10,6 +10,7 @@ export const keys = {
   lists: ["lists"] as const,
   photos: (placeId: string) => ["photos", placeId] as const,
   me: ["me"] as const,
+  billing: ["billing"] as const,
 };
 
 /** The reader's whole library, the single source for map, sheet, search and filters. */
@@ -28,6 +29,11 @@ export function useLists() {
 
 export function useMe() {
   return useQuery({ queryKey: keys.me, queryFn: api.me, staleTime: Infinity });
+}
+
+/** Plan, today's allowance and credits. Analyses run in the DM, so a return to the app refetches it (window focus). */
+export function useBilling() {
+  return useQuery({ queryKey: keys.billing, queryFn: api.billing.status });
 }
 
 /** Google photos of a saved place; places without a Google id have none to ask for. */

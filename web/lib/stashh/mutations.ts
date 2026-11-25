@@ -4,7 +4,8 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { track } from "@/lib/analytics/analytics";
 import { api } from "./endpoints";
 import { keys } from "./queries";
-import type { CategoryGroup, SavedPlace } from "./types";
+import { rewardEarned } from "./rewards";
+import type { BillingStatus, BillingTask, CategoryGroup, PremiumPeriod, SavedPlace } from "./types";
 
 /**
  * Writes against the library. Edits to a single place are optimistic: the
@@ -102,10 +103,43 @@ export function useCreateList() {
   return useMutation({
     mutationFn: (body: { title: string; description: string | null; cover: CategoryGroup; placeIds: string[] }) =>
       api.lists.create({ title: body.title, description: body.description, cover_category: body.cover, place_ids: body.placeIds }),
-    onSuccess: (_data, { placeIds }) => track("list_created", { entry: placeIds.length ? "place" : "empty" }),
+    onSuccess: (_data, { placeIds }) => {
+      track("list_created", { entry: placeIds.length ? "place" : "empty" });
+      // The database grants the first list's credits; the screen moves on without waiting to hear.
+      void refreshForReward(client, "first_list");
+    },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.places });
       void client.invalidateQueries({ queryKey: keys.lists });
     },
+  });
+}
+
+/**
+ * Refetches the plan after a write that can complete a task, and reports the
+ * task's credits if this write is what completed it: it was open before and is
+ * done now. Without a plan loaded before, there is nothing to compare, so nothing is said.
+ */
+async function refreshForReward(client: QueryClient, task: BillingTask) {
+  const taskIn = (status: BillingStatus | undefined) => status?.tasks.find((t) => t.task === task);
+  const before = taskIn(client.getQueryData<BillingStatus>(keys.billing));
+  const after = taskIn(await client.fetchQuery({ queryKey: keys.billing, queryFn: api.billing.status, staleTime: 0 }).catch(() => undefined));
+  if (before && !before.done && after?.done) rewardEarned({ task, credits: after.credits });
+}
+
+/**
+ * Premium without payment, while the owner allows it from ops. The answer is
+ * the new plan, so the screens show it at once. A switch turned off meanwhile
+ * (`PURCHASES_UNAVAILABLE`) refetches the plan, and the paywall falls back to "soon".
+ */
+export function useMockPurchase() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (period: PremiumPeriod) => api.billing.mockPurchase(period),
+    onSuccess: (status, period) => {
+      client.setQueryData(keys.billing, status);
+      track("premium_purchased", { period, store: "mock" });
+    },
+    onError: () => void client.invalidateQueries({ queryKey: keys.billing }),
   });
 }

@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { reset as resetAnalytics, track } from "@/lib/analytics/analytics";
 import { signOut } from "@/lib/auth/session";
 import { ActionPill } from "@/lib/discovery/components/ActionPill";
 import { Avatar } from "@/lib/discovery/components/Avatar";
-import { Button } from "@/lib/discovery/components/Button";
+import { Button, ButtonLink } from "@/lib/discovery/components/Button";
 import { Dialog } from "@/lib/discovery/components/Dialog";
+import { Glyph } from "@/lib/discovery/components/Glyph";
 import { MicroLabel } from "@/lib/discovery/components/MicroLabel";
 import { SegmentedControl } from "@/lib/discovery/components/SegmentedControl";
 import { Sticker } from "@/lib/discovery/components/Sticker";
@@ -23,6 +25,8 @@ import type { SavedPlace } from "@/lib/stashh/types";
 import { Section, SheetBody } from "../shell/sheet-parts";
 import { setLocale } from "./actions";
 import { profileCopy } from "./copy";
+import { PlanSection } from "./plan-section";
+import { StatTile } from "./stat-tile";
 
 /** The ID card's slight tilt, as in the design. */
 const CARD_TILT = "rotate(-1.2deg)";
@@ -43,7 +47,10 @@ const LANGUAGES: Array<{ value: Locale; label: string }> = [
   { value: "en", label: "English" },
 ];
 
-/** The reader's ID card, their device settings, and signing out. */
+/** Stashh on Instagram, for the follow link. */
+const INSTAGRAM_PROFILE = "https://www.instagram.com/stashh.me";
+
+/** The reader's ID card, their plan and credits, their device settings, and signing out. */
 export function ProfileSheet() {
   const c = useCopy(profileCopy);
   const [confirming, setConfirming] = React.useState(false);
@@ -51,9 +58,14 @@ export function ProfileSheet() {
   return (
     <SheetBody>
       <IdCard />
+      <PlanSection />
       <Section label={c.settings}>
         <Settings />
-        <Button variant="danger" size="lg" shape="pill" fullWidth onClick={() => setConfirming(true)} style={{ marginTop: "var(--sp-8)" }}>
+        {/* Away from the credit tasks, and with nothing beside it: following earns nothing. Opens in place, like every link in an in-app browser. */}
+        <ButtonLink href={INSTAGRAM_PROFILE} variant="secondary" size="lg" shape="pill" fullWidth trailingIcon={<Glyph icon={ExternalLink} />} style={{ marginTop: "var(--sp-8)" }}>
+          {c.follow}
+        </ButtonLink>
+        <Button variant="danger" size="lg" shape="pill" fullWidth onClick={() => setConfirming(true)} style={{ marginTop: "var(--sp-6)" }}>
           {c.signOut}
         </Button>
       </Section>
@@ -119,24 +131,9 @@ function IdCard() {
         </div>
         <dl style={{ display: "flex", gap: "var(--sp-5)", margin: "var(--sp-9) 0 0" }}>
           {stats.map((s) => (
-            <div key={s.label} style={{ flex: 1, padding: "var(--sp-7) var(--sp-6)", borderRadius: "var(--r-cta)", background: "var(--surface-card)", boxShadow: "var(--sh-card)", textAlign: "center", display: "flex", flexDirection: "column-reverse" }}>
-              <dt className="ds-nano" style={{ marginTop: "var(--sp-2)", color: TEXT_SECONDARY_STRONG }}>
-                {s.label}
-              </dt>
-              <dd
-                style={{
-                  margin: 0,
-                  fontFamily: "var(--font-rounded)",
-                  fontSize: "var(--fs-title-1)",
-                  lineHeight: 1,
-                  fontWeight: "var(--fw-black)",
-                  fontVariantNumeric: "tabular-nums",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {formatCount(s.value, locale)}
-              </dd>
-            </div>
+            <StatTile key={s.label} label={s.label}>
+              {formatCount(s.value, locale)}
+            </StatTile>
           ))}
         </dl>
         {district ? (

@@ -1,9 +1,11 @@
 import { request, requestAll } from "./api";
 import type {
   AddPlacesResult,
+  BillingStatus,
   CategoryGroup,
   ListSummary,
   Me,
+  PremiumPeriod,
   RecentRecognition,
   Recognition,
   SavedPlace,
@@ -52,6 +54,12 @@ export const api = {
     get: (recognitionId: string) => request<Recognition>("GET", `/recognitions/${recognitionId}`),
     /** GET /recognitions — the reader's latest, newest first. */
     recent: () => request<{ items: RecentRecognition[] }>("GET", "/recognitions", { query: { limit: 10 } }),
+  },
+  billing: {
+    /** GET /billing — plan, today's allowance, credits and the tasks that earn them. */
+    status: () => request<BillingStatus>("GET", "/billing"),
+    /** POST /billing/mock-purchase — Premium without payment while the owner allows it; `403 PURCHASES_UNAVAILABLE` otherwise. */
+    mockPurchase: (period: PremiumPeriod) => request<BillingStatus>("POST", "/billing/mock-purchase", { body: { period } }),
   },
   /** GET /me */
   me: () => request<Me>("GET", "/me"),

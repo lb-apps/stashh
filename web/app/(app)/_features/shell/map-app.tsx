@@ -10,12 +10,15 @@ import { HomeSheet } from "../home/home-sheet";
 import { LibrarySheet } from "../library/library-sheet";
 import { ListDetailSheet } from "../lists/list-detail-sheet";
 import { PlaceSheet } from "../place/place-sheet";
+import { PremiumSheet } from "../premium/premium-sheet";
 import { ProfileSheet } from "../profile/profile-sheet";
 import { ListPickerSheet } from "../recognize/list-picker-sheet";
 import { NewListSheet } from "../recognize/new-list-sheet";
 import { shellCopy } from "./copy";
 import { CreateFab, CreateSheet } from "./create-sheet";
-import { initialSheetState, PresentedAt, reduceSheet, SheetNavProvider, useSheetNav, type SheetRoute } from "./sheet-state";
+import type { EntrySheet } from "./entry";
+import { RewardToast } from "./reward-toast";
+import { PresentedAt, reduceSheet, SheetNavProvider, sheetStateFor, useSheetNav, type SheetRoute } from "./sheet-state";
 
 /** One screen per route; every screen is composed from the shared parts. */
 function RouteScreen({ route }: { route: SheetRoute }) {
@@ -34,6 +37,8 @@ function RouteScreen({ route }: { route: SheetRoute }) {
       return <FilterSheet />;
     case "profile":
       return <ProfileSheet />;
+    case "premium":
+      return <PremiumSheet source={route.source} />;
   }
 }
 
@@ -41,10 +46,17 @@ function RouteScreen({ route }: { route: SheetRoute }) {
  * The app: home as a full-page screen, and every other screen presented over
  * the current one as a page sheet — a place over a list, a list picker over
  * the place. Closing a sheet uncovers the screen it came from, which kept its
- * scroll. The + button on home asks what to create.
+ * scroll. The + button on home asks what to create. `entry` is a screen a link
+ * asked for (`/app?sheet=premium`), already presented when the app opens.
  */
-export function MapApp() {
-  const [state, dispatch] = React.useReducer(reduceSheet, initialSheetState);
+export function MapApp({ entry }: { entry: EntrySheet | null }) {
+  const [state, dispatch] = React.useReducer(reduceSheet, entry, sheetStateFor);
+
+  // The screen is up; the address drops its `?sheet=`, so a reload opens home rather than the screen again.
+  React.useEffect(() => {
+    if (entry) window.history.replaceState(null, "", "/app");
+  }, [entry]);
+
   return (
     <SheetNavProvider state={state} dispatch={dispatch}>
       <AppScreens />
@@ -75,7 +87,7 @@ function AppScreens() {
             covered={depth < stack.length - 1}
             onClose={() => nav.close(depth)}
             closeLabel={t.common.close}
-            aria-label={route.name === "profile" ? c.profile : "Stashh"}
+            aria-label={route.name === "profile" ? c.profile : route.name === "premium" ? c.premium : "Stashh"}
           >
             <PresentedAt depth={depth}>
               <RouteScreen route={route} />
@@ -95,6 +107,8 @@ function AppScreens() {
           />
         ) : null}
       </AnimatePresence>
+
+      <RewardToast />
     </div>
   );
 }
