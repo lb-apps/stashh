@@ -94,6 +94,8 @@ const envSchema = z.object({
     .url()
     .default("https://stashh.me/app")
     .transform((value) => value.replace(/\/$/, "")),
+  MENU_SERVICE_URL: z.string().url().optional(),
+  MENU_SERVICE_TOKEN: z.string().min(32).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

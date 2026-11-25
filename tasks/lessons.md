@@ -252,6 +252,57 @@ its structure from the most common example. List the shapes it takes (one subjec
 one per slide, mixed) and check the fix and the eval set against each; ask for the reporter's own
 failing example early and test with it.
 
+## Stashh Ads Manager lives in the Little Big Apps Chrome profile (2026-11-18)
+
+**Mistake:** Opened Ads Manager with `Control_Chrome open_url`, which landed in the only open
+window, the My Dora profile. Every page read then failed with "Google Chrome is not running"
+(the same failure behind the empty daily ad reports since 14 Nov). Owner: "yanlış chrome
+penceresi, Little Big Apps ile giriş yap".
+
+**How to apply:** For Stashh's Meta account, open the URL in the Little Big Apps profile first:
+`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --profile-directory="Profile 1" "<url>"`
+(Default = My Dora). Then drive that window by id with `osascript` (`set index of window id … to 1`,
+`execute tab id … javascript`). Never read Stashh ads from the My Dora window.
+
+## 2026-11-20 — A usage report counts real users doing the core action, and is checked twice
+
+**Correction:** "eksik bilgiler var… verilerin de doğru olduğundan emin ol… esas KPI: bir kullanıcı
+ortalama kaç günde bir reel analizi başlatıyor, rastgele mesajları sayma."
+
+**What happened:** The first infographic counted every row: team/test accounts (199 analyses, incl.
+ops-panel `bypass_cache` runs), and Stashh's own ad post that 298 analyses were of. That inflated
+places per analysis (0.90 → 0.77, 0.61 without the ad) and İstanbul/coffee shares, and "return
+frequency" mixed chat messages with analyses.
+
+**How to apply:** Before any product-metrics report: (1) exclude team/test accounts (created before
+the 2026-10-26 launch) and ops test runs; (2) look for one piece of content analysed by many users —
+it is our own promo, report with and without it; (3) define the KPI on the core action
+(`recognition_tasks`), with Istanbul day boundaries; (4) verify with server-side counts
+(`Prefer: count=exact`) and an independent recomputation before presenting.
+
+## 2026-11-20 — A report HTML must show its charts without JavaScript
+
+**Correction:** "eksik görünüyor html… grafikler vs yok."
+
+**What happened:** The charts were SVG drawn by a script after load. The owner's viewer does not run
+scripts, so every chart area was empty; my headless checks ran with scripts on and missed it.
+
+**How to apply:** Build report charts as static HTML/CSS (bars as positioned divs, tooltips as
+`title`), generated from the metrics file rather than typed in. Script only for extras (keyboard
+nav). Before sending, render a copy with every `<script>` stripped and look at it.
+
+## 2026-11-20 — Product reports speak in standard product metrics
+
+**Correction:** "başlıkların ve yazıların kafa karıştırıcı… senior product manager'sın, doğru terimleri
+kullan: day 0, day 7 retention gibi."
+
+**How to apply:** Frame usage reports with the standard set and define each once on a glossary
+slide: Day 0, active user (core action), activation, aha moment, classic Dn retention (active on
+exactly day N, only users who completed day N) and unbounded Dn+ return, cohort table by signup
+week, DAU/WAU and stickiness, core-KPI frequency. Headlines state the metric and its value. In a
+`lang="tr"` page, uppercase English labels in code per word, never with CSS `text-transform`
+("SİGNUPS").
+
 ## Never source an env file to read one secret (2026-11-25)
 
 **What happened:** to send a test webhook I ran `set -a; . ./backend/.env; set +a`. One value was

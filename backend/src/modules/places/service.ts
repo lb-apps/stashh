@@ -14,6 +14,7 @@ import type { PlaceInsert, PlacesRepository, PlaceRow, SavedPlaceRecord } from "
 import type { AddPlacesBody, NearbyPlacesQuery, PatchSavedPlaceBody, PlacesListQuery } from "./types.js";
 import { decodeOffsetCursor, encodeOffsetCursor } from "../../lib/pagination.js";
 import type { ApiPaginationMeta } from "../../http/types.js";
+import { triggerMenuDiscovery } from "../../lib/menu-client.js";
 
 /** The post a saved place was found in. */
 export interface SavedPlaceSourceDto {
@@ -398,6 +399,8 @@ export class PlacesService {
       { googlePlaceId, placeId: placeRow.id, place_source, saved_created: created },
       created ? "places: saved_places row inserted" : "places: saved_places row already existed",
     );
+
+    void triggerMenuDiscovery(placeRow, config);
 
     return {
       google_place_id: googlePlaceId,

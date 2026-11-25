@@ -9,6 +9,7 @@ import {
   placePhotosQuerySchema,
   placesListQuerySchema,
 } from "./types.js";
+import { createSupabaseServiceClient } from "../../db/supabaseClient.js";
 
 export const placesRouter = Router();
 
@@ -216,6 +217,28 @@ placesRouter.get("/:placeId", async (req, res, next) => {
     if (!service) return;
     const data = await service.getSavedPlace(ownerUserId, parsedParams.data.placeId);
     sendSuccess(res, req, 200, data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+placesRouter.get("/:placeId/menu", async (req, res, next) => {
+  const parsedParams = placeIdParamsSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid placeId");
+    return;
+  }
+  try {
+    const db = createSupabaseServiceClient();
+    // place_menus table is added by migration 20261120120000; the generated types don't
+    // include it yet, so we bypass the type layer with `from<string, any>(...)`.
+    const { data: menus } = await (db as any)
+      .from("place_menus")
+      .select("id, source_url, source_type, menu_type, language, status, menu_categories(id, name, name_en, description, description_en, image_url, sort_order, menu_items(id, name, name_en, description, description_en, price, currency, image_url, is_available, sort_order, tags, portion_info))")
+      .eq("place_id", parsedParams.data.placeId)
+      .eq("status", "done")
+      .order("menu_type");
+    sendSuccess(res, req, 200, menus ?? []);
   } catch (err) {
     next(err);
   }
