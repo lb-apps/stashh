@@ -26,11 +26,13 @@ export function cleanHtml(html: string, baseUrl: string): { text: string; imageU
 
   const imageUrls: string[] = [];
 
-  $("img[src]").each((_, el) => {
+  $("img").each((_, el) => {
     const src = $(el).attr("src");
-    if (!src) return;
+    const lazySrc = $(el).attr("data-src") ?? $(el).attr("data-lazy-src") ?? $(el).attr("data-original");
+    const resolved = (src && !src.startsWith("data:")) ? src : lazySrc;
+    if (!resolved) return;
     try {
-      const absolute = new URL(src, baseUrl).href;
+      const absolute = new URL(resolved, baseUrl).href;
       if (absolute.startsWith("http") && !absolute.includes("data:")) {
         imageUrls.push(absolute);
         $(el).replaceWith(`\n[IMG: ${absolute}]\n`);
