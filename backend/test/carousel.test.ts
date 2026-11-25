@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildMediaParts, buildUserText } from "../src/modules/recognitions/ai-analyzer.js";
-import { dedupeDownloaderItems } from "../src/modules/recognitions/instagram-scraper.js";
+import { dedupeDownloaderItems, parseDownloaderAnswer } from "../src/modules/recognitions/instagram-scraper.js";
 
 /** A downloader link: a proxy URL whose token payload names the real CDN file. */
 function link(cdnPath: string, rendition: number): string {
@@ -26,6 +26,29 @@ describe("dedupeDownloaderItems", () => {
       { url: "https://cdn.example/y", thumbnail: null },
     ];
     expect(dedupeDownloaderItems(items).map((item) => item.url)).toEqual(["https://cdn.example/x?sig=1", "https://cdn.example/y"]);
+  });
+});
+
+describe("parseDownloaderAnswer", () => {
+  it("drops a link the service built wrong, so the task falls back to the caption instead of failing", () => {
+    const thumb = "https://d.rapidcdn.app/thumb?token=abc";
+    expect(parseDownloaderAnswer([{ thumbnail: thumb, url: "https://snapsave.app&dl=1" }])).toEqual([]);
+  });
+
+  it("keeps fetchable links and their thumbnails, and skips blank or non-http ones", () => {
+    const video = "https://d.rapidcdn.app/v2?token=abc&dl=1";
+    expect(
+      parseDownloaderAnswer([
+        { url: "" },
+        { url: "javascript:alert(1)" },
+        { url: video, thumbnail: "https://snapsave.app&dl=1" },
+        "https://cdn.example/x.jpg",
+        "not a link",
+      ]),
+    ).toEqual([
+      { url: video, thumbnail: null },
+      { url: "https://cdn.example/x.jpg", thumbnail: null },
+    ]);
   });
 });
 
