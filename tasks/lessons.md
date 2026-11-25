@@ -251,3 +251,16 @@ own failing post was one venue spread across slides, named nowhere on the shared
 its structure from the most common example. List the shapes it takes (one subject across slides,
 one per slide, mixed) and check the fix and the eval set against each; ask for the reporter's own
 failing example early and test with it.
+
+## Never source an env file to read one secret (2026-11-25)
+
+**What happened:** to send a test webhook I ran `set -a; . ./backend/.env; set +a`. One value was
+`Bearer <hex>`; the shell split it at the space, ran the hex as a command, and the "command not found"
+error printed the secret into the transcript. It had to be rotated.
+
+**Why:** a shell is not a dotenv parser. Unquoted values with spaces, `#`, `$` or quotes break, and the
+breakage is printed — with the value in it.
+
+**How to apply:** read a single key with `grep '^KEY=' file | cut -d= -f2-` into a variable and pass it
+on; never source a whole env file. Generate secrets without spaces (`openssl rand -hex 32`). Print only
+lengths, prefixes or status codes.
