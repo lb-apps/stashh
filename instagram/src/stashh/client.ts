@@ -10,7 +10,7 @@ import type { InstagramProfile } from "../meta/graph-client.ts";
 const envelopeSchema = z.object({
   ok: z.boolean(),
   data: z.unknown(),
-  error: z.object({ code: z.string(), message: z.string() }).nullable(),
+  error: z.object({ code: z.string(), message: z.string(), details: z.unknown().optional() }).nullable(),
 });
 
 const channelIdentitySchema = z.object({ user_id: z.string().uuid(), created: z.boolean() });
@@ -22,6 +22,27 @@ const staleIdentitiesSchema = z.object({ external_ids: z.array(z.string()) });
 const recognitionAcceptedSchema = z.object({ recognition_id: z.string().uuid(), status: z.string() });
 
 const signInLinkSchema = z.object({ url: z.string().url() });
+
+/**
+ * Why an analysis was refused, from `RECOGNITION_QUOTA`'s details: the plan's free analyses
+ * for the last 24 hours are used up and there are no credits.
+ */
+export const recognitionQuotaSchema = z.object({
+  plan: z.enum(["free", "premium"]),
+  daily_limit: z.number().int(),
+  used_today: z.number().int(),
+  /** When the next free analysis comes back. */
+  next_free_at: z.string().nullable(),
+  credits: z.number().int(),
+});
+export type RecognitionQuota = z.infer<typeof recognitionQuotaSchema>;
+
+/** The person's plan and credits (`GET /internal/v1/users/:id/billing`), as much as the DM quotes. */
+const billingSchema = z.object({
+  plan: z.enum(["free", "premium"]),
+  credits: z.number().int(),
+});
+export type Billing = z.infer<typeof billingSchema>;
 
 // ── The assistant's reply plan ──────────────────────────────────────────────
 // What the backend's assistant asks the channel to send, in order. Mirrors
@@ -79,6 +100,10 @@ const recognitionSchema = z.object({
   error_message: z.string().nullable(),
   /** Why it failed, for the reply's wording; a code this build does not know reads as null. */
   error_code: z.enum(["private", "temporarily_unavailable", "unreadable"]).nullable().optional().catch(null).default(null),
+  /** What paid for it: the daily allowance or a credit. */
+  charge: z.enum(["allowance", "credit"]).nullable().optional().catch(null).default(null),
+  /** `charged` once it found a place; `released` (free) when it failed or found none. */
+  charge_status: z.enum(["reserved", "charged", "released"]).nullable().optional().catch(null).default(null),
 });
 export type Recognition = z.infer<typeof recognitionSchema>;
 
@@ -100,24 +125,34 @@ export type RecognitionSource =
   | { kind: "url"; url: string; caption?: string | null }
   | { kind: "instagram_media"; format: "post" | "story"; mediaId: string; mediaUrl: string; caption: string | null };
 
-/** The backend's answer when a user started their daily number of recognitions. */
+/** The backend's answer when the day's free analyses and the person's credits are used up. */
 export const RECOGNITION_QUOTA = "RECOGNITION_QUOTA";
 
 export class StashhApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /** The error's `details`, as the backend sent them. */
+  readonly details: unknown;
 
-  constructor(status: number, code: string | null, message: string) {
+  constructor(status: number, code: string | null, message: string, details: unknown = null) {
     super(message);
     this.name = "StashhApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 
-  /** 5xx, 429 and network failures are worth retrying; 4xx are not, nor the daily recognition cap. */
+  /** 5xx, 429 and network failures are worth retrying; 4xx are not, nor a used-up allowance. */
   get retryable(): boolean {
     if (this.code === RECOGNITION_QUOTA) return false;
     return this.status === 0 || this.status === 429 || this.status >= 500;
+  }
+
+  /** What was used up, when this is `RECOGNITION_QUOTA` with readable details; otherwise null. */
+  get quota(): RecognitionQuota | null {
+    if (this.code !== RECOGNITION_QUOTA) return null;
+    const parsed = recognitionQuotaSchema.safeParse(this.details);
+    return parsed.success ? parsed.data : null;
   }
 }
 
@@ -137,6 +172,8 @@ export interface StashhApi {
   getRecognition(params: { userId: string; recognitionId: string }): Promise<Recognition>;
   /** A personal link that signs the user in to the web app, for good; for their DM only. */
   mintSignInLink(userId: string): Promise<{ url: string }>;
+  /** The person's plan and the credits they can spend now. */
+  getBilling(userId: string): Promise<Billing>;
   /** One conversational turn for the user: the assistant answers and acts on their account. */
   assistantTurn(params: { userId: string; messages: TurnMessage[] }): Promise<ReplyPlan>;
 }
@@ -202,6 +239,10 @@ export class HttpStashhApi implements StashhApi {
     return { url: data.url };
   }
 
+  async getBilling(userId: string) {
+    return this.request("GET", `/internal/v1/users/${userId}/billing`, billingSchema);
+  }
+
   async assistantTurn({ userId, messages }: { userId: string; messages: TurnMessage[] }) {
     return this.request("POST", `/internal/v1/users/${userId}/assistant/turns`, replyPlanSchema, {
       body: {
@@ -244,7 +285,12 @@ export class HttpStashhApi implements StashhApi {
       throw new StashhApiError(response.status, null, `Stashh API ${method} ${path} → unexpected body (${response.status})`);
     }
     if (!response.ok || !parsed.data.ok) {
-      throw new StashhApiError(response.status, parsed.data.error?.code ?? null, parsed.data.error?.message ?? `HTTP ${response.status}`);
+      throw new StashhApiError(
+        response.status,
+        parsed.data.error?.code ?? null,
+        parsed.data.error?.message ?? `HTTP ${response.status}`,
+        parsed.data.error?.details ?? null,
+      );
     }
     const data = schema.safeParse(parsed.data.data);
     if (!data.success) {

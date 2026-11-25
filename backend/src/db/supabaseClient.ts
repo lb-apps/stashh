@@ -59,8 +59,8 @@ export function createSupabaseServiceClient(): SupabaseClient<Database> {
 }
 
 /**
- * Realtime client for postgres_changes subscriptions in Node.js.
- * WebSocket transport must be set explicitly (no native WebSocket in Node).
+ * Realtime client for the worker's wake-up broadcasts, with the publishable key: the topic
+ * carries no data. WebSocket transport must be set explicitly (no native WebSocket in Node).
  */
 export function createSupabaseRealtimeClient(): SupabaseClient<Database> | null {
   const key = config.supabasePublishableKey;

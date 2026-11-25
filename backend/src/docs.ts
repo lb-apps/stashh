@@ -9,6 +9,7 @@ import "./modules/lists/openapi.js";
 import "./modules/library/openapi.js";
 import "./modules/recognitions/openapi.js";
 import "./modules/me/openapi.js";
+import "./modules/billing/openapi.js";
 import "./modules/internal/openapi.js";
 import "./modules/assistant/openapi.js";
 

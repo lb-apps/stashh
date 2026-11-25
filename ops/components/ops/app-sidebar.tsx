@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useInstagramOps, useRecognitionOps } from "@/hooks/use-ops-data";
+import { useInstagramOps, useMenuList, useRecognitionOps } from "@/hooks/use-ops-data";
 import { NAV } from "./nav";
 import { StatusDot } from "./status-dot";
 
@@ -59,9 +59,11 @@ export function AppSidebar() {
 function ServiceHealth() {
   const recognitions = useRecognitionOps();
   const instagram = useInstagramOps();
+  const menus = useMenuList();
   const rows = [
     { name: "Backend", query: recognitions },
     { name: "Instagram", query: instagram },
+    { name: "Menus", query: menus },
   ];
 
   return (

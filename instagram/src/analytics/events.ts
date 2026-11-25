@@ -33,7 +33,7 @@ export type RecognitionFailure =
   | "needs_link"
   /** No result within the wait (5 minutes), or the reply window closed. */
   | "timed_out"
-  /** The person reached the day's number of analyses. */
+  /** The day's free analyses and the person's credits were used up. */
   | "daily_limit"
   /** Our side failed; the person got an apology. */
   | "error";
@@ -43,15 +43,18 @@ export interface RecognitionProps {
   source_type: SourceType;
 }
 
+/** What paid for an analysis that found places: the plan's daily allowance or a credit. */
+export type PaidWith = "allowance" | "credit";
+
 export type DmEventCatalog = {
   /** The person's first message created their Stashh account. */
   user_signed_up: Record<string, never>;
   /** The person shared a post or a link to analyse. */
   recognition_started: RecognitionProps;
   /** The places reached the person, already saved to their map. */
-  recognition_completed: RecognitionProps & { place_count: number; duration_ms: number };
-  /** The person got a reply without places. */
-  recognition_failed: RecognitionProps & { reason: RecognitionFailure; duration_ms: number };
+  recognition_completed: RecognitionProps & { place_count: number; duration_ms: number; paid_with?: PaidWith };
+  /** The person got a reply without places; `plan` says whose allowance ran out (`daily_limit`). */
+  recognition_failed: RecognitionProps & { reason: RecognitionFailure; duration_ms: number; plan?: "free" | "premium" };
 };
 
 export type DmEventName = keyof DmEventCatalog;

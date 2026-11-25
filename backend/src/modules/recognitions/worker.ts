@@ -21,6 +21,7 @@ import { autoSavePlaces } from "./auto-save.js";
 import type { RecognitionStage, RecognitionTaskRow, RecognitionTaskOptions } from "./types.js";
 import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
 import { uploadSourceThumbnail } from "../../lib/sourceThumbnailUploader.js";
+import { triggerMenuDiscovery } from "../../lib/menu-client.js";
 
 let shouldKeepRunning = true;
 let wakeResolver: (() => void) | null = null;
@@ -29,6 +30,9 @@ let hasPendingWakeSignal = false;
 function createWorkerIdentifier(): string {
   return randomUUID().slice(0, 8);
 }
+
+/** The Realtime topic `wake_recognition_worker()` broadcasts on. */
+const RECOGNITION_WORKER_TOPIC = "recognition-worker";
 
 function wakeWorkerLoop(): void {
   hasPendingWakeSignal = true;
@@ -114,6 +118,13 @@ async function processRecognition(
         await stage("saving");
         await savePlaces(cached.places);
       }
+
+      // Menu discovery must fire for cached places that have no menu yet, regardless of auto_save.
+      // resolveAndSavePlace already triggers it when auto_save is on, but only as a side effect of
+      // saving — this dedicated step covers the gap and is harmless as a duplicate (the menus
+      // service deduplicates by place_id).
+      void triggerMenuDiscoveryForPlaces(cached.places, tl.log);
+
       await tl.step(
         "served from cache",
         () => recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId: cached.id }),
@@ -203,6 +214,7 @@ async function processRecognition(
       location_hint: place.location_hint,
       instagram_username: place.instagram_username,
       recommendations: place.recommendations,
+      transcript_mentions: place.transcript_mentions,
       confidence_score: place.confidence_score,
       source: place.source,
       matched_place: placeMatches.get(place.name) ?? null,
@@ -256,6 +268,23 @@ async function processRecognition(
   }
 }
 
+async function triggerMenuDiscoveryForPlaces(places: RecognitionResultPlace[], log: Logger): Promise<void> {
+  if (!config.MENU_SERVICE_URL) return;
+  const db = createSupabaseServiceClient();
+  for (const place of places) {
+    try {
+      const { data: row } = await db
+        .from("places")
+        .select("id, google_place_id, name, city, website_url, instagram_username, category, types")
+        .eq("google_place_id", place.google_place_id)
+        .single();
+      if (row) void triggerMenuDiscovery(row, config);
+    } catch (err) {
+      log.debug({ err, googlePlaceId: place.google_place_id }, "menu trigger lookup failed");
+    }
+  }
+}
+
 async function runWorker(): Promise<void> {
   const workerIdentifier = createWorkerIdentifier();
   const workerLog: Logger = rootLogger.child({ worker: workerIdentifier });
@@ -276,13 +305,11 @@ async function runWorker(): Promise<void> {
   let realtimeChannel: RealtimeChannel | null = null;
 
   if (realtimeClient) {
+    // The database broadcasts an empty "queued" message whenever a task becomes claimable
+    // (`wake_recognition_worker`); no row ever travels, so the channel can stay public.
     realtimeChannel = realtimeClient
-      .channel(`recognitions-worker-${workerIdentifier}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "recognition_tasks" },
-        () => wakeWorkerLoop(),
-      )
+      .channel(RECOGNITION_WORKER_TOPIC)
+      .on("broadcast", { event: "queued" }, () => wakeWorkerLoop())
       .subscribe((status, err) => {
         workerLog.info({ status, err: err?.message }, "realtime");
       });

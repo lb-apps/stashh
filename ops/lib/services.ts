@@ -111,6 +111,55 @@ async function sendJson(config: ServiceConfig, method: string, path: string, bod
   return envelope.data;
 }
 
+/** Menus: menu discovery summaries for a set of places, keyed by google_place_id. */
+export async function fetchMenusForPlaces(googlePlaceIds: string[]): Promise<Record<string, unknown[]>> {
+  if (googlePlaceIds.length === 0) return {};
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return {};
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  const param = encodeURIComponent(googlePlaceIds.join(","));
+  const body = (await getJson(config, `/internal/v1/ops/menus?google_place_ids=${param}`)) as { data: Record<string, unknown[]> };
+  return body.data ?? {};
+}
+
+/** Menus: one menu's full detail — categories and items. */
+export async function fetchMenuDetail(menuId: string): Promise<unknown | null> {
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return null;
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  let response: Response;
+  try {
+    response = await fetch(`${config.url}/internal/v1/ops/menus/${encodeURIComponent(menuId)}`, {
+      headers: { authorization: `Bearer ${config.token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return null;
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) return null;
+  return ((await response.json()) as { data: unknown }).data;
+}
+
+/** Menus: list all menus with place names and counts. */
+export async function fetchMenuList(): Promise<unknown[]> {
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return [];
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  const body = (await getJson(config, "/internal/v1/ops/menu-list")) as { data: unknown[] };
+  return body.data ?? [];
+}
+
 /** Instagram channel: DM ops snapshot. */
 export async function fetchInstagramOps(range: OpsRange): Promise<unknown> {
   return getJson(service("Instagram", "INSTAGRAM_API_URL", "INSTAGRAM_OPS_TOKEN"), `/ops/stats?range=${range}`);
@@ -213,4 +262,41 @@ export async function fetchRecognitionDetail(id: string): Promise<unknown | null
   if (response.status === 404) return null;
   if (!response.ok) throw new ServiceUnavailableError(config.name, `${config.name} answered ${response.status}`);
   return ((await response.json()) as { data: unknown }).data;
+}
+
+/* ── Plans and credits: /internal/v1/ops/billing ──────────────────────────────────── */
+
+/** Backend: billing numbers for the range and the latest credit movements. */
+export async function fetchBillingOps(range: OpsRange): Promise<unknown> {
+  const body = (await getJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), `/internal/v1/ops/billing?range=${range}`)) as { data: unknown };
+  return body.data;
+}
+
+/** Backend: the plans and credits settings as the owner set them. */
+export async function fetchBillingSettings(): Promise<unknown> {
+  const body = (await getJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "/internal/v1/ops/billing/settings")) as { data: unknown };
+  return body.data;
+}
+
+/** Backend: change the settings; its refusal (a bad value, Premium under Free) is passed through. */
+export async function updateBillingSettings(patch: unknown): Promise<unknown> {
+  return sendJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "PUT", "/internal/v1/ops/billing/settings", patch);
+}
+
+/** Backend: people by Instagram username (any part) or exact user id, with their plan and credits. */
+export async function findBillingPeople(query: string): Promise<unknown> {
+  const body = (await getJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), `/internal/v1/ops/billing/people?q=${encodeURIComponent(query)}`)) as {
+    data: unknown;
+  };
+  return body.data;
+}
+
+/** Backend: add or remove a person's credits; answers with their status after it. */
+export async function changeCredits(userId: string, change: unknown): Promise<unknown> {
+  return sendJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "POST", `/internal/v1/ops/billing/people/${encodeURIComponent(userId)}/credits`, change);
+}
+
+/** Backend: set a person's plan; answers with their status after it. */
+export async function setPlan(userId: string, plan: unknown): Promise<unknown> {
+  return sendJson(service("Backend", "STASHH_API_URL", "STASHH_OPS_TOKEN"), "PUT", `/internal/v1/ops/billing/people/${encodeURIComponent(userId)}/plan`, plan);
 }

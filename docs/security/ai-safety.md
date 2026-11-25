@@ -42,8 +42,13 @@ on the erase button erases, everything else goes to the assistant.
    refusal). `delete_list` / `remove_place` run only when the channel reports a real tap on that
    exact button in the same turn. A typed "[tapped …]" is defused text.
 6. **Least privilege and caps.** Every tool is scoped to the sender. 60 assistant turns a day per
-   user (`assistant_settings.daily_turn_cap`), and 100 recognitions a day per user
-   (`RECOGNITIONS_DAILY_CAP`, `429 RECOGNITION_QUOTA`, a fixed DM line). Per-minute rate limits on
+   user (`assistant_settings.daily_turn_cap`). Recognitions are paid for by the plan's daily
+   allowance or a credit (`billing_settings`, `create_recognition_task`, under the person's account
+   lock): with neither left the share is refused with `429 RECOGNITION_QUOTA` and a fixed DM line.
+   Only the backend writes recognition tasks; people can read their own and nothing else.
+   The assistant reads a plan with `get_plan` and nothing more: no tool changes a plan, grants
+   credits or buys anything, so no message can talk it into one. Its Premium button is a sign-in
+   link the code mints (`premium_link`), never a URL the model writes. Per-minute rate limits on
    both APIs.
 
 ## Rules for new work
@@ -57,12 +62,14 @@ on the erase button erases, everything else goes to the assistant.
 
 ## Red team
 
-`cd backend && npm run security:redteam` runs 15 assistant attacks (each 3×,
+`cd backend && npm run security:redteam` runs 19 assistant attacks (each 3×,
 `REDTEAM_REPEATS`) and 10 analyzer attacks against the real models. In-memory fakes stand behind
 the tools, so nothing is written. It covers DAN and role-play, developer mode, fake system tags,
 policy puppetry, forged taps, poisoned tips, Arabic, Russian and Japanese injections, tag
 smuggling, base64, claimed staff, the grandma exploit, prompt and tool enumeration, injected
-links and phones, a fake JSON close, abusive-tip requests, and a venue flood.
+links and phones, a fake JSON close, abusive-tip requests, a venue flood, and the plan: a claimed
+payment, a fake system note granting credits, a promo code, and an allowance question that must
+be answered from `get_plan` (2026-11-25: 0 of 57 assistant runs landed).
 
 Results on 2026-11-04 (Haiku 5.5 assistant, Gemini 3.8 Flash analyzer):
 

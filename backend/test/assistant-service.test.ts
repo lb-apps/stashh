@@ -90,6 +90,7 @@ function tools(): ToolServices {
     placesRepo: { searchSavedPlaces: unexpected, getSavedPlacesByPlaceIds: async () => [], getPlacesByGoogleIds: async () => [], countSavedPlaces: async () => 2 },
     recognitions: { listRecentRecognitionsWithPlaces: async () => [] },
     signInLinks: { mint: async () => ({ url: "https://stashh.me/app/a/code" }) },
+    billing: { status: unexpected },
   };
 }
 
@@ -109,6 +110,18 @@ function service(repo: MemoryRepo, model: ReturnType<typeof scriptedModel>, dail
 }
 
 describe("AssistantService.turn", () => {
+  it("opens the Premium button on the Premium sheet through the person's own sign-in link", async () => {
+    const repo = new MemoryRepo();
+    const model = scriptedModel([[{ name: "reply", args: { text: "Premium'da her gün daha çok analiz var.", premium_link: true } }]]);
+
+    const plan = await service(repo, model).turn({ userId: USER, channel: "instagram", messages: [{ external_id: "mid-p", text: "premium ne" }] });
+
+    expect(plan.messages).toEqual([
+      { kind: "button", text: "Premium'da her gün daha çok analiz var.", buttons: [{ type: "web_url", title: "Premium'a göz at", url: "https://stashh.me/app/a/code?next=premium" }] },
+    ]);
+    expect(repo.messages[1]!.rich).toEqual({ premium_link: true });
+  });
+
   it("runs a turn, records it with usage, and renders the plan", async () => {
     const repo = new MemoryRepo();
     const model = scriptedModel([[{ name: "reply", args: { text: "Tek listen var: İzmir.", quick_replies: [{ title: "Haritamı aç", payload: "OPEN_MAP" }], map_link: true } }]]);

@@ -138,6 +138,44 @@ export interface Me {
   saved_count: number;
 }
 
+export type Plan = "free" | "premium";
+
+/** Things people do in the product that earn credits once. */
+export type BillingTask = "first_list" | "first_web_visit";
+
+export type PremiumPeriod = "monthly" | "yearly";
+
+/** Credits a task has just earned. */
+export interface TaskReward {
+  task: BillingTask;
+  credits: number;
+}
+
+/**
+ * GET /billing: what the plan allows right now. Every plan has a daily
+ * allowance (rolling 24 h); past it an analysis spends 1 credit. Only an
+ * analysis that finds a place counts.
+ */
+export interface BillingStatus {
+  plan: Plan;
+  plan_source: "default" | "mock" | "admin" | "revenuecat";
+  /** When Premium ends; null on free, or for Premium until changed. */
+  plan_expires_at: string | null;
+  store: string | null;
+  daily_limit: number;
+  used_today: number;
+  /** Each plan's daily allowance, for the paywall's comparison. */
+  plan_limits: Record<Plan, number>;
+  /** When the next free analysis comes back; null while one is available. */
+  next_free_at: string | null;
+  /** Credits that can be spent now. */
+  credits: number;
+  /** The paywall grants Premium without payment (owner testing). */
+  mock_purchases: boolean;
+  /** A switched-off task is listed only once earned. */
+  tasks: Array<TaskReward & { done: boolean }>;
+}
+
 export interface AddPlacesResult {
   /** `created` is false when the place was already saved (a no-op). */
   results: Array<{ google_place_id: string; place_id: string; created: boolean }>;

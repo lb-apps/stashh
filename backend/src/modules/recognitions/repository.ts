@@ -1,13 +1,31 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type { Database, Json } from "../../types/database.js";
+import { recognitionQuotaSchema, type RecognitionQuota } from "../billing/types.js";
 import type { SourceType } from "../../types/schemas.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
   RecognitionStage,
-  RecognitionTaskInsert,
   RecognitionTaskRow,
 } from "./types.js";
+
+interface CreateRecognitionTaskParams {
+  ownerUserId: string;
+  sourceUrl: string;
+  sourceMedia: Json | null;
+  options: Json;
+  idempotencyKey: string | null;
+}
+
+export type CreateRecognitionTaskOutcome =
+  | { status: "created" | "existing"; task: RecognitionTaskRow }
+  | { status: "quota"; quota: RecognitionQuota };
+
+const createRecognitionTaskOutcomeSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.enum(["created", "existing"]), task: z.object({ id: z.string().uuid() }).passthrough() }),
+  recognitionQuotaSchema.extend({ status: z.literal("quota") }),
+]);
 
 interface ClaimRecognitionParams {
   workerIdentifier: string;
@@ -47,6 +65,7 @@ interface UpsertRecognitionResultParams {
   sourceThumbnailUrl: string | null;
   /** Written only when present, so a share that does not name the author keeps an earlier one. */
   authorUsername: string | null;
+  transcript: Json | null;
 }
 
 /** One of the owner's recognitions in a list: the task and its result's cover and count. */
@@ -80,41 +99,26 @@ export interface RecognitionWithResult {
 export class RecognitionRepository {
   constructor(private readonly supabaseClient: SupabaseClient<Database>) {}
 
-  async createQueuedRecognition(recognition: RecognitionTaskInsert): Promise<RecognitionTaskRow> {
-    const { data, error } = await this.supabaseClient
-      .from("recognition_tasks")
-      .insert(recognition)
-      .select("*")
-      .single();
-
+  /**
+   * Creates a queued task, paid for by the daily allowance or a credit (`create_recognition_task`
+   * reserves it under the person's account lock). A repeated idempotency key returns the
+   * original task; with neither allowance nor credits left, nothing is created.
+   */
+  async createRecognitionTask(params: CreateRecognitionTaskParams): Promise<CreateRecognitionTaskOutcome> {
+    const { data, error } = await this.supabaseClient.rpc("create_recognition_task", {
+      p_owner_user_id: params.ownerUserId,
+      p_source_url: params.sourceUrl,
+      p_source_media: params.sourceMedia,
+      p_options: params.options,
+      p_idempotency_key: params.idempotencyKey,
+    });
     if (error) throw error;
-    return data;
-  }
-
-  /** Recognitions the owner started since `since`, of any status. */
-  async countRecognitionsSince(ownerUserId: string, since: Date): Promise<number> {
-    const { count, error } = await this.supabaseClient
-      .from("recognition_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_user_id", ownerUserId)
-      .gte("created_at", since.toISOString());
-    if (error) throw error;
-    return count ?? 0;
-  }
-
-  async getRecognitionByIdempotencyKey(
-    ownerUserId: string,
-    idempotencyKey: string,
-  ): Promise<RecognitionTaskRow | null> {
-    const { data, error } = await this.supabaseClient
-      .from("recognition_tasks")
-      .select("*")
-      .eq("owner_user_id", ownerUserId)
-      .eq("idempotency_key", idempotencyKey)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const outcome = createRecognitionTaskOutcomeSchema.parse(data);
+    if (outcome.status === "quota") {
+      const { status: _, ...quota } = outcome;
+      return { status: "quota", quota };
+    }
+    return { status: outcome.status, task: outcome.task as RecognitionTaskRow };
   }
 
   async getRecognitionByIdForOwner(
@@ -232,6 +236,7 @@ export class RecognitionRepository {
           source_type: params.sourceType,
           ...(params.sourceThumbnailUrl ? { source_thumbnail_url: params.sourceThumbnailUrl } : {}),
           ...(params.authorUsername ? { author_username: params.authorUsername } : {}),
+          transcript: params.transcript,
         },
         { onConflict: "source_url" },
       )

@@ -97,3 +97,16 @@ export function formatSource(url: string | null): string {
     return url;
   }
 }
+
+const signedInteger = new Intl.NumberFormat(LOCALE, { signDisplay: "exceptZero" });
+const date = new Intl.DateTimeFormat(LOCALE, { month: "short", day: "numeric", year: "numeric" });
+
+/** "+5", "-1": a change, always with its sign. */
+export function formatSignedInt(value: number): string {
+  return signedInteger.format(value);
+}
+
+/** "Dec 3, 2026". */
+export function formatDate(iso: string | null | undefined): string {
+  return iso ? date.format(new Date(iso)) : DASH;
+}

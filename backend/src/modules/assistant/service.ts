@@ -203,17 +203,27 @@ export class AssistantService {
       lists = ids.flatMap((id) => byId.get(id) ?? []);
     }
 
-    let mapUrl: string | null = null;
-    if (reply.map_link) {
+    // One sign-in link serves both buttons; the Premium one opens the web app on the Premium sheet.
+    let signInUrl: string | null = null;
+    if (reply.map_link || reply.premium_link) {
       try {
-        mapUrl = (await tools.signInLinks.mint(userId)).url;
+        signInUrl = (await tools.signInLinks.mint(userId)).url;
       } catch (error) {
-        log.warn({ err: error, userId }, "sign-in link not minted; replying without the map button");
+        log.warn({ err: error, userId }, "sign-in link not minted; replying without the map and Premium buttons");
       }
     }
+    const mapUrl = reply.map_link ? signInUrl : null;
+    const premiumUrl = reply.premium_link && signInUrl ? premiumSheetUrl(signInUrl) : null;
 
-    return renderReply({ reply, places, lists, mapUrl, buttonLanguage });
+    return renderReply({ reply, places, lists, mapUrl, premiumUrl, buttonLanguage });
   }
+}
+
+/** A sign-in link that lands on the Premium sheet, as the DM's own quota reply builds it. */
+export function premiumSheetUrl(signInUrl: string): string {
+  const url = new URL(signInUrl);
+  url.searchParams.set("next", "premium");
+  return url.toString();
 }
 
 /** Turkish for Turkish and for Latin-script text the hint cannot place; English for everything else. */
@@ -250,16 +260,18 @@ function richNote(reply: ReplyInput, plan: ReplyPlan): Json | null {
   const carousel = plan.messages.find((message) => message.kind === "carousel");
   if (carousel && carousel.kind === "carousel") note["cards"] = carousel.cards.map((card) => card.title);
   if (reply.quick_replies?.length) note["quick_replies"] = reply.quick_replies.map((item) => item.title);
-  if (plan.messages.some((message) => message.kind === "button")) note["map_link"] = true;
+  if (reply.map_link && plan.messages.some((message) => message.kind === "button")) note["map_link"] = true;
+  if (reply.premium_link && plan.messages.some((message) => message.kind === "button")) note["premium_link"] = true;
   return Object.keys(note).length > 0 ? note : null;
 }
 
 function toChatMessage(row: AssistantMessageRow): ChatMessage {
   if (row.role === "user") return { role: "user", content: cleanUntrustedText(row.content, HISTORY_ROW_MAX_CHARS) };
-  const rich = (row.rich ?? null) as null | { cards?: string[]; quick_replies?: string[]; map_link?: boolean };
+  const rich = (row.rich ?? null) as null | { cards?: string[]; quick_replies?: string[]; map_link?: boolean; premium_link?: boolean };
   const notes: string[] = [];
   if (rich?.cards?.length) notes.push(`you sent cards: ${rich.cards.join(", ")}`);
   if (rich?.quick_replies?.length) notes.push(`with quick replies: ${rich.quick_replies.join(" · ")}`);
   if (rich?.map_link) notes.push("with the map link button");
+  if (rich?.premium_link) notes.push("with the Premium button");
   return { role: "assistant", content: notes.length > 0 ? `${row.content}\n[${notes.join("; ")}]` : row.content };
 }

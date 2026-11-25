@@ -16,6 +16,8 @@ export interface RenderInput {
   lists: ListSummaryDto[];
   /** The minted sign-in link when the reply asked for one; null when it could not be minted. */
   mapUrl: string | null;
+  /** The same sign-in link opening on Premium, when the reply asked for it. */
+  premiumUrl?: string | null;
   /** The language the confirm buttons are written in; the model never writes them. */
   buttonLanguage?: ButtonLanguage;
 }
@@ -42,7 +44,10 @@ export function confirmQuickReplies(confirm: ConfirmAction, language: ButtonLang
 /** The button label on the person's map link, understood in either of the channel's languages. */
 export const MAP_BUTTON_TITLE = "stashh.me";
 
-export function renderReply({ reply, places, lists, mapUrl, buttonLanguage = "tr" }: RenderInput): ReplyPlan {
+/** The Premium button's label, fixed like the DM's own quota reply ("Premium'a göz at"). */
+export const PREMIUM_BUTTON_TITLES: Record<ButtonLanguage, string> = { tr: "Premium'a göz at", en: "See Premium" };
+
+export function renderReply({ reply, places, lists, mapUrl, premiumUrl = null, buttonLanguage = "tr" }: RenderInput): ReplyPlan {
   const messages: PlanMessage[] = [];
 
   if (reply.cards?.kind === "places" && places.length > 0) {
@@ -55,10 +60,10 @@ export function renderReply({ reply, places, lists, mapUrl, buttonLanguage = "tr
   const quickReplies = reply.confirm
     ? confirmQuickReplies(reply.confirm, buttonLanguage)
     : reply.quick_replies?.map((item) => ({ title: item.title, payload: item.payload ?? item.title }));
-  const last: PlanMessage =
-    reply.map_link && mapUrl
-      ? { kind: "button", text: reply.text, buttons: [{ type: "web_url", title: MAP_BUTTON_TITLE, url: mapUrl }] }
-      : { kind: "text", text: reply.text };
+  const buttons: PlanButton[] = [];
+  if (reply.map_link && mapUrl) buttons.push({ type: "web_url", title: MAP_BUTTON_TITLE, url: mapUrl });
+  if (reply.premium_link && premiumUrl) buttons.push({ type: "web_url", title: PREMIUM_BUTTON_TITLES[buttonLanguage], url: premiumUrl });
+  const last: PlanMessage = buttons.length > 0 ? { kind: "button", text: reply.text, buttons } : { kind: "text", text: reply.text };
   if (quickReplies && quickReplies.length > 0) last.quick_replies = quickReplies;
   messages.push(last);
 

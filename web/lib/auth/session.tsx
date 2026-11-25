@@ -26,6 +26,12 @@ export function useSession(): SessionState {
   return React.use(SessionContext);
 }
 
+/** The signed-in person's Supabase user id, or null: the one id they carry everywhere. */
+export function useSignedInUserId(): string | null {
+  const session = useSession();
+  return session.status === "signed-in" ? session.session.user.id : null;
+}
+
 /** Exchanges the `token_hash` redeemed from a DM link for a session; resolves with the signed-in user's id. */
 export async function signInWithTokenHash(tokenHash: string): Promise<string | null> {
   const { data, error } = await supabase().auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });

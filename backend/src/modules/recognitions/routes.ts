@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { sendAccepted, sendError, sendSuccess } from "../../http/response.js";
-import { createRecognitionServiceForRequest } from "./factory.js";
+import { createRecognitionServiceForRequest, createRecognitionServiceWithServiceRole } from "./factory.js";
 import { presentAcceptedRecognition, presentRecognition, presentRecognitionSummary } from "./presenter.js";
 import {
   createRecognitionRequestSchema,
@@ -87,7 +87,8 @@ recognitionsRouter.post("/", async (req, res, next) => {
   }
 
   try {
-    const recognitionService = createRecognitionServiceForRequest(req);
+    // Tasks are written by the backend only: the owner comes from the verified JWT.
+    const recognitionService = createRecognitionServiceWithServiceRole();
 
     const recognition = await recognitionService.enqueueRecognition({
       ownerUserId,
@@ -147,7 +148,7 @@ recognitionsRouter.post("/:id/commit", async (req, res, next) => {
   }
 
   try {
-    const recognitionService = createRecognitionServiceForRequest(req);
+    const recognitionService = createRecognitionServiceWithServiceRole();
     const recognition = await recognitionService.commitRecognition(
       parsedParameters.data.id,
       ownerUserId,
