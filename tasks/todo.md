@@ -176,7 +176,9 @@ duplicate or late event just syncs again. (Changed from the first plan, which st
       the footer and `legal-page.tsx`; the privacy policy adds Paddle and RevenueCat. Drafted with
       content-writer, checked by the owner.
 - [ ] Owner: mali müşavir on invoicing Paddle and foreign-currency income.
-- [ ] Lower `free_daily_analyses` from ops once Premium can be bought.
+- [x] Allowances set by the owner, 2026-11-25: Free 3, Premium 50 analyses a day (`billing_settings`, through
+      the ops settings route; was 100 / 300). Production enforces them from this branch's deploy on; until then
+      its old code keeps `RECOGNITIONS_DAILY_CAP` (100). Nobody had used more than 3 that day.
 
 ## Phase 4 — iOS, when it resumes
 
