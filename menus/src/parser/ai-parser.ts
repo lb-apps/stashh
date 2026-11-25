@@ -61,7 +61,7 @@ export async function parseMenuContent(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-sonnet-4-20250514",
+        model: "anthropic/claude-sonnet-4.5",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -70,17 +70,21 @@ export async function parseMenuContent(
         max_tokens: 16_000,
         response_format: { type: "json_object" },
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(180_000),
     });
 
     if (!response.ok) {
-      log.warn({ status: response.status }, "OpenRouter parse request failed");
+      const body = await response.text().catch(() => "");
+      log.warn({ status: response.status, body: body.slice(0, 500) }, "OpenRouter parse request failed");
       return null;
     }
 
     const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
     const raw = data.choices[0]?.message?.content;
-    if (!raw) return null;
+    if (!raw) {
+      log.warn({ choicesLen: data.choices?.length }, "OpenRouter returned no content");
+      return null;
+    }
 
     const json: unknown = JSON.parse(raw);
     const parsed = aiParseResultSchema.safeParse(json);

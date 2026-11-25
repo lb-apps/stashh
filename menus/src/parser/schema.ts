@@ -23,8 +23,14 @@ export const menuCategorySchema = z.object({
 });
 
 export const parsedMenuSchema = z.object({
-  menu_type: z.enum(["food", "drinks", "desserts", "hookah", "services", "room_service", "unknown"]),
-  language: z.enum(["tr", "en", "tr+en"]),
+  menu_type: z.enum(["food", "drinks", "desserts", "hookah", "services", "room_service", "unknown"]).catch("unknown"),
+  language: z.string().transform((v) => {
+    const lower = v.toLowerCase();
+    if (lower.includes("tr") && lower.includes("en")) return "tr+en" as const;
+    if (lower.includes("tr") || lower.includes("turk")) return "tr" as const;
+    if (lower.includes("en") || lower.includes("eng")) return "en" as const;
+    return "tr" as const;
+  }),
   categories: menuCategorySchema.array().min(1),
 });
 

@@ -7,6 +7,8 @@ export interface AppOptions {
   discoverHandler: express.RequestHandler;
   statusHandler: express.RequestHandler;
   refreshHandler: express.RequestHandler;
+  opsMenusHandler: express.RequestHandler;
+  opsMenuDetailHandler: express.RequestHandler;
 }
 
 export function createApp(options: AppOptions) {
@@ -35,6 +37,8 @@ export function createApp(options: AppOptions) {
   app.post("/internal/v1/discover", auth, options.discoverHandler);
   app.get("/internal/v1/status/:menuId", auth, options.statusHandler);
   app.post("/internal/v1/refresh/:placeId", auth, options.refreshHandler);
+  app.get("/internal/v1/ops/menus", auth, options.opsMenusHandler);
+  app.get("/internal/v1/ops/menus/:menuId", auth, options.opsMenuDetailHandler);
 
   app.use(((err: Error, _req, res, _next) => {
     options.log.error({ err }, "unhandled error");

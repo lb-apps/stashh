@@ -29,7 +29,7 @@ export async function verifyMenuBelongsToPlace(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-haiku-3-5-20241022",
+        model: "anthropic/claude-haiku-5.5",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {

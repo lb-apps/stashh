@@ -17,6 +17,7 @@ export const KNOWN_PLATFORMS: MenuPlatform[] = [
   { name: "finedinemenu", domains: ["finedinemenu.com"] },
   { name: "emenu", domains: ["emenu.com.tr"] },
   { name: "paycell", domains: ["qr.paycell.com.tr"] },
+  { name: "karekod", domains: ["karekodrestaurantmenu.com"], pathPattern: /^\/menu\// },
 ];
 
 const MENU_LINK_PATTERNS = [
