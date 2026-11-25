@@ -92,10 +92,15 @@ the cap line in `docs/security/ai-safety.md`.
 
 ## Phase 2 — RevenueCat + Paddle sandbox
 
-- [ ] Owner: RevenueCat project "Stashh"; Paddle sandbox; Paddle Billing connected in RevenueCat; products
-      `premium_monthly` and `premium_yearly` in Paddle (USD base, TRY price override); entitlement `premium`;
-      offering `default`. Credit packs later as Paddle one-time products (supported; check a repeat purchase
-      in the sandbox).
+- [x] RevenueCat project "Stashh" (`4bee9680`, 2026-11-25, Little Big Apps Chrome window): entitlement
+      `premium`; offering `default` with monthly and yearly packages; Test Store products `premium_monthly`
+      and `premium_yearly` attached to both. No secret key or webhook yet.
+- [ ] Owner: Paddle sandbox account (sandbox-login.paddle.com; signing up needs the owner's password and
+      email check).
+- [ ] Paddle Billing connected in RevenueCat (Web → Paddle Billing → Add Paddle config); products
+      `premium_monthly` and `premium_yearly` in Paddle (USD base, TRY price override), imported into
+      RevenueCat and attached to `premium` and the `default` offering's packages. Credit packs later as Paddle
+      one-time products (supported; check a repeat purchase in the sandbox).
 - [ ] Web: `@revenuecat/purchases-js`, configured after sign-in with the session user id; paywall prices from
       the offering; purchase through Paddle checkout. Check the checkout, 3-D Secure included, inside the
       Instagram in-app browser on a real phone.
