@@ -149,7 +149,7 @@ user id in both projects.
 | `user_signed_out` | sign-out confirmed | — |
 | `paywall_viewed` | the Premium screen opened | `source`: dm, profile |
 | `premium_plan_selected` | Premium's button tapped | `period`: monthly, yearly; `available` (false = the "coming soon" fake door) |
-| `premium_purchased` | Premium granted (today only the mock paywall) | `period`, `store`: mock |
+| `premium_purchased` | Premium bought or granted, once the purchase resolves on the web | `period`, `store`: paddle (Paddle checkout through RevenueCat), mock (the owner's mock paywall) |
 | `credits_earned` | a task's credits were granted | `task`: first_list, first_web_visit; `credits` |
 
 **From the DM conversation** (`instagram/src/analytics/events.ts`):

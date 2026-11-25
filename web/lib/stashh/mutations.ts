@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { track } from "@/lib/analytics/analytics";
+import { purchasePremium, type PremiumOffer } from "@/lib/billing/purchases";
 import { api } from "./endpoints";
 import { keys } from "./queries";
 import { rewardEarned } from "./rewards";
@@ -141,5 +142,27 @@ export function useMockPurchase() {
       track("premium_purchased", { period, store: "mock" });
     },
     onError: () => void client.invalidateQueries({ queryKey: keys.billing }),
+  });
+}
+
+/**
+ * Buys Premium through Paddle's checkout, then asks the backend to sync the plan from RevenueCat
+ * so it shows at once; RevenueCat's webhook gets there too, a moment later. Resolves with
+ * "cancelled" when the checkout was closed. A purchase whose sync fails still went through: the
+ * plan is refetched instead, and the webhook catches up.
+ */
+export function usePremiumPurchase() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, offer, language }: { userId: string; offer: PremiumOffer; language: string }) => {
+      if ((await purchasePremium(userId, offer, language)) === "cancelled") return { outcome: "cancelled" as const, status: null };
+      return { outcome: "purchased" as const, status: await api.billing.sync().catch(() => null) };
+    },
+    onSuccess: ({ outcome, status }, { offer }) => {
+      if (outcome === "cancelled") return;
+      if (status) client.setQueryData(keys.billing, status);
+      else void client.invalidateQueries({ queryKey: keys.billing });
+      track("premium_purchased", { period: offer.period, store: "paddle" });
+    },
   });
 }

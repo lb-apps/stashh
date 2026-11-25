@@ -46,10 +46,13 @@ export type EventCatalog = {
 
   /** The Premium sheet came up: from the DM's quota reply, or from the profile. */
   paywall_viewed: { source: PaywallSource };
-  /** Premium's button was tapped. `available` is false while it can't be bought yet (the fake door). */
+  /** Premium's button was tapped. `available` is false while it can't be bought here (the fake door). */
   premium_plan_selected: { period: PremiumPeriod; available: boolean };
-  /** A purchase went through. `mock` while payments are off and the owner grants Premium from the paywall. */
-  premium_purchased: { period: PremiumPeriod; store: "mock" };
+  /**
+   * A purchase went through: `paddle` through Paddle's checkout (RevenueCat), `mock` when the owner
+   * grants Premium from the paywall while payments are off.
+   */
+  premium_purchased: { period: PremiumPeriod; store: "paddle" | "mock" };
   /** A task's credits were earned, seen by the reader as they came in. */
   credits_earned: { task: BillingTask; credits: number };
 };

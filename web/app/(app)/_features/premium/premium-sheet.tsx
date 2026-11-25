@@ -4,17 +4,19 @@ import * as React from "react";
 import { Clock, Coins, SearchCheck, type LucideIcon } from "lucide-react";
 import { track } from "@/lib/analytics/analytics";
 import type { PaywallSource } from "@/lib/analytics/events";
-import { Button } from "@/lib/discovery/components/Button";
+import { useSignedInUserId } from "@/lib/auth/session";
+import { Button, ButtonLink } from "@/lib/discovery/components/Button";
 import { Glyph } from "@/lib/discovery/components/Glyph";
 import { MicroLabel } from "@/lib/discovery/components/MicroLabel";
 import { ScreenFooter } from "@/lib/discovery/components/Screen";
 import { SegmentedControl } from "@/lib/discovery/components/SegmentedControl";
 import { TEXT_DANGER_STRONG, TEXT_SECONDARY_STRONG } from "@/lib/discovery/pending-tokens";
+import { publicEnv } from "@/lib/env";
 import { useCopy, useIntlLocale, useT } from "@/lib/i18n/provider";
 import { StashhApiError } from "@/lib/stashh/api";
-import { formatCount, formatDay } from "@/lib/stashh/format";
-import { useMockPurchase } from "@/lib/stashh/mutations";
-import { useBilling } from "@/lib/stashh/queries";
+import { formatCount, formatDay, formatMoney } from "@/lib/stashh/format";
+import { useMockPurchase, usePremiumPurchase } from "@/lib/stashh/mutations";
+import { useBilling, usePremiumOffers, useSubscriptionManagementUrl } from "@/lib/stashh/queries";
 import type { BillingStatus, Plan, PremiumPeriod } from "@/lib/stashh/types";
 import { QuietNote, SheetBody, SheetTitle } from "../shell/sheet-parts";
 import { premiumCopy } from "./copy";
@@ -36,10 +38,10 @@ const NUMERAL: React.CSSProperties = {
 
 /**
  * Premium: what each plan allows a day, the two rules that make the allowance
- * and credits fair, and the way in. There are no prices yet. While the owner
- * allows it, the button grants Premium on the spot (a mock purchase);
- * otherwise it is a fake door that says "soon" in place and records the
- * interest. Someone already on Premium sees their plan instead.
+ * and credits fair, and the way in. Where purchases are on, the way in is a
+ * price and Paddle's checkout; elsewhere (production, until Paddle is live) it
+ * is the owner's mock purchase or a fake door that says "soon". Someone
+ * already on Premium sees their plan instead.
  */
 export function PremiumSheet({ source }: { source: PaywallSource }) {
   const c = useCopy(premiumCopy);
@@ -82,7 +84,9 @@ function Premium({ status }: { status: BillingStatus }) {
           <Rule icon={Coins}>{c.credits}</Rule>
         </div>
       </SheetBody>
-      <ScreenFooter>{status.plan === "premium" ? <OnPremium expiresAt={status.plan_expires_at} /> : <Offer status={status} />}</ScreenFooter>
+      <ScreenFooter>
+        {status.plan === "premium" ? <OnPremium status={status} /> : publicEnv.revenueCatApiKey ? <PaidOffer /> : <Offer status={status} />}
+      </ScreenFooter>
     </>
   );
 }
@@ -124,10 +128,70 @@ function Rule({ icon, children }: { icon: LucideIcon; children: React.ReactNode 
   );
 }
 
+/** Monthly or yearly. */
+function PeriodPicker({ value, onChange }: { value: PremiumPeriod; onChange: (period: PremiumPeriod) => void }) {
+  const c = useCopy(premiumCopy);
+  return (
+    <SegmentedControl
+      aria-label={c.period}
+      onWhite
+      options={PERIODS.map((period) => ({ value: period, label: c.periods[period] }))}
+      value={value}
+      onChange={(next) => onChange(PERIODS.find((p) => p === next) ?? value)}
+    />
+  );
+}
+
 /**
- * The period and the button. The button grants Premium while mock purchases
- * are on; otherwise — or when they were switched off meanwhile — it turns
- * into a calm "soon" in place, and the tap is the interest we measure.
+ * The real way in: the period, its price from RevenueCat, the button that opens
+ * Paddle's checkout, and how the subscription renews. The price keeps its line
+ * while it loads, so nothing jumps; the button waits for it. Closing the
+ * checkout is not an error. After a purchase the plan updates and the sheet
+ * shows Premium in place of this.
+ */
+function PaidOffer() {
+  const c = useCopy(premiumCopy);
+  const t = useT();
+  const locale = useIntlLocale();
+  const userId = useSignedInUserId();
+  const [period, setPeriod] = React.useState<PremiumPeriod>("monthly");
+  const offers = usePremiumOffers();
+  const purchase = usePremiumPurchase();
+  const offer = offers.data?.[period];
+  const failed = offers.isError || (offers.isSuccess && !offers.data) || purchase.isError;
+
+  const buy = () => {
+    if (!offer || !userId) return;
+    track("premium_plan_selected", { period, available: true });
+    purchase.mutate({ userId, offer, language: locale.split("-")[0] ?? locale });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
+      <PeriodPicker value={period} onChange={setPeriod} />
+      <p className="ds-headline" style={{ margin: 0, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+        {offer ? c.price[period](formatMoney(offer.amountMicros, offer.currency, locale)) : "\u00a0"}
+      </p>
+      {failed ? (
+        <p role="alert" className="ds-caption" style={{ margin: 0, textAlign: "center", color: TEXT_DANGER_STRONG }}>
+          {t.errors.generic}
+        </p>
+      ) : null}
+      <Button variant="primary" size="lg" shape="pill" fullWidth disabled={!offer || purchase.isPending} onClick={buy}>
+        {c.cta}
+      </Button>
+      <p className="ds-caption" style={{ margin: 0, textAlign: "center", color: TEXT_SECONDARY_STRONG }}>
+        {c.renews[period]}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Where Premium cannot be bought: the period and the button. The button grants
+ * Premium while mock purchases are on; otherwise — or when they were switched
+ * off meanwhile — it turns into a calm "soon" in place, and the tap is the
+ * interest we measure.
  */
 function Offer({ status }: { status: BillingStatus }) {
   const c = useCopy(premiumCopy);
@@ -146,13 +210,7 @@ function Offer({ status }: { status: BillingStatus }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
-      <SegmentedControl
-        aria-label={c.period}
-        onWhite
-        options={PERIODS.map((value) => ({ value, label: c.periods[value] }))}
-        value={period}
-        onChange={(next) => setPeriod(PERIODS.find((p) => p === next) ?? period)}
-      />
+      <PeriodPicker value={period} onChange={setPeriod} />
       {purchase.isError && !unavailable ? (
         <p role="alert" className="ds-caption" style={{ margin: 0, textAlign: "center", color: TEXT_DANGER_STRONG }}>
           {t.errors.generic}
@@ -195,20 +253,37 @@ function takeFocus(node: HTMLParagraphElement | null) {
   node?.focus({ preventScroll: true });
 }
 
-/** In place of the button for someone already on Premium: the plan, and until when. */
-function OnPremium({ expiresAt }: { expiresAt: string | null }) {
+/**
+ * In place of the button for someone already on Premium: the plan, until when,
+ * and — when they bought it — where to change or cancel it.
+ */
+function OnPremium({ status }: { status: BillingStatus }) {
   const c = useCopy(premiumCopy);
   const locale = useIntlLocale();
   return (
-    <div role="status" style={{ textAlign: "center" }}>
-      <p className="ds-headline" style={{ margin: 0 }}>
-        {c.onPremium}
-      </p>
-      {expiresAt ? (
-        <p className="ds-caption" style={{ margin: 0, color: TEXT_SECONDARY_STRONG }}>
-          {c.until(formatDay(expiresAt, locale))}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-6)" }}>
+      <div role="status" style={{ textAlign: "center" }}>
+        <p className="ds-headline" style={{ margin: 0 }}>
+          {c.onPremium}
         </p>
-      ) : null}
+        {status.plan_expires_at ? (
+          <p className="ds-caption" style={{ margin: 0, color: TEXT_SECONDARY_STRONG }}>
+            {c.until(formatDay(status.plan_expires_at, locale))}
+          </p>
+        ) : null}
+      </div>
+      {status.plan_source === "revenuecat" ? <ManageSubscription /> : null}
     </div>
   );
+}
+
+/** Paddle's portal, through RevenueCat; shown once the link is known. */
+function ManageSubscription() {
+  const c = useCopy(premiumCopy);
+  const url = useSubscriptionManagementUrl(true).data;
+  return url ? (
+    <ButtonLink href={url} target="_blank" rel="noopener noreferrer" variant="ghost" size="md" shape="pill">
+      {c.manage}
+    </ButtonLink>
+  ) : null;
 }

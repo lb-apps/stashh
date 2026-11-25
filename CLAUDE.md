@@ -261,7 +261,12 @@ credit. Only an analysis that finds a place counts. Guide: [docs/api-screen-map.
   entitlement. RevenueCat project "Stashh" (`4bee9680`) holds entitlement `premium` and offering
   `default` (`$rc_monthly`, `$rc_annual`); its Paddle web config `app6e836d09cf` is the sandbox
   account (product "Stashh Premium", prices `premium_monthly` / `premium_yearly`). The Paddle API key
-  lives only in RevenueCat; never put it in the repo or an env file. Bought credits never expire (App Store 3.1.1). Following @stashh.me earns nothing
+  lives only in RevenueCat; never put it in the repo or an env file.
+- **A bought Premium has one writer:** `syncFromRevenueCat` re-reads the person's RevenueCat
+  subscriptions and writes the plan; `/billing/sync` (web, after a purchase) and
+  `/webhooks/revenuecat` both call it, so neither ever applies a delta. Owner and mock plans are left
+  alone. The web sells only where `NEXT_PUBLIC_REVENUECAT_API_KEY` is set (never in production before
+  Paddle is live); the backend grants only from `REVENUECAT_ENVIRONMENTS`. Bought credits never expire (App Store 3.1.1). Following @stashh.me earns nothing
   (Meta's spam standard bans exchanging anything for follows); credit tasks live in the product.
 - **Only the backend writes recognition tasks.** People read their own through RLS and nothing else;
   the worker wakes on an empty Realtime broadcast (`recognition-worker`), never on table changes.

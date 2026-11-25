@@ -15,6 +15,15 @@ export const premiumCopy = {
     period: "Billing period",
     periods: { monthly: "Monthly", yearly: "Yearly" } satisfies Record<PremiumPeriod, string>,
     cta: "Get Premium",
+    price: {
+      monthly: (price: string) => `${price} / month`,
+      yearly: (price: string) => `${price} / year`,
+    } satisfies Record<PremiumPeriod, (price: string) => string>,
+    renews: {
+      monthly: "Renews every month. Cancel anytime.",
+      yearly: "Renews every year. Cancel anytime.",
+    } satisfies Record<PremiumPeriod, string>,
+    manage: "Manage subscription",
     soon: "Premium is coming soon",
     onPremium: "You’re on Premium.",
     until: (date: string) => `Until ${date}`,
@@ -29,6 +38,15 @@ export const premiumCopy = {
     period: "Ödeme dönemi",
     periods: { monthly: "Aylık", yearly: "Yıllık" },
     cta: "Premium’a geç",
+    price: {
+      monthly: (price: string) => `${price} / ay`,
+      yearly: (price: string) => `${price} / yıl`,
+    },
+    renews: {
+      monthly: "Her ay yenilenir. İstediğin zaman iptal edebilirsin.",
+      yearly: "Her yıl yenilenir. İstediğin zaman iptal edebilirsin.",
+    },
+    manage: "Aboneliği yönet",
     soon: "Premium çok yakında geliyor",
     onPremium: "Premium’dasın.",
     until: (date: string) => `${date} tarihine kadar`,

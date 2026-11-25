@@ -13,6 +13,7 @@
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.3.3",
+    "@revenuecat/purchases-js": "1.74.0",
     "@supabase/supabase-js": "2.118.0",
     "@tanstack/react-query": "5.105.1",
     "lucide-react": "^1.57.0",

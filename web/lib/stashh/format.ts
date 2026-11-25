@@ -33,6 +33,11 @@ export function formatUntil(at: string, locale: string, now = new Date()): strin
   return minutes < 60 ? relative.format(minutes, "minute") : relative.format(Math.ceil(minutes / 60), "hour");
 }
 
+/** "₺129,99" / "$3.99": an amount in micro-units of its currency, in the reader's locale. */
+export function formatMoney(amountMicros: number, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amountMicros / 1_000_000);
+}
+
 /** "25 December 2026" / "25 Aralık 2026" */
 export function formatDay(at: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date(at));

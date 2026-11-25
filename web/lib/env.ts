@@ -30,6 +30,14 @@ export const publicEnv = {
   get metaPixelId(): string | null {
     return process.env.NEXT_PUBLIC_META_PIXEL_ID || null;
   },
+  /**
+   * Optional: RevenueCat's public key for the Paddle web config. Without it Premium cannot be
+   * bought here and the paywall stays the fake door (or the owner's mock purchase); production
+   * goes without it until Paddle is live.
+   */
+  get revenueCatApiKey(): string | null {
+    return process.env.NEXT_PUBLIC_REVENUECAT_API_KEY || null;
+  },
   /** `production` only on stashh.me; tags every event so a wrong token shows up at once. */
   get appEnv(): string {
     return process.env.NEXT_PUBLIC_APP_ENV || "development";

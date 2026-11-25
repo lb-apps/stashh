@@ -58,6 +58,8 @@ export const api = {
   billing: {
     /** GET /billing — plan, today's allowance, credits and the tasks that earn them. */
     status: () => request<BillingStatus>("GET", "/billing"),
+    /** POST /billing/sync — the plan RevenueCat gives now, right after a purchase; `503 PURCHASES_UNAVAILABLE` where purchases are off. */
+    sync: () => request<BillingStatus>("POST", "/billing/sync"),
     /** POST /billing/mock-purchase — Premium without payment while the owner allows it; `403 PURCHASES_UNAVAILABLE` otherwise. */
     mockPurchase: (period: PremiumPeriod) => request<BillingStatus>("POST", "/billing/mock-purchase", { body: { period } }),
   },

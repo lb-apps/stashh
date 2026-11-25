@@ -101,10 +101,14 @@ Task status lifecycle: `queued → processing → completed → committed` (also
 |---|---|---|
 | Plan, free analyses left today, next free one, credits, tasks; each plan's allowance | web (profile, Premium sheet) | `GET /billing` |
 | Premium without payment, while the owner allows it | web (Premium sheet) | `POST /billing/mock-purchase` |
+| The plan right after a Paddle purchase (re-read from RevenueCat) | web (Premium sheet) | `POST /billing/sync` |
+| A subscription bought, renewed, cancelled or expired | RevenueCat (its webhook `Authorization`) | `POST /webhooks/revenuecat` (outside `/api`) |
 | Credits left after a credit-paid analysis | DM service (service token) | `GET /internal/v1/users/:userId/billing` |
 | Numbers, settings, a person's plan and credits | ops dashboard (service token) | `/internal/v1/ops/billing/*` |
 
 Rules live in the database (`supabase/migrations/…_billing.sql`): `billing_settings` (one row, from ops), `billing_accounts` (plan, balance), `credit_ledger` (append-only, idempotent per `(user, reason, ref)`). The first list (anywhere) and the first visit to the web app earn their task's credits once.
+
+A bought Premium has one writer: `BillingService.syncFromRevenueCat`, which reads the person's subscriptions from RevenueCat API v2 and writes the plan they give now. The web calls it through `/billing/sync` when a purchase resolves; RevenueCat's webhook calls it for every change after that. Prices come from RevenueCat's `default` offering through `@revenuecat/purchases-js`, only where `NEXT_PUBLIC_REVENUECAT_API_KEY` is set; elsewhere the Premium sheet stays the fake door (or the owner's mock purchase).
 
 ## Profile
 
