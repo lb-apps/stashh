@@ -17,6 +17,7 @@ Rules:
 - portion_info for size/duration info (200ml, 2 kişilik, 30 dakika)
 - If an item has no price, set price to null
 - Keep the original ordering
+- Images appear as [IMG: url] markers in the text. If a marker appears directly before or after a menu item or category heading, use that URL as its image_url. Only assign an image when the position clearly ties it to that item — do not guess
 
 Return ONLY valid JSON matching this schema:
 {
@@ -47,13 +48,10 @@ Return ONLY valid JSON matching this schema:
 
 export async function parseMenuContent(
   content: string,
-  imageUrls: string[],
   apiKey: string,
   log: Logger,
 ): Promise<AiParseResult | null> {
-  const userMessage = imageUrls.length > 0
-    ? `Menu content:\n\n${content}\n\nAvailable image URLs from the page:\n${imageUrls.join("\n")}`
-    : `Menu content:\n\n${content}`;
+  const userMessage = `Menu content:\n\n${content}`;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {

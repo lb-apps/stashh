@@ -92,7 +92,7 @@ async function runPipeline(task: PlaceMenu, { config, repo, images, httpClient, 
     // 3. PARSE
     await repo.updateStatus(task.id, "parsing");
     taskLog.info({ contentLen: scraped.content.length, imageCount: scraped.imageUrls.length, type: scraped.contentType }, "sending to AI parser");
-    const parsed = await parseMenuContent(scraped.content, scraped.imageUrls, config.OPENROUTER_API_KEY, taskLog);
+    const parsed = await parseMenuContent(scraped.content, config.OPENROUTER_API_KEY, taskLog);
     if (!parsed) {
       await repo.markFailed(task.id, "AI parse returned no result", task.retry_count);
       return;
@@ -119,17 +119,23 @@ async function runPipeline(task: PlaceMenu, { config, repo, images, httpClient, 
     await repo.updateMenuSource(task.id, candidate.url, sourceType, menuType);
 
     for (const menu of parsed.menus) {
-      const savedCategories = await repo.saveCategories(
-        task.id,
-        menu.categories.map((cat, idx) => ({
-          name: cat.name,
-          name_en: cat.name_en ?? null,
-          description: cat.description ?? null,
-          description_en: cat.description_en ?? null,
-          image_url: null,
-          sort_order: idx,
-        })),
+      const categoryRows = await Promise.all(
+        menu.categories.map(async (cat, idx) => {
+          let storedImageUrl: string | null = null;
+          if (cat.image_url) {
+            storedImageUrl = await images.downloadAndStore(cat.image_url, task.place_id, `cat-${idx}`);
+          }
+          return {
+            name: cat.name,
+            name_en: cat.name_en ?? null,
+            description: cat.description ?? null,
+            description_en: cat.description_en ?? null,
+            image_url: storedImageUrl,
+            sort_order: idx,
+          };
+        }),
       );
+      const savedCategories = await repo.saveCategories(task.id, categoryRows);
 
       for (let catIdx = 0; catIdx < savedCategories.length; catIdx++) {
         const savedCat = savedCategories[catIdx]!;

@@ -25,6 +25,7 @@ export function cleanHtml(html: string, baseUrl: string): { text: string; imageU
   }
 
   const imageUrls: string[] = [];
+
   $("img[src]").each((_, el) => {
     const src = $(el).attr("src");
     if (!src) return;
@@ -32,13 +33,14 @@ export function cleanHtml(html: string, baseUrl: string): { text: string; imageU
       const absolute = new URL(src, baseUrl).href;
       if (absolute.startsWith("http") && !absolute.includes("data:")) {
         imageUrls.push(absolute);
+        $(el).replaceWith(`\n[IMG: ${absolute}]\n`);
       }
     } catch {
       // skip
     }
   });
 
-  const text = $("body").text().replace(/\s+/g, " ").trim();
+  const text = $("body").text().replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 
   const maxLength = 50_000;
   return {
