@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { commonErrorResponses, recognitionQuotaResponse, registry, successEnvelope } from "../../lib/openapi.js";
+import { billingStatusOpenApiSchema } from "../billing/openapi.js";
 import {
   channelIdentityParamsSchema,
   channelProfileSchema,
@@ -264,7 +265,15 @@ A code can be redeemed any number of times; an unknown code, or one whose owner 
         "application/json": {
           schema: successEnvelope(
             z
-              .object({ user_id: z.string().uuid(), token_hash: z.string(), type: z.literal("magiclink") })
+              .object({
+                user_id: z.string().uuid(),
+                token_hash: z.string(),
+                type: z.literal("magiclink"),
+                reward: z
+                  .object({ task: z.literal("first_web_visit"), credits: z.number().int() })
+                  .nullable()
+                  .describe("Credits earned by this first visit to the web app; null on every later one"),
+              })
               .openapi("RedeemedSignInLink"),
             "RedeemSignInLink",
           ),
@@ -272,6 +281,22 @@ A code can be redeemed any number of times; an unknown code, or one whose owner 
       },
     },
     410: { description: "Code unknown, or its owner was erased" },
+    ...commonErrorResponses,
+  },
+});
+
+// ── Plan and credits ────────────────────────────────────────────────────────
+
+registry.registerPath({
+  ...internal(),
+  method: "get",
+  path: "/users/{userId}/billing",
+  summary: "Get a person's plan and credits",
+  description:
+    "What `GET /api/v1/billing` returns, for the channel: the plan, the day's free analyses and when the next one comes back, credits, and tasks. The DM quotes the credits left after an analysis paid with one.",
+  request: { params: z.object({ userId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Plan and credits", content: { "application/json": { schema: successEnvelope(billingStatusOpenApiSchema, "GetUserBilling") } } },
     ...commonErrorResponses,
   },
 });

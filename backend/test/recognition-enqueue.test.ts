@@ -1,37 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { config } from "../src/config.js";
-import type { RecognitionRepository } from "../src/modules/recognitions/repository.js";
+import type { RecognitionQuota } from "../src/modules/billing/types.js";
+import type { CreateRecognitionTaskOutcome, RecognitionRepository } from "../src/modules/recognitions/repository.js";
 import { RecognitionService } from "../src/modules/recognitions/service.js";
-import type { RecognitionTaskInsert, RecognitionTaskRow } from "../src/modules/recognitions/types.js";
+import type { RecognitionTaskRow } from "../src/modules/recognitions/types.js";
 
+/**
+ * Stands in for `create_recognition_task`: replays a known key, and refuses once `allowance`
+ * tasks exist (the database decides the real allowance and credits; see the SQL tests).
+ */
 class FakeRepository {
   tasks: RecognitionTaskRow[] = [];
   results: Array<{ id: string; source_url: string; places: unknown }> = [];
-  /** Simulates another request inserting the same key between our read and our write. */
-  raceOnNextInsert: RecognitionTaskRow | null = null;
-
-  async getRecognitionByIdempotencyKey(owner: string, key: string) {
-    return this.tasks.find((t) => t.owner_user_id === owner && t.idempotency_key === key) ?? null;
-  }
-
-  /** Every task counts as started now; the cap test fills the day by itself. */
-  async countRecognitionsSince(owner: string) {
-    return this.tasks.filter((t) => t.owner_user_id === owner).length;
-  }
+  allowance = Number.POSITIVE_INFINITY;
+  quota: RecognitionQuota = { plan: "free", daily_limit: 3, used_today: 3, next_free_at: "2026-11-26T09:00:00+00:00", credits: 0 };
 
   async getRecognitionResultBySourceUrl(sourceUrl: string) {
     return this.results.find((r) => r.source_url === sourceUrl) ?? null;
   }
 
-  async createQueuedRecognition(insert: RecognitionTaskInsert): Promise<RecognitionTaskRow> {
-    if (this.raceOnNextInsert) {
-      this.tasks.push(this.raceOnNextInsert);
-      this.raceOnNextInsert = null;
-      throw Object.assign(new Error("duplicate key"), { code: "23505" });
+  async createRecognitionTask(params: {
+    ownerUserId: string;
+    sourceUrl: string;
+    sourceMedia: unknown;
+    options: unknown;
+    idempotencyKey: string | null;
+  }): Promise<CreateRecognitionTaskOutcome> {
+    const existing = params.idempotencyKey
+      ? this.tasks.find((t) => t.owner_user_id === params.ownerUserId && t.idempotency_key === params.idempotencyKey)
+      : undefined;
+    if (existing) return { status: "existing", task: existing };
+    if (this.tasks.filter((t) => t.owner_user_id === params.ownerUserId).length >= this.allowance) {
+      return { status: "quota", quota: this.quota };
     }
-    const row = task({ ...insert, id: `task-${this.tasks.length + 1}` });
+    const row = task({
+      id: `task-${this.tasks.length + 1}`,
+      owner_user_id: params.ownerUserId,
+      source_url: params.sourceUrl,
+      source_media: params.sourceMedia as RecognitionTaskRow["source_media"],
+      options: params.options as RecognitionTaskRow["options"],
+      idempotency_key: params.idempotencyKey,
+      charge: "allowance",
+      charge_status: "reserved",
+    });
     this.tasks.push(row);
-    return row;
+    return { status: "created", task: row };
   }
 }
 
@@ -47,6 +59,9 @@ function task(partial: Partial<RecognitionTaskRow> & { owner_user_id: string; so
     retry_count: 0,
     idempotency_key: null,
     source_media: null,
+    charge: null,
+    charge_status: null,
+    stage: null,
     available_at: "2026-10-14T00:00:00Z",
     created_at: "2026-10-14T00:00:00Z",
     updated_at: "2026-10-14T00:00:00Z",
@@ -117,13 +132,6 @@ describe("RecognitionService.enqueueRecognition", () => {
     expect(repo.tasks).toHaveLength(1);
   });
 
-  it("returns the winner when a concurrent request inserts the same key first", async () => {
-    const { repo, service } = setup();
-    repo.raceOnNextInsert = task({ id: "winner", owner_user_id: OWNER, source_url: URL, idempotency_key: "mid-2" });
-    const result = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "mid-2" });
-    expect(result.id).toBe("winner");
-  });
-
   it("creates a new task every time without a key", async () => {
     const { repo, service } = setup();
     await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } });
@@ -155,12 +163,17 @@ describe("RecognitionService.enqueueRecognition", () => {
     expect(repo.tasks).toHaveLength(1);
   });
 
-  it("refuses a new recognition once the owner started the day's cap, but still replays a known key", async () => {
+  it("refuses with the quota's details when nothing is left to pay with, but still replays a known key", async () => {
     const { repo, service } = setup();
-    for (let i = 0; i < config.RECOGNITIONS_DAILY_CAP; i++) repo.tasks.push(task({ id: `old-${i}`, owner_user_id: OWNER, source_url: URL, idempotency_key: `k-${i}` }));
+    repo.allowance = 1;
+    const first = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "k-1" });
 
-    await expect(service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } })).rejects.toMatchObject({ status: 429, errorCode: "RECOGNITION_QUOTA" });
-    const replay = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "k-3" });
-    expect(replay.id).toBe("old-3");
+    await expect(service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL } })).rejects.toMatchObject({
+      status: 429,
+      errorCode: "RECOGNITION_QUOTA",
+      details: repo.quota,
+    });
+    const replay = await service.enqueueRecognition({ ownerUserId: OWNER, source: { kind: "url", url: URL }, idempotencyKey: "k-1" });
+    expect(replay.id).toBe(first.id);
   });
 });

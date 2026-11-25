@@ -14,8 +14,6 @@ import type {
   SharedMediaFormat,
 } from "./types.js";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 interface RecognitionBackoffResult {
   retryCount: number;
   delayMilliseconds: number;
@@ -49,15 +47,9 @@ interface EnqueueRecognitionParams {
   options?: RecognitionTaskOptions;
   /**
    * Caller-supplied key (e.g. the channel's message id). A repeat with the same key
-   * for the same owner returns the original task instead of creating a second one.
+   * for the same owner returns the original task instead of creating (or charging) a second one.
    */
   idempotencyKey?: string;
-}
-
-const UNIQUE_VIOLATION = "23505";
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === UNIQUE_VIOLATION;
 }
 
 interface ProcessRecognitionSuccessParams {
@@ -137,38 +129,18 @@ export class RecognitionService {
         : source.caption
           ? { caption: source.caption }
           : null;
-    const options = params.options ?? {};
-    const { idempotencyKey } = params;
-
-    if (idempotencyKey) {
-      const existing = await this.recognitionRepository.getRecognitionByIdempotencyKey(params.ownerUserId, idempotencyKey);
-      if (existing) return existing;
+    const outcome = await this.recognitionRepository.createRecognitionTask({
+      ownerUserId: params.ownerUserId,
+      sourceUrl,
+      sourceMedia,
+      options: (params.options ?? {}) as Json,
+      idempotencyKey: params.idempotencyKey ?? null,
+    });
+    if (outcome.status === "quota") {
+      // Neither the day's free analyses nor a credit is left; the details say when one comes back.
+      throw new AppHttpError(429, "No free analyses or credits left", "RECOGNITION_QUOTA", outcome.quota);
     }
-
-    // One account cannot run up the model and Places bill by pasting link after link.
-    const startedToday = await this.recognitionRepository.countRecognitionsSince(params.ownerUserId, new Date(Date.now() - DAY_MS));
-    if (startedToday >= config.RECOGNITIONS_DAILY_CAP) {
-      throw new AppHttpError(429, "Daily recognition limit reached; try again tomorrow", "RECOGNITION_QUOTA");
-    }
-
-    try {
-      return await this.recognitionRepository.createQueuedRecognition({
-        owner_user_id: params.ownerUserId,
-        source_url: sourceUrl,
-        status: "queued",
-        retry_count: 0,
-        options: options as Json,
-        idempotency_key: idempotencyKey ?? null,
-        source_media: sourceMedia,
-      });
-    } catch (error) {
-      // Lost a race with a concurrent request carrying the same key: return the winner.
-      if (idempotencyKey && isUniqueViolation(error)) {
-        const winner = await this.recognitionRepository.getRecognitionByIdempotencyKey(params.ownerUserId, idempotencyKey);
-        if (winner) return winner;
-      }
-      throw error;
-    }
+    return outcome.task;
   }
 
   async getRecognition(recognitionId: string, ownerUserId: string): Promise<RecognitionWithResult | null> {

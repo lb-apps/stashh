@@ -9,7 +9,9 @@ import {
   resolveChannelIdentityBodySchema,
   staleChannelIdentitiesQuerySchema,
 } from "../identities/types.js";
+import { rootLogger } from "../../lib/logger.js";
 import { assistantRouter } from "../assistant/routes.js";
+import { createBillingService } from "../billing/factory.js";
 import { opsRouter } from "../ops/routes.js";
 import { createRecognitionServiceWithServiceRole } from "../recognitions/factory.js";
 import { presentAcceptedRecognition, presentRecognition } from "../recognitions/presenter.js";
@@ -179,6 +181,23 @@ internalRouter.get("/users/:userId/recognitions/:id", async (req, res, next) => 
   }
 });
 
+// ── Plan and credits ────────────────────────────────────────────────────────
+
+/** The person's plan, allowance, credits and tasks, for the channel to quote. */
+internalRouter.get("/users/:userId/billing", async (req, res, next) => {
+  const params = userParamsSchema.safeParse(req.params);
+  if (!params.success) {
+    sendError(res, req, 400, "VALIDATION_ERROR", "Invalid path", params.error.flatten().fieldErrors);
+    return;
+  }
+
+  try {
+    sendSuccess(res, req, 200, await createBillingService().status(params.data.userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Web sign-in links ───────────────────────────────────────────────────────
 
 /** A personal link to the web app, for the channel to send to `userId`. */
@@ -210,7 +229,14 @@ internalRouter.post("/sign-in-links/redeem", async (req, res, next) => {
       sendError(res, req, 410, "SIGN_IN_LINK_INVALID", "This sign-in link is invalid");
       return;
     }
-    sendSuccess(res, req, 200, redeemed);
+    // Coming to the web app earns its task's credits once. A failed grant never blocks the sign-in.
+    const reward = await createBillingService()
+      .rewardFirstWebVisit(redeemed.user_id)
+      .catch((error: unknown) => {
+        rootLogger.warn({ err: error, userId: redeemed.user_id }, "first web visit reward not granted");
+        return null;
+      });
+    sendSuccess(res, req, 200, { ...redeemed, reward });
   } catch (error) {
     next(error);
   }

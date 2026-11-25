@@ -15,6 +15,9 @@ export function presentRecognition({ task, places, names_elsewhere }: Recognitio
     error_message: task.error_message,
     error_code: recognitionErrorCode(task),
     retry_count: task.retry_count,
+    // What paid for it: the daily allowance or a credit; charged only when it found a place.
+    charge: task.charge,
+    charge_status: task.charge_status,
     started_at: task.started_at,
     finished_at: task.finished_at,
     created_at: task.created_at,

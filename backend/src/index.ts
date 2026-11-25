@@ -9,6 +9,7 @@ import { libraryRouter } from "./modules/library/routes.js";
 import { placesRouter } from "./modules/places/routes.js";
 import { recognitionsRouter } from "./modules/recognitions/routes.js";
 import { meRouter } from "./modules/me/routes.js";
+import { billingRouter } from "./modules/billing/routes.js";
 import { rootLogger } from "./lib/logger.js";
 import { requireAuth } from "./middleware/auth.js";
 import { apiRateLimiter, internalRateLimiter } from "./middleware/rateLimiter.js";
@@ -96,6 +97,10 @@ app.use("/api/v1/recognitions", requireAuth, apiRateLimiter, recognitionsRouter)
 // ── Profile (protected + rate limited) ───────────────────────────────────────
 
 app.use("/api/v1/me", requireAuth, apiRateLimiter, meRouter);
+
+// ── Plan, allowance and credits (protected + rate limited) ──────────────────
+
+app.use("/api/v1/billing", requireAuth, apiRateLimiter, billingRouter);
 
 // ── Internal API (service-to-service; service token, never user JWTs) ───────
 
