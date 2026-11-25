@@ -141,10 +141,30 @@ duplicate or late event just syncs again. (Changed from the first plan, which st
 - [x] Analytics: `premium_purchased.store` gains `paddle`; `premium_plan_selected.available` is true when the
       purchase can happen. RevenueCat's Mixpanel integration stays off (events stay in the interfaces);
       renewals and cancellations are read in RevenueCat and ops.
-- [ ] Owner, with my help: RevenueCat v2 secret key and webhook (URL `https://api.stashh.me/webhooks/revenuecat`,
-      the auth value generated into env files, never printed); env on the Mac and on `home-server`.
-- [ ] Sandbox purchase end to end: checkout → `/billing/sync` → Premium; webhook → same; cancel → Free at
-      period end.
+- [x] RevenueCat setup (2026-11-25): v2 project id `proj4bee9680`; secret key "Stashh backend" (v2,
+      customers read_write + subscriptions read, nothing else); webhook "Stashh backend"
+      (`whintgr791267996884412fabc2a0d9a99fd559`) → `https://api.stashh.me/webhooks/revenuecat`, both
+      environments, all events, **Disabled** until production runs this code. Keys reached the env files
+      from the clipboard, never printed. On this Mac (`backend/.env`, `web/.env.local`, gitignored):
+      `REVENUECAT_*` with `sandbox,production`, and `NEXT_PUBLIC_REVENUECAT_API_KEY`.
+      Incident, same day: sourcing `backend/.env` in a shell split the first webhook value ("Bearer <hex>")
+      at its space and printed the hex in an error, so it was rotated at once; values now carry no spaces
+      (`.env.example` says so). Read single values with `grep '^KEY=' | cut -d= -f2-`, never `. ./.env`.
+- [x] Sandbox purchase end to end on this Mac (IAB simulator, iPhone frame): price ₺129,99 / ay and
+      ₺999,99 / yıl from the offering; Paddle checkout in Turkish with VAT shown (₺108,33 + ₺21,66);
+      test card → "Ödeme tamamlandı" → `/billing/sync` 200 → "Premium’dasın, 25 Aralık 2026 tarihine kadar"
+      and "Aboneliği yönet" (Paddle sandbox portal, 48 px). Row: premium / revenuecat / PADDLE /
+      2026-12-25. Local webhook: right value syncs (anonymous alias skipped), wrong 401, TEST 200.
+- [ ] Deploy, after the PR merges into `develop`: on `home-server`, `~/HomeServer/stashh/env/backend.env`
+      gets `REVENUECAT_PROJECT_ID`, `REVENUECAT_SECRET_KEY`, `REVENUECAT_WEBHOOK_AUTH` (the value in
+      RevenueCat) and `REVENUECAT_ENVIRONMENTS` (`sandbox,production` while Phase 2 is tested, then
+      `production`); restart the backend; set the webhook Active and send RevenueCat's test event (expect 200).
+      Vercel: `NEXT_PUBLIC_REVENUECAT_API_KEY` on Preview only, never Production before Phase 3.
+- [ ] Cancel in the sandbox portal → access until the period ends → the webhook (`EXPIRATION`) drops to Free.
+- [ ] Optional: Paddle checkout in Discovery colours (RevenueCat → Web → Stashh (Paddle) → Appearance:
+      cobalt button instead of Paddle's green); HMAC webhook signing as a second check.
+- [ ] Sandbox test user `05cd2fe2-…` is on a sandbox Premium until 2026-12-25; set back to Free from ops
+      (or cancel in the portal) once testing ends.
 - [ ] Moved to Phase 3: the data-deletion page's note that Paddle keeps invoices by law (nobody can pay in
       production before then).
 - [ ] `mock_purchases` off; `mock` plans reset.
