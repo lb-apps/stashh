@@ -95,12 +95,20 @@ the cap line in `docs/security/ai-safety.md`.
 - [x] RevenueCat project "Stashh" (`4bee9680`, 2026-11-25, Little Big Apps Chrome window): entitlement
       `premium`; offering `default` with monthly and yearly packages; Test Store products `premium_monthly`
       and `premium_yearly` attached to both. No secret key or webhook yet.
-- [ ] Owner: Paddle sandbox account (sandbox-login.paddle.com; signing up needs the owner's password and
-      email check).
-- [ ] Paddle Billing connected in RevenueCat (Web → Paddle Billing → Add Paddle config); products
-      `premium_monthly` and `premium_yearly` in Paddle (USD base, TRY price override), imported into
-      RevenueCat and attached to `premium` and the `default` offering's packages. Credit packs later as Paddle
-      one-time products (supported; check a repeat purchase in the sandbox).
+- [x] Paddle sandbox account "Little Big Apps" (2026-11-25). Checkout: `stashh.me` and `pay.rev.cat`
+      approved, default payment link `https://pay.rev.cat`, checkout recovery emails off. Product "Stashh
+      Premium" `pro_01m89t9j4bcczzha1kd4qaqgd2` (Standard digital goods), tax by location:
+      - "Premium · Aylık" `pri_01m89tb2zp086es5db2cek4xm0`: $3.99/month, Turkey ₺129.99;
+      - "Premium · Yıllık" `pri_01m89tbzwm1hepzb5ysxgtedjm`: $29.99/year, Turkey ₺999.99.
+      Prices are placeholders, not decided; the owner sets them before Phase 3.
+- [x] Paddle Billing connected in RevenueCat: web config "Stashh (Paddle)" `app6e836d09cf` (Sandbox),
+      automatic purchase tracking, inline checkout in purchases-js. Paddle API key "RevenueCat" (never expires,
+      RevenueCat's 17 minimum permissions) lives only in that config. Both prices imported as
+      `premium_monthly` / `premium_yearly`, attached to `premium`, and added to the `default` offering
+      (`ofrngdf93253d5d`) next to the Test Store products (`$rc_monthly`, `$rc_annual`).
+- [ ] Credit packs later as Paddle one-time products (supported; check a repeat purchase in the sandbox).
+- [ ] Live (Phase 3) needs a second Paddle config in RevenueCat with the live account's key, and
+      `stashh.me` approved there (Paddle reviews it).
 - [ ] Web: `@revenuecat/purchases-js`, configured after sign-in with the session user id; paywall prices from
       the offering; purchase through Paddle checkout. Check the checkout, 3-D Secure included, inside the
       Instagram in-app browser on a real phone.
