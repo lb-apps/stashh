@@ -214,6 +214,7 @@ async function processRecognition(
       location_hint: place.location_hint,
       instagram_username: place.instagram_username,
       recommendations: place.recommendations,
+      transcript_mentions: place.transcript_mentions,
       confidence_score: place.confidence_score,
       source: place.source,
       matched_place: placeMatches.get(place.name) ?? null,

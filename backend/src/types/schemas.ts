@@ -34,6 +34,19 @@ export interface SourceContent {
   author_username?: string | null;
 }
 
+// ── Transcript ────────────────────────────────────────────
+
+export interface TranscriptSegment {
+  text: string;
+  start_s: number;
+  end_s: number;
+}
+
+export interface Transcript {
+  full_text: string;
+  segments: TranscriptSegment[];
+}
+
 // ── AI extraction result ───────────────────────────────────
 
 export type VenueRecommendationKind =
@@ -76,6 +89,7 @@ export interface ExtractedPlace {
   recommendations: VenueRecommendation[];
   confidence_score: number;
   source: "caption" | "video" | "both";
+  transcript_mentions: TranscriptSegment[];
 }
 
 export interface AIAnalysisResult {
@@ -98,6 +112,7 @@ export interface AIAnalysisResult {
   model: string;
   provider: string | null;
   usage: ModelUsage | null;
+  transcript: Transcript | null;
 }
 
 // ── Google Places enrichment ───────────────────────────────
@@ -124,6 +139,7 @@ export interface ExtractedPlaceWithMatch {
   recommendations: VenueRecommendation[];
   confidence_score: number;
   source: "caption" | "video" | "both";
+  transcript_mentions: TranscriptSegment[];
   matched_place: MatchedPlace | null;
 }
 
