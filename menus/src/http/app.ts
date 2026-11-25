@@ -9,6 +9,7 @@ export interface AppOptions {
   refreshHandler: express.RequestHandler;
   opsMenusHandler: express.RequestHandler;
   opsMenuDetailHandler: express.RequestHandler;
+  opsMenuListHandler: express.RequestHandler;
 }
 
 export function createApp(options: AppOptions) {
@@ -38,6 +39,7 @@ export function createApp(options: AppOptions) {
   app.get("/internal/v1/status/:menuId", auth, options.statusHandler);
   app.post("/internal/v1/refresh/:placeId", auth, options.refreshHandler);
   app.get("/internal/v1/ops/menus", auth, options.opsMenusHandler);
+  app.get("/internal/v1/ops/menu-list", auth, options.opsMenuListHandler);
   app.get("/internal/v1/ops/menus/:menuId", auth, options.opsMenuDetailHandler);
 
   app.use(((err: Error, _req, res, _next) => {

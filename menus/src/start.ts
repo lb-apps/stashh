@@ -2,7 +2,7 @@ import { createSupabaseClient } from "./storage/supabase.ts";
 import { MenuRepository } from "./storage/repository.ts";
 import { ImageStorage } from "./storage/images.ts";
 import { createApp } from "./http/app.ts";
-import { createDiscoverHandler, createStatusHandler, createRefreshHandler, createOpsMenusHandler, createOpsMenuDetailHandler } from "./http/routes.ts";
+import { createDiscoverHandler, createStatusHandler, createRefreshHandler, createOpsMenusHandler, createOpsMenuDetailHandler, createOpsMenuListHandler } from "./http/routes.ts";
 import { MenuWorker } from "./worker/worker.ts";
 import { createPipeline } from "./worker/pipeline.ts";
 import { HttpClient } from "./lib/http-client.ts";
@@ -34,6 +34,7 @@ const app = createApp({
   refreshHandler: createRefreshHandler(repo, log),
   opsMenusHandler: createOpsMenusHandler(repo),
   opsMenuDetailHandler: createOpsMenuDetailHandler(repo),
+  opsMenuListHandler: createOpsMenuListHandler(repo),
 });
 
 const server = app.listen(config.PORT, () => {

@@ -93,6 +93,13 @@ export function createOpsMenuDetailHandler(repo: MenuRepository): RequestHandler
   };
 }
 
+export function createOpsMenuListHandler(repo: MenuRepository): RequestHandler {
+  return async (_req, res) => {
+    const menus = await repo.listAllMenus();
+    res.json({ ok: true, data: menus });
+  };
+}
+
 export function createRefreshHandler(repo: MenuRepository, log: Logger): RequestHandler {
   return async (req, res) => {
     const placeId = req.params["placeId"];

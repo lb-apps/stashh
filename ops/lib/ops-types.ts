@@ -263,6 +263,24 @@ export interface PlaceMenuSummary {
   updated_at: string;
 }
 
+export interface PlaceMenuListItem {
+  id: string;
+  place_id: string;
+  place_name: string | null;
+  google_place_id: string | null;
+  status: MenuDiscoveryStatus;
+  menu_type: string;
+  language: string;
+  source_url: string;
+  source_type: string;
+  error_message: string | null;
+  retry_count: number;
+  categories_count: number;
+  items_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MenuDetailItem {
   id: string;
   category_id: string;

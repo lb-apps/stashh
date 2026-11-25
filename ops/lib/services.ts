@@ -148,6 +148,18 @@ export async function fetchMenuDetail(menuId: string): Promise<unknown | null> {
   return ((await response.json()) as { data: unknown }).data;
 }
 
+/** Menus: list all menus with place names and counts. */
+export async function fetchMenuList(): Promise<unknown[]> {
+  const urlVar = "MENUS_API_URL";
+  const tokenVar = "MENUS_OPS_TOKEN";
+  const url = process.env[urlVar];
+  const token = process.env[tokenVar];
+  if (!url || !token) return [];
+  const config: ServiceConfig = { name: "Menus", url: url.replace(/\/$/, ""), token };
+  const body = (await getJson(config, "/internal/v1/ops/menu-list")) as { data: unknown[] };
+  return body.data ?? [];
+}
+
 /** Instagram channel: DM ops snapshot. */
 export async function fetchInstagramOps(range: OpsRange): Promise<unknown> {
   return getJson(service("Instagram", "INSTAGRAM_API_URL", "INSTAGRAM_OPS_TOKEN"), `/ops/stats?range=${range}`);

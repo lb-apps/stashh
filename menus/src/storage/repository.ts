@@ -64,6 +64,24 @@ export interface PlaceMenuSummary {
   updated_at: string;
 }
 
+export interface PlaceMenuListItem {
+  id: string;
+  place_id: string;
+  place_name: string | null;
+  google_place_id: string | null;
+  status: MenuStatus;
+  menu_type: string;
+  language: string;
+  source_url: string;
+  source_type: string;
+  error_message: string | null;
+  retry_count: number;
+  categories_count: number;
+  items_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const MAX_RETRIES = 3;
 
 export class MenuRepository {
@@ -262,6 +280,64 @@ export class MenuRepository {
       .eq("status", "done")
       .order("menu_type");
     return menus ?? [];
+  }
+
+  async listAllMenus(limit = 100): Promise<PlaceMenuListItem[]> {
+    const { data: menus } = await this.db
+      .from("place_menus")
+      .select("id, place_id, source_url, source_type, menu_type, language, status, error_message, retry_count, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+
+    if (!menus || menus.length === 0) return [];
+
+    const placeIds = [...new Set(menus.map((m: { place_id: string }) => m.place_id))];
+    const { data: places } = await this.db
+      .from("places")
+      .select("id, name, google_place_id")
+      .in("id", placeIds);
+
+    const placeMap = new Map((places ?? []).map((p: { id: string; name: string; google_place_id: string }) => [p.id, p]));
+
+    const doneIds = menus.filter((m: { status: string }) => m.status === "done").map((m: { id: string }) => m.id);
+    let categoryCounts = new Map<string, number>();
+    let itemCounts = new Map<string, number>();
+
+    if (doneIds.length > 0) {
+      const { data: cats } = await this.db.from("menu_categories").select("id, menu_id").in("menu_id", doneIds);
+      for (const c of cats ?? []) categoryCounts.set(c.menu_id, (categoryCounts.get(c.menu_id) ?? 0) + 1);
+
+      const catIds = (cats ?? []).map((c: { id: string }) => c.id);
+      if (catIds.length > 0) {
+        const { data: items } = await this.db.from("menu_items").select("category_id").in("category_id", catIds);
+        const catToMenu = new Map((cats ?? []).map((c: { id: string; menu_id: string }) => [c.id, c.menu_id]));
+        for (const i of items ?? []) {
+          const menuId = catToMenu.get(i.category_id);
+          if (menuId) itemCounts.set(menuId, (itemCounts.get(menuId) ?? 0) + 1);
+        }
+      }
+    }
+
+    return menus.map((m) => {
+      const place = placeMap.get(m.place_id);
+      return {
+        id: m.id,
+        place_id: m.place_id,
+        place_name: (place as { name?: string })?.name ?? null,
+        google_place_id: (place as { google_place_id?: string })?.google_place_id ?? null,
+        status: m.status as MenuStatus,
+        menu_type: m.menu_type,
+        language: m.language,
+        source_url: m.source_url,
+        source_type: m.source_type,
+        error_message: m.error_message,
+        retry_count: m.retry_count,
+        categories_count: categoryCounts.get(m.id) ?? 0,
+        items_count: itemCounts.get(m.id) ?? 0,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+      };
+    });
   }
 }
 
