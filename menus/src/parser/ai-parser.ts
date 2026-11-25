@@ -17,8 +17,6 @@ Rules:
 - portion_info for size/duration info (200ml, 2 kişilik, 30 dakika)
 - If an item has no price, set price to null
 - Keep the original ordering
-- Images appear as [IMG: url] markers in the text. If a marker appears directly before or after a menu item or category heading, use that URL as its image_url. Only assign an image when the position clearly ties it to that item — do not guess
-
 Return ONLY valid JSON matching this schema:
 {
   "menus": [{
@@ -29,7 +27,6 @@ Return ONLY valid JSON matching this schema:
       "name_en": "English Name or null",
       "description": "Category description or null",
       "description_en": "English description or null",
-      "image_url": "URL or null",
       "items": [{
         "name": "Item Name",
         "name_en": "English Name or null",
@@ -37,7 +34,6 @@ Return ONLY valid JSON matching this schema:
         "description_en": "English description or null",
         "price": 150.00,
         "currency": "TRY",
-        "image_url": "URL or null",
         "is_available": true,
         "tags": ["vegan"],
         "portion_info": "200ml"
@@ -51,7 +47,8 @@ export async function parseMenuContent(
   apiKey: string,
   log: Logger,
 ): Promise<AiParseResult | null> {
-  const userMessage = `Menu content:\n\n${content}`;
+  const cleaned = content.replace(/\[IMG:[^\]]*\]\n?/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const userMessage = `Menu content:\n\n${cleaned}`;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -87,9 +84,13 @@ export async function parseMenuContent(
     }
 
     const json: unknown = JSON.parse(raw);
+    const rawMenus = (json as any)?.menus;
+    if (Array.isArray(rawMenus)) {
+      log.info({ menuCount: rawMenus.length, categories: rawMenus.map((m: any) => ({ type: m.menu_type, cats: m.categories?.length, items: m.categories?.reduce((s: number, c: any) => s + (c.items?.length ?? 0), 0) })) }, "raw AI parse result");
+    }
     const parsed = aiParseResultSchema.safeParse(json);
     if (!parsed.success) {
-      log.warn({ issues: parsed.error.issues.slice(0, 3) }, "AI output failed validation");
+      log.warn({ issues: parsed.error.issues.slice(0, 5) }, "AI output failed validation");
       return null;
     }
 

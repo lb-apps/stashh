@@ -118,57 +118,57 @@ async function runPipeline(task: PlaceMenu, { config, repo, images, httpClient, 
       : parsed.menus.map((m) => m.menu_type).join("+");
     await repo.updateMenuSource(task.id, candidate.url, sourceType, menuType);
 
-    for (const menu of parsed.menus) {
-      const categoryRows = await Promise.all(
-        menu.categories.map(async (cat, idx) => {
+    const allCategories = parsed.menus.flatMap((m) => m.categories);
+    taskLog.info({ menuCount: parsed.menus.length, categoryCount: allCategories.length, itemCount: allCategories.reduce((s, c) => s + c.items.length, 0) }, "flattened menus for storage");
+    const categoryRows = await Promise.all(
+      allCategories.map(async (cat, idx) => {
+        let storedImageUrl: string | null = null;
+        if (cat.image_url) {
+          storedImageUrl = await images.downloadAndStore(cat.image_url, task.place_id, `cat-${idx}`);
+        }
+        return {
+          name: cat.name,
+          name_en: cat.name_en ?? null,
+          description: cat.description ?? null,
+          description_en: cat.description_en ?? null,
+          image_url: storedImageUrl,
+          sort_order: idx,
+        };
+      }),
+    );
+    const savedCategories = await repo.saveCategories(task.id, categoryRows);
+
+    for (let catIdx = 0; catIdx < savedCategories.length; catIdx++) {
+      const savedCat = savedCategories[catIdx]!;
+      const parsedCat = allCategories[catIdx]!;
+
+      const itemRows = await Promise.all(
+        parsedCat.items.map(async (item, itemIdx) => {
           let storedImageUrl: string | null = null;
-          if (cat.image_url) {
-            storedImageUrl = await images.downloadAndStore(cat.image_url, task.place_id, `cat-${idx}`);
+          const originalImageUrl = item.image_url ?? null;
+
+          if (originalImageUrl) {
+            storedImageUrl = await images.downloadAndStore(originalImageUrl, task.place_id, `${savedCat.id}-${itemIdx}`);
           }
+
           return {
-            name: cat.name,
-            name_en: cat.name_en ?? null,
-            description: cat.description ?? null,
-            description_en: cat.description_en ?? null,
+            name: item.name,
+            name_en: item.name_en ?? null,
+            description: item.description ?? null,
+            description_en: item.description_en ?? null,
+            price: item.price ?? null,
+            currency: item.currency ?? "TRY",
             image_url: storedImageUrl,
-            sort_order: idx,
+            original_image_url: originalImageUrl,
+            is_available: item.is_available ?? true,
+            sort_order: itemIdx,
+            tags: item.tags ?? [],
+            portion_info: item.portion_info ?? null,
           };
         }),
       );
-      const savedCategories = await repo.saveCategories(task.id, categoryRows);
 
-      for (let catIdx = 0; catIdx < savedCategories.length; catIdx++) {
-        const savedCat = savedCategories[catIdx]!;
-        const parsedCat = menu.categories[catIdx]!;
-
-        const itemRows = await Promise.all(
-          parsedCat.items.map(async (item, itemIdx) => {
-            let storedImageUrl: string | null = null;
-            const originalImageUrl = item.image_url ?? null;
-
-            if (originalImageUrl) {
-              storedImageUrl = await images.downloadAndStore(originalImageUrl, task.place_id, `${savedCat.id}-${itemIdx}`);
-            }
-
-            return {
-              name: item.name,
-              name_en: item.name_en ?? null,
-              description: item.description ?? null,
-              description_en: item.description_en ?? null,
-              price: item.price ?? null,
-              currency: item.currency ?? "TRY",
-              image_url: storedImageUrl,
-              original_image_url: originalImageUrl,
-              is_available: item.is_available ?? true,
-              sort_order: itemIdx,
-              tags: item.tags ?? [],
-              portion_info: item.portion_info ?? null,
-            };
-          }),
-        );
-
-        await repo.saveItems(savedCat.id, itemRows);
-      }
+      await repo.saveItems(savedCat.id, itemRows);
     }
 
     await repo.updateStatus(task.id, "done", {

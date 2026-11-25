@@ -42,7 +42,13 @@ export function cleanHtml(html: string, baseUrl: string): { text: string; imageU
     }
   });
 
-  const text = $("body").text().replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  const text = $("body").text()
+    .split("\n")
+    .map(line => line.replace(/[ \t]+/g, " ").trim())
+    .filter(line => line.length > 0)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   const maxLength = 50_000;
   return {
