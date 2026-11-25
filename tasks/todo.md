@@ -116,29 +116,29 @@ API v2 and writes the plan; the webhook and the web both call it, so every entry
 construction (it re-reads the state, never applies a delta). That makes an events table unnecessary: a
 duplicate or late event just syncs again. (Changed from the first plan, which stored events by id.)
 
-- [ ] Backend `lib`/billing: a RevenueCat v2 client (`GET …/customers/{id}/subscriptions`, paginated;
+- [x] Backend `lib`/billing: a RevenueCat v2 client (`GET …/customers/{id}/subscriptions`, paginated;
       `DELETE …/customers/{id}`), bounded by a timeout. `BillingService.syncFromRevenueCat(userId)`: Premium
       while a subscription `gives_access`, is in an allowed environment and carries entitlement `premium`
       (until the latest `ends_at`, store from the subscription); otherwise a plan whose source is `revenuecat`
       falls back to Free, and admin / mock plans stay untouched. An unknown person (FK 23503) is skipped.
-- [ ] Backend `POST /webhooks/revenuecat` (outside `/internal` and `/api`): `Authorization` compared as
+- [x] Backend `POST /webhooks/revenuecat` (outside `/internal` and `/api`): `Authorization` compared as
       SHA-256 digests with `timingSafeEqual` against `REVENUECAT_WEBHOOK_AUTH`; every UUID among `app_user_id`,
       `original_app_user_id`, `aliases`, `transferred_from/_to` is synced; `200` after the sync, an error
       status if it fails so RevenueCat retries. `TEST` events answer `200` without work.
-- [ ] Backend `POST /api/v1/billing/sync`: the web calls it when a purchase resolves, so Premium shows
+- [x] Backend `POST /api/v1/billing/sync`: the web calls it when a purchase resolves, so Premium shows
       before the webhook lands.
-- [ ] Config, all optional (unset → sync/webhook `503 PURCHASES_UNAVAILABLE`): `REVENUECAT_PROJECT_ID`,
+- [x] Config, all optional (unset → sync/webhook `503 PURCHASES_UNAVAILABLE`): `REVENUECAT_PROJECT_ID`,
       `REVENUECAT_SECRET_KEY` (v2; customers read_write, subscriptions read), `REVENUECAT_WEBHOOK_AUTH`
       (≥ 32 chars), `REVENUECAT_ENVIRONMENTS` (default `production`; `sandbox,production` while testing).
-- [ ] "sil": the internal erase also deletes the RevenueCat customer (`404` = nothing there); a failure
+- [x] "sil": the internal erase also deletes the RevenueCat customer (`404` = nothing there); a failure
       fails the erase, which is idempotent, so a retry finishes it.
-- [ ] Web: `NEXT_PUBLIC_REVENUECAT_API_KEY` (the Paddle config's public key). Unset → today's fake door /
+- [x] Web: `NEXT_PUBLIC_REVENUECAT_API_KEY` (the Paddle config's public key). Unset → today's fake door /
       mock purchase, so production stays a fake door until Phase 3. Set → prices from the `default`
       offering; `@revenuecat/purchases-js` loaded on demand and configured with the Supabase user id; the
       purchase opens Paddle's checkout; on success `/billing/sync`; a renewal note under the button;
       someone on a `revenuecat` plan gets "Manage subscription" (`customerInfo.managementURL`). Check the
-      checkout, 3-D Secure included, in the IAB simulator, then on a real phone.
-- [ ] Analytics: `premium_purchased.store` gains `paddle`; `premium_plan_selected.available` is true when the
+      checkout, 3-D Secure included, in the IAB simulator, then on a real phone (not yet).
+- [x] Analytics: `premium_purchased.store` gains `paddle`; `premium_plan_selected.available` is true when the
       purchase can happen. RevenueCat's Mixpanel integration stays off (events stay in the interfaces);
       renewals and cancellations are read in RevenueCat and ops.
 - [ ] Owner, with my help: RevenueCat v2 secret key and webhook (URL `https://api.stashh.me/webhooks/revenuecat`,
