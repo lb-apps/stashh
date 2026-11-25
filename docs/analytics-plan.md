@@ -147,6 +147,10 @@ user id in both projects.
 | `source_post_opened` | open the post, from a place | `surface` |
 | `location_permission_answered` | location asked for from profile or home | `is_granted`, `surface` |
 | `user_signed_out` | sign-out confirmed | — |
+| `paywall_viewed` | the Premium screen opened | `source`: dm, profile |
+| `premium_plan_selected` | Premium's button tapped | `period`: monthly, yearly; `available` (false = the "coming soon" fake door) |
+| `premium_purchased` | Premium granted (today only the mock paywall) | `period`, `store`: mock |
+| `credits_earned` | a task's credits were granted | `task`: first_list, first_web_visit; `credits` |
 
 **From the DM conversation** (`instagram/src/analytics/events.ts`):
 
@@ -154,10 +158,14 @@ user id in both projects.
 |---|---|---|
 | `user_signed_up` | the person's first message created their account | — |
 | `recognition_started` | a share or a pasted link is taken in | `entry`: dm_share, dm_link; `source_type`: reel, post, story, tiktok |
-| `recognition_completed` | the places reached the person (already on their map) | `place_count`, `duration_ms`, `entry`, `source_type` |
-| `recognition_failed` | the person got an answer without places | `reason`: private, unavailable, unreadable, no_places, needs_link, timed_out, daily_limit, error; `duration_ms`, `entry`, `source_type` |
+| `recognition_completed` | the places reached the person (already on their map) | `place_count`, `duration_ms`, `entry`, `source_type`; `paid_with`: allowance, credit |
+| `recognition_failed` | the person got an answer without places | `reason`: private, unavailable, unreadable, no_places, needs_link, timed_out, daily_limit, error; `duration_ms`, `entry`, `source_type`; `plan`: free, premium (with daily_limit) |
 
 `duration_ms` is the person's wait: from their message to the answer.
+
+`daily_limit` means the plan's free analyses for the last 24 hours and the person's credits were
+both used up. Only an analysis that found a place uses either, so `paid_with` is on
+`recognition_completed` only.
 
 **Back in use (2026-11-12):** `recognition_started`, `recognition_completed` and
 `recognition_failed` were the web's paste flow until 2026-11-10 (`entry`: clipboard,
@@ -177,6 +185,9 @@ Lexicon in both projects.
 - **Arrival:** `map_link_opened` → `place_viewed`.
 - **Going:** `place_viewed` → `directions_opened`.
 - **Landing:** `$mp_web_page_view` (path `/`) → `instagram_cta_clicked`.
+- **Premium demand:** `recognition_failed` (`daily_limit`) → `paywall_viewed` (`source`: dm) →
+  `premium_plan_selected`; the profile property `plan` splits every report by plan.
+- **Credits:** `credits_earned` by `task`; `recognition_completed` by `paid_with`.
 
 ## Meta: Pixel and Conversions API
 

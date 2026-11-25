@@ -240,9 +240,28 @@ One Meta app, one Instagram account, no test app: Meta's Instagram callback is
 ## Backend / API
 
 - **Canonical reference:** the running Scalar UI at `/docs` and the spec at `/openapi.json`.
-- **Source of truth:** `backend/src/modules/<domain>/openapi.ts` + `routes.ts` (domains: `places`, `lists`, `library`, `recognitions`).
+- **Source of truth:** `backend/src/modules/<domain>/openapi.ts` + `routes.ts` (domains: `places`, `lists`, `library`, `recognitions`, `billing`).
 - **"Which endpoints power screen X?"** → [docs/api-screen-map.md](docs/api-screen-map.md).
 - **Envelope:** every response is `{ ok, data, meta, error }`. Auth is a Supabase JWT Bearer token on every request.
+
+## Plans and credits
+
+Free and Premium; each has a daily allowance of analyses (rolling 24 h), then an analysis spends one
+credit. Only an analysis that finds a place counts. Guide: [docs/api-screen-map.md](docs/api-screen-map.md)
+(Plan and credits).
+
+- **The rules live in the database**, not in TypeScript: `create_recognition_task` reserves the
+  allowance or a credit under the person's `billing_accounts` row lock; a trigger settles it when the
+  task ends (charged / released); `credit_ledger` is append-only and `(user_id, reason, ref)` is unique,
+  so every grant and spend happens once. Never count usage or move credits from application code.
+- **Settings are one row** (`billing_settings`), edited from ops → Billing; no deploy.
+- **One person, one id**: the Supabase user id is the id in Supabase, Mixpanel (`$user_id`) and
+  RevenueCat (App User ID, set only after sign-in, never anonymous).
+- **Payments (next):** RevenueCat with Paddle on the web, the App Store on iOS, one `premium`
+  entitlement. Bought credits never expire (App Store 3.1.1). Following @stashh.me earns nothing
+  (Meta's spam standard bans exchanging anything for follows); credit tasks live in the product.
+- **Only the backend writes recognition tasks.** People read their own through RLS and nothing else;
+  the worker wakes on an empty Realtime broadcast (`recognition-worker`), never on table changes.
 
 ## AI safety
 

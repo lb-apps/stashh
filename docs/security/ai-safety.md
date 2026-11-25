@@ -42,9 +42,11 @@ on the erase button erases, everything else goes to the assistant.
    refusal). `delete_list` / `remove_place` run only when the channel reports a real tap on that
    exact button in the same turn. A typed "[tapped …]" is defused text.
 6. **Least privilege and caps.** Every tool is scoped to the sender. 60 assistant turns a day per
-   user (`assistant_settings.daily_turn_cap`), and 100 recognitions a day per user
-   (`RECOGNITIONS_DAILY_CAP`, `429 RECOGNITION_QUOTA`, a fixed DM line). Per-minute rate limits on
-   both APIs.
+   user (`assistant_settings.daily_turn_cap`). Recognitions are paid for by the plan's daily
+   allowance or a credit (`billing_settings`, `create_recognition_task`, under the person's account
+   lock): with neither left the share is refused with `429 RECOGNITION_QUOTA` and a fixed DM line.
+   Only the backend writes recognition tasks; people can read their own and nothing else.
+   Per-minute rate limits on both APIs.
 
 ## Rules for new work
 
