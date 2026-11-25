@@ -17,6 +17,7 @@ Rules:
 - portion_info for size/duration info (200ml, 2 kişilik, 30 dakika)
 - If an item has no price, set price to null
 - Keep the original ordering
+- Images appear as [IMG: <url>] markers in the text. When an image appears next to or inside an item or category, include its URL as image_url. If no image is nearby, set image_url to null
 Return ONLY valid JSON matching this schema:
 {
   "menus": [{
@@ -27,6 +28,7 @@ Return ONLY valid JSON matching this schema:
       "name_en": "English Name or null",
       "description": "Category description or null",
       "description_en": "English description or null",
+      "image_url": "https://example.com/category.jpg or null",
       "items": [{
         "name": "Item Name",
         "name_en": "English Name or null",
@@ -34,6 +36,7 @@ Return ONLY valid JSON matching this schema:
         "description_en": "English description or null",
         "price": 150.00,
         "currency": "TRY",
+        "image_url": "https://example.com/item.jpg or null",
         "is_available": true,
         "tags": ["vegan"],
         "portion_info": "200ml"
@@ -47,7 +50,7 @@ export async function parseMenuContent(
   apiKey: string,
   log: Logger,
 ): Promise<AiParseResult | null> {
-  const cleaned = content.replace(/\[IMG:[^\]]*\]\n?/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const cleaned = content.replace(/\n{3,}/g, "\n\n").trim();
   const userMessage = `Menu content:\n\n${cleaned}`;
 
   try {
