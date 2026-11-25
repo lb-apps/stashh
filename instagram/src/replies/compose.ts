@@ -1,6 +1,6 @@
 import { LIMITS, type CarouselCard, type OutboundMessage, type QuickReply } from "../meta/graph-client.ts";
-import type { Place, PlanMessage, ReplyPlan } from "../stashh/client.ts";
-import { copy, type SourceKind } from "./copy.tr.ts";
+import type { Place, PlanMessage, RecognitionQuota, ReplyPlan } from "../stashh/client.ts";
+import { copy, untilText, type SourceKind } from "./copy.tr.ts";
 
 /** The payloads the recognition reply's quick replies carry; the assistant knows both. */
 export const ADD_TO_LIST_PAYLOAD = (recognitionId: string) => `ADD_TO_LIST:${recognitionId}`;
@@ -15,6 +15,8 @@ export interface RecognitionReplyOptions {
   suggestedReplies?: boolean;
   /** A shared feed post read from one page while more venues sit on the others: the summary asks for its link. */
   morePagesNeeded?: boolean;
+  /** Paid with a credit: the credits left, said in the summary. Null when the allowance paid. */
+  creditsLeft?: number | null;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface RecognitionReplyOptions {
  */
 export function composeRecognitionReply(places: Place[], kind: SourceKind, options: RecognitionReplyOptions = {}): OutboundMessage[] {
   if (places.length === 0) return [{ kind: "text", text: copy.empty(kind) }];
-  const { mapUrl = null, recognitionId = null, suggestedReplies = false, morePagesNeeded = false } = options;
+  const { mapUrl = null, recognitionId = null, suggestedReplies = false, morePagesNeeded = false, creditsLeft = null } = options;
 
   const cards = places.map(toCard);
   const carousels: OutboundMessage[] = [];
@@ -36,12 +38,26 @@ export function composeRecognitionReply(places: Place[], kind: SourceKind, optio
   if (suggestedReplies && recognitionId) quickReplies.push({ title: copy.addToList, payload: ADD_TO_LIST_PAYLOAD(recognitionId) });
   if (suggestedReplies && !mapUrl) quickReplies.push({ title: copy.openMyMapQuick, payload: OPEN_MAP_PAYLOAD });
 
-  const text = morePagesNeeded ? copy.foundSomeNeedsLink(places.length) : copy.found(places.length, kind);
+  const found = morePagesNeeded ? copy.foundSomeNeedsLink(places.length) : copy.found(places.length, kind);
+  // Paid with a credit: the person hears what it cost and what is left.
+  const text = creditsLeft === null ? found : `${found} ${copy.creditUsed(creditsLeft)}`;
   const taps = quickReplies.length > 0 ? { quickReplies } : {};
   const summary: OutboundMessage = mapUrl
     ? { kind: "button", text, buttons: [{ type: "web_url", title: copy.openMyMap, url: mapUrl }], ...taps }
     : { kind: "text", text, ...taps };
   return [...carousels, summary];
+}
+
+/**
+ * A share refused for want of allowance and credits. On the free plan it carries a button to
+ * the paywall (the person's sign-in link, opening on Premium) when one could be minted. A
+ * refusal whose details could not be read says so without the numbers.
+ */
+export function quotaReply(quota: RecognitionQuota | null, now: Date, paywallUrl: string | null): OutboundMessage {
+  const until = quota?.next_free_at ? untilText(new Date(quota.next_free_at), now) : null;
+  const text = copy.quotaReached(quota?.daily_limit ?? null, until);
+  if (quota?.plan === "premium" || !paywallUrl) return { kind: "text", text };
+  return { kind: "button", text: `${text} ${copy.quotaPremium}`, buttons: [{ type: "web_url", title: copy.seePremium, url: paywallUrl }] };
 }
 
 /** `text` with the button that opens the person's map through their sign-in link. */

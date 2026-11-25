@@ -33,7 +33,19 @@ const recognition = (
   names_elsewhere: false,
   error_message: error,
   error_code: code,
+  charge: null,
+  charge_status: null,
 });
+
+/** The backend's refusal when the day's free analyses and the credits are used up. */
+const quotaError = (plan: "free" | "premium" = "free", nextFreeAt: string | null = "2026-01-01T03:00:00Z") =>
+  new StashhApiError(429, "RECOGNITION_QUOTA", "No free analyses or credits left", {
+    plan,
+    daily_limit: 3,
+    used_today: 3,
+    next_free_at: nextFreeAt,
+    credits: 0,
+  });
 
 let time: ReturnType<typeof clock>;
 let store: MemoryStore;
@@ -316,13 +328,36 @@ describe("failures and retries", () => {
     expect(messenger.texts()).toHaveLength(1);
   });
 
-  it("says the day's limit is reached, once, without retrying, when the backend refuses with RECOGNITION_QUOTA", async () => {
-    stashh.createSteps.push(new StashhApiError(429, "RECOGNITION_QUOTA", "Daily recognition limit reached"));
+  it("says the free analyses are used up and when the next comes, once, with a button to Premium", async () => {
+    stashh.createSteps.push(quotaError("free", new Date(time.now().getTime() + 150 * 60_000).toISOString()));
     const mid = await reel();
     await tick();
 
-    expect(store.row(mid)).toMatchObject({ status: "failed", lastError: "daily recognition cap reached" });
-    expect(messenger.texts()).toEqual([copy.dailyLimit]);
+    expect(store.row(mid)).toMatchObject({ status: "failed", lastError: "no free analyses or credits left" });
+    const [reply] = messenger.sent.map((s) => s.message);
+    expect(reply).toMatchObject({ kind: "button", text: `${copy.quotaReached(3, "3 saat sonra")} ${copy.quotaPremium}` });
+    const button = reply?.kind === "button" ? reply.buttons[0] : undefined;
+    expect(button).toMatchObject({ type: "web_url", title: copy.seePremium });
+    expect(new URL(button && "url" in button ? button.url : "").searchParams.get("next")).toBe("premium");
+    expect(messenger.sent).toHaveLength(1);
+  });
+
+  it("does not offer Premium to someone already on it", async () => {
+    stashh.createSteps.push(quotaError("premium", null));
+    await reel();
+    await tick();
+
+    expect(messenger.texts()).toEqual([copy.quotaReached(3, null)]);
+    expect(stashh.minted).toHaveLength(0);
+  });
+
+  it("still answers a refusal whose details it cannot read", async () => {
+    stashh.createSteps.push(new StashhApiError(429, "RECOGNITION_QUOTA", "No free analyses or credits left"));
+    const mid = await reel();
+    await tick();
+
+    expect(store.row(mid).status).toBe("failed");
+    expect(messenger.sent[0]?.message).toMatchObject({ text: `${copy.quotaReached(null, null)} ${copy.quotaPremium}` });
   });
 
   it("does not try to apologise when Instagram itself refuses the reply", async () => {
@@ -680,13 +715,35 @@ describe("product analytics", () => {
     expect(analytics.of("recognition_failed")[0]?.props.reason).toBe("timed_out");
   });
 
-  it("reports daily_limit, paired with its start, when the backend refuses with RECOGNITION_QUOTA", async () => {
-    stashh.createSteps.push(new StashhApiError(429, "RECOGNITION_QUOTA", "Daily recognition limit reached"));
+  it("reports daily_limit with the plan, paired with its start, when the backend refuses with RECOGNITION_QUOTA", async () => {
+    stashh.createSteps.push(quotaError("free"));
     await reel();
     await tick();
 
     expect(analytics.names()).toEqual(["user_signed_up", "recognition_started", "recognition_failed"]);
-    expect(analytics.of("recognition_failed")[0]?.props.reason).toBe("daily_limit");
+    expect(analytics.of("recognition_failed")[0]?.props).toMatchObject({ reason: "daily_limit", plan: "free" });
+  });
+
+  it("says what a credit-paid analysis cost and reports it paid with a credit", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", [place(1)]), charge: "credit", charge_status: "charged" });
+    stashh.billingSteps.push({ plan: "free", credits: 2 });
+    await next(mid);
+
+    expect(messenger.texts().at(-1)).toBe(`${copy.found(1, "reel")} ${copy.creditUsed(2)}`);
+    expect(analytics.of("recognition_completed")[0]?.props.paid_with).toBe("credit");
+  });
+
+  it("replies without the credits line when they cannot be read", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push({ ...recognition("completed", [place(1)]), charge: "credit", charge_status: "charged" });
+    stashh.billingSteps.push(new StashhApiError(503, null, "unavailable"));
+    await next(mid);
+
+    expect(messenger.texts().at(-1)).toBe(copy.found(1, "reel"));
+    expect(store.row(mid).status).toBe("replied");
   });
 
   it("repeats the start of a retried share at the same moment and key, so Mixpanel keeps one", async () => {

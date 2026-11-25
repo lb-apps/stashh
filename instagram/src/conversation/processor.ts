@@ -1,10 +1,10 @@
-import type { RecognitionFailure, RecognitionProps } from "../analytics/events.ts";
+import type { PaidWith, RecognitionFailure, RecognitionProps } from "../analytics/events.ts";
 import { NoopAnalytics, type Analytics } from "../analytics/mixpanel.ts";
 import type { Logger } from "../lib/logger.ts";
 import { GraphApiError, type InstagramProfile, type Messenger, type OutboundMessage, type ProfileReader, type SenderAction } from "../meta/graph-client.ts";
-import { composeRecognitionReply, mapLinkMessage, renderPlan } from "../replies/compose.ts";
+import { composeRecognitionReply, mapLinkMessage, quotaReply, renderPlan } from "../replies/compose.ts";
 import { copy, sourceKindOf, type SourceKind } from "../replies/copy.tr.ts";
-import { RECOGNITION_QUOTA, StashhApiError, TERMINAL_STATUSES, type Recognition, type StashhApi } from "../stashh/client.ts";
+import { RECOGNITION_QUOTA, StashhApiError, TERMINAL_STATUSES, type Recognition, type RecognitionQuota, type StashhApi } from "../stashh/client.ts";
 import { commandReply } from "../webhooks/core/commands.ts";
 import { interpret, type Intent } from "./intent.ts";
 import { mayMessage, OUTBOUND_BLOCKED, type OutboundMode } from "./outbound.ts";
@@ -158,8 +158,10 @@ export class MessageProcessor {
           ({ recognitionId } = await this.stashh.createRecognition({ userId, source: intent.source, idempotencyKey: message.mid }));
         } catch (error) {
           if (error instanceof StashhApiError && error.code === RECOGNITION_QUOTA) {
-            await this.reply(message, [text(copy.dailyLimit)], "failed", "daily recognition cap reached");
-            return this.recognitionEnded(message, userId, { reason: "daily_limit" });
+            const { quota } = error;
+            const paywallUrl = quota?.plan === "premium" ? null : await this.paywallUrl(userId, message.mid);
+            await this.reply(message, [quotaReply(quota, this.now(), paywallUrl)], "failed", "no free analyses or credits left");
+            return this.recognitionEnded(message, userId, { reason: "daily_limit", ...(quota ? { plan: quota.plan } : {}) });
           }
           throw error;
         }
@@ -271,11 +273,23 @@ export class MessageProcessor {
         return this.recognitionEnded(message, message.userId, { reason: "needs_link" });
       }
       const mapUrl = places.length > 0 ? await this.mapUrl(message.userId, message.mid) : null;
+      const paidWithCredit = places.length > 0 && recognition.charge === "credit" && recognition.charge_status === "charged";
+      const creditsLeft = paidWithCredit ? await this.creditsLeft(message.userId, message.mid) : null;
       await this.reply(
         message,
-        composeRecognitionReply(places, kind, { mapUrl, recognitionId: message.recognitionId, suggestedReplies: this.suggestedReplies, morePagesNeeded }),
+        composeRecognitionReply(places, kind, {
+          mapUrl,
+          recognitionId: message.recognitionId,
+          suggestedReplies: this.suggestedReplies,
+          morePagesNeeded,
+          creditsLeft,
+        }),
       );
-      return this.recognitionEnded(message, message.userId, places.length > 0 ? { places: places.length } : { reason: "no_places" });
+      return this.recognitionEnded(
+        message,
+        message.userId,
+        places.length > 0 ? { places: places.length, paidWith: paidWithCredit ? "credit" : "allowance" } : { reason: "no_places" },
+      );
     }
     if (TERMINAL_STATUSES.has(recognition.status)) {
       await this.reply(message, [text(copy.failedBecause(recognition.error_code, kind))], "failed", recognition.error_message ?? `recognition ${recognition.status}`);
@@ -302,6 +316,25 @@ export class MessageProcessor {
       return (await this.stashh.mintSignInLink(userId)).url;
     } catch (error) {
       this.log.warn({ err: error, mid }, "sign-in link not minted; replying without the map button");
+      return null;
+    }
+  }
+
+  /** The sign-in link opening on Premium, for a refused share's button; null drops the button. */
+  private async paywallUrl(userId: string, mid: string): Promise<string | null> {
+    const url = await this.mapUrl(userId, mid);
+    if (!url) return null;
+    const paywall = new URL(url);
+    paywall.searchParams.set("next", "premium");
+    return paywall.toString();
+  }
+
+  /** Credits left after a credit-paid analysis; the reply goes out without the line when unknown. */
+  private async creditsLeft(userId: string, mid: string): Promise<number | null> {
+    try {
+      return (await this.stashh.getBilling(userId)).credits;
+    } catch (error) {
+      this.log.warn({ err: error, mid }, "credits not read; replying without them");
       return null;
     }
   }
@@ -356,14 +389,17 @@ export class MessageProcessor {
   }
 
   /** A share's outcome as the person got it; called once its message has settled for good. */
-  private recognitionEnded(message: StoredMessage, userId: string, outcome: { places: number } | { reason: RecognitionFailure }): void {
+  private recognitionEnded(message: StoredMessage, userId: string, outcome: RecognitionOutcome): void {
     const intent = interpret(message);
     if (intent.kind !== "recognize") return;
     const now = this.now();
     const props = { ...recognitionProps(intent), duration_ms: now.getTime() - message.sentAt.getTime() };
     const at = { userId, time: now, key: message.mid };
-    if ("reason" in outcome) this.analytics.track("recognition_failed", { ...props, reason: outcome.reason }, at);
-    else this.analytics.track("recognition_completed", { ...props, place_count: outcome.places }, at);
+    if ("reason" in outcome) {
+      this.analytics.track("recognition_failed", { ...props, reason: outcome.reason, ...(outcome.plan ? { plan: outcome.plan } : {}) }, at);
+    } else {
+      this.analytics.track("recognition_completed", { ...props, place_count: outcome.places, ...(outcome.paidWith ? { paid_with: outcome.paidWith } : {}) }, at);
+    }
   }
 
   /** Settles with the message's intent, so every outcome is attributed to what was asked. */
@@ -384,6 +420,11 @@ export class MessageProcessor {
 }
 
 const text = (value: string): OutboundMessage => ({ kind: "text", text: value });
+
+/** How a share ended for the person: places (and what paid for them), or why there were none. */
+type RecognitionOutcome =
+  | { places: number; paidWith?: PaidWith }
+  | { reason: RecognitionFailure; plan?: RecognitionQuota["plan"] };
 
 /** How a share was handed over and what it is, as the analytics catalog names them. */
 function recognitionProps(intent: Extract<Intent, { kind: "recognize" }>): RecognitionProps {

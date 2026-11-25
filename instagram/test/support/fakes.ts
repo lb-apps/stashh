@@ -2,7 +2,7 @@ import type { DmEventName, DmEventProps } from "../../src/analytics/events.ts";
 import type { Analytics, DmProfile, EventAt } from "../../src/analytics/mixpanel.ts";
 import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
 import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply, SenderAction } from "../../src/meta/graph-client.ts";
-import type { Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
+import type { Billing, Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
 
 interface Row extends StoredMessage {
   nextAttemptAt: Date;
@@ -137,6 +137,8 @@ export class FakeStashh implements StashhApi {
   eraseSteps: Array<Step<void>> = [];
   minted: string[] = [];
   mintSteps: Array<Step<{ url: string }>> = [];
+  /** Billing reads; an empty queue answers with a free plan and 4 credits. */
+  billingSteps: Array<Step<Billing>> = [];
   /** Assistant turns asked for, with their messages. */
   turns: Array<{ userId: string; messages: TurnMessage[] }> = [];
   turnSteps: Array<Step<ReplyPlan>> = [];
@@ -183,6 +185,12 @@ export class FakeStashh implements StashhApi {
     const step = this.mintSteps.shift() ?? { url: `https://stashh.me/app/a/${"c".repeat(31)}${this.minted.length}` };
     if (step instanceof Error) throw step;
     this.minted.push(userId);
+    return step;
+  }
+
+  async getBilling() {
+    const step = this.billingSteps.shift() ?? { plan: "free" as const, credits: 4 };
+    if (step instanceof Error) throw step;
     return step;
   }
 
