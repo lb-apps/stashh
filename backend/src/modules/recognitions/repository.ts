@@ -47,6 +47,7 @@ interface UpsertRecognitionResultParams {
   sourceThumbnailUrl: string | null;
   /** Written only when present, so a share that does not name the author keeps an earlier one. */
   authorUsername: string | null;
+  transcript: Json | null;
 }
 
 /** One of the owner's recognitions in a list: the task and its result's cover and count. */
@@ -232,6 +233,7 @@ export class RecognitionRepository {
           source_type: params.sourceType,
           ...(params.sourceThumbnailUrl ? { source_thumbnail_url: params.sourceThumbnailUrl } : {}),
           ...(params.authorUsername ? { author_username: params.authorUsername } : {}),
+          transcript: params.transcript,
         },
         { onConflict: "source_url" },
       )

@@ -2,7 +2,7 @@ import { config } from "../../config.js";
 import { AppHttpError } from "../../errors/appHttpError.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
-import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
+import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, TranscriptSegment, VenueRecommendation, SourceContent } from "../../types/schemas.js";
 import type { RecognitionRepository, RecognitionSummaryRow, RecognitionWithResult } from "./repository.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
@@ -85,6 +85,7 @@ export interface RecognitionResultPlace {
   thumbnail_url: string | null;
   instagram_username: string | null;
   recommendations: VenueRecommendation[];
+  transcript_mentions: TranscriptSegment[];
 }
 
 function normalizeErrorMessage(error: unknown): string {
@@ -247,6 +248,7 @@ export class RecognitionService {
           thumbnail_url: thumbnailUrls.get(place.google_place_id) ?? null,
           instagram_username: entry.instagram_username,
           recommendations: entry.recommendations,
+          transcript_mentions: entry.transcript_mentions,
         };
       });
   }
@@ -255,7 +257,7 @@ export class RecognitionService {
     sourceUrl: string,
     places: RecognitionResultPlace[],
     sourceContent: SourceContent,
-    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere">,
+    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere" | "transcript">,
     sourceThumbnailUrl: string | null,
   ): Promise<string> {
     const result = await this.recognitionRepository.upsertRecognitionResult({
@@ -268,6 +270,7 @@ export class RecognitionService {
       sourceType: sourceContent.source_type,
       sourceThumbnailUrl,
       authorUsername: sourceContent.author_username ?? null,
+      transcript: analysis.transcript as unknown as Json ?? null,
     });
     return result.id;
   }
