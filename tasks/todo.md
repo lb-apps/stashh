@@ -70,20 +70,20 @@ DM — `instagram/`:
       `copy.tr.ts`.
 
 Web — `/app`, built and checked in `/app/dev/iab`:
-- [ ] Design first: ui-ux-pro-max, the Discovery design project (look for a plan or paywall screen), 21st for
+- [x] Design first: ui-ux-pro-max, the Discovery design project (look for a plan or paywall screen), 21st for
       the paywall (a pricing surface), rebuilt in Discovery components.
-- [ ] Profile sheet: plan, today's allowance, credits, tasks (done or not), a "follow @stashh.me" link with no
+- [x] Profile sheet: plan, today's allowance, credits, tasks (done or not), a "follow @stashh.me" link with no
       reward, the Premium button.
-- [ ] `premium` sheet route (`shell/sheet-state.tsx`): Free vs Premium, monthly/yearly `SegmentedControl`. The
+- [x] `premium` sheet route (`shell/sheet-state.tsx`): Free vs Premium, monthly/yearly `SegmentedControl`. The
       CTA is a fake door ("yakında") unless `mock_purchases` is on.
-- [ ] `?next=premium` opens the sheet after the link is redeemed (allow-listed values, no open redirect).
-- [ ] A reward toast when a response carries `reward`.
-- [ ] Analytics (`lib/analytics/events.ts`): `paywall_viewed {source}`, `premium_plan_selected {period}`,
+- [x] `?next=premium` opens the sheet after the link is redeemed (allow-listed values, no open redirect).
+- [x] A reward toast when a response carries `reward`.
+- [x] Analytics (`lib/analytics/events.ts`): `paywall_viewed {source}`, `premium_plan_selected {period}`,
       `credits_earned {task, credits}`; profile property `plan` in `analytics-session.tsx`. Lexicon entries in
       both projects (owner's go-ahead), `docs/analytics-plan.md` updated.
 
 Ops — `ops/`:
-- [ ] Billing page: settings panel (the pattern of `components/ops/assistant-settings.tsx`), stats (Premium
+- [x] Billing page: settings panel (the pattern of `components/ops/assistant-settings.tsx`), stats (Premium
       users, people who hit the limit, credits earned by task and spent), a user lookup to grant credits or
       set a plan.
 
@@ -149,6 +149,21 @@ editor. SQL verified on a local Postgres 17 with a Supabase stand-in (18 scenari
 - Mixpanel Staging: web and DM events land on the same user id (Live view).
 - Phase 2: a Paddle sandbox purchase → the RevenueCat customer id is the Supabase id → webhook → Premium →
   larger allowance; cancel → expiry → Free.
+
+**Review (2026-11-25).**
+- Migrations run by the owner in the SQL editor (one transaction, recorded in the history) and checked
+  live: tables, 13 functions, 5 triggers, one read-own policy on tasks, nothing granted to clients,
+  the table out of the Realtime publication, 3 people credited for an existing list.
+- Backend from the branch on :3000: a cached Reel enqueued through the RPC, the worker woke within a
+  second on the broadcast, completed, the allowance was charged (used 1/100); mock purchase 403 while off.
+- Web in `/app/dev/iab`: profile plan card (99/100, 3 credits, open task, Premium entry), the Premium
+  sheet, the fake door ("Premium çok yakında geliyor"), and — with the switch on — the mock purchase
+  ("Premium'dasın", end date). `/app/a/<code>?next=premium` signed in and opened the Premium sheet; the
+  first visit's 3 credits were granted. The reward toast itself was not seen (it fired during the dev
+  compile).
+- Ops `/billing`: live numbers, settings saved (mock switch on, then off), the person lookup by user id
+  and its sheet. The test user is back on Free; `mock_purchases` is off.
+- Left for the owner: Mixpanel Lexicon entries (a write to Mixpanel); production deploy after the PR.
 
 **Rollout (prod and dev share the database):** migration → backend (default allowance 100, same as today) →
 DM → web → ops. The free allowance comes down only when the paywall is ready to show.
