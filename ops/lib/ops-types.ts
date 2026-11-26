@@ -184,6 +184,12 @@ export interface RecognitionOps {
   };
 }
 
+export interface TranscriptSegment {
+  text: string;
+  start_s: number;
+  end_s: number;
+}
+
 export interface RecognitionPlace {
   google_place_id: string;
   name: string;
@@ -196,6 +202,7 @@ export interface RecognitionPlace {
   instagram_username?: string | null;
   google_maps_uri?: string | null;
   recommendations?: { summary: string; kind: string }[];
+  transcript_mentions?: TranscriptSegment[];
 }
 
 export interface RecognitionRunDetail {
@@ -241,6 +248,7 @@ export interface RecognitionDetail {
   finished_at: string | null;
   source: { caption: string | null; thumbnail_url: string | null; video_url: string | null; source_type: string | null; result_created_at: string } | null;
   places: RecognitionPlace[];
+  transcript?: { full_text: string; segments: TranscriptSegment[] } | null;
   runs: RecognitionRunDetail[];
   menus?: Record<string, PlaceMenuSummary[]>;
 }
