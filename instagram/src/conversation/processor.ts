@@ -339,18 +339,40 @@ export class MessageProcessor {
     }
   }
 
-  /** Sends what has not been delivered yet, then settles the message. */
+  /**
+   * Sends what has not been delivered yet, then settles the message. The first message sent in
+   * this step quotes the share it answers (`quotedMid`); on a resumed step that is the first one
+   * still missing, since another share's answer may have gone out in between.
+   */
   private async reply(
     message: StoredMessage,
     replies: OutboundMessage[],
     status: MessageStatus = "replied",
     lastError: string | null = null,
   ): Promise<void> {
+    const quoted = quotedMid(message);
     for (let i = message.repliesSent; i < replies.length; i++) {
-      await this.messenger.send(message.senderId, replies[i]!);
+      await this.send(message, replies[i]!, i === message.repliesSent ? quoted : null);
       await this.store.recordRepliesSent(message.mid, i + 1);
     }
     await this.settle(message, { status, repliesSent: Math.max(replies.length, message.repliesSent), lastError });
+  }
+
+  /**
+   * One outbound message, quoting `replyTo` when given. The quote only says which share the
+   * answer belongs to, so when Instagram refuses the message with it (the person unsent the
+   * share, say) the answer goes out unquoted rather than not at all. A retryable failure is
+   * left to the step's retry, which quotes again.
+   */
+  private async send(message: StoredMessage, outbound: OutboundMessage, replyTo: string | null): Promise<void> {
+    if (!replyTo) return this.messenger.send(message.senderId, outbound);
+    try {
+      await this.messenger.send(message.senderId, outbound, { replyTo });
+    } catch (error) {
+      if (!(error instanceof GraphApiError) || error.retryable) throw error;
+      this.log.warn({ err: error, mid: message.mid }, "quoted reply refused; sending it unquoted");
+      await this.messenger.send(message.senderId, outbound);
+    }
   }
 
   private async fail(message: StoredMessage, error: unknown, log: Logger, step: StepContext): Promise<void> {
@@ -369,7 +391,7 @@ export class MessageProcessor {
     // A Graph API failure means we cannot reach the person, so there is no one to apologise to.
     if (!(error instanceof GraphApiError)) {
       const apology = chat ? copy.assistantUnavailable : copy.failed(this.sourceKind(message));
-      await this.messenger.send(message.senderId, text(apology)).catch((sendError: unknown) => {
+      await this.send(message, text(apology), quotedMid(message)).catch((sendError: unknown) => {
         log.warn({ err: sendError }, "apology not sent");
       });
     }
@@ -420,6 +442,18 @@ export class MessageProcessor {
 }
 
 const text = (value: string): OutboundMessage => ({ kind: "text", text: value });
+
+/**
+ * The person's message an answer quotes: a share or a pasted link, readable or not. People send
+ * several in a row and recognitions finish in any order, so without the quote the answers cannot
+ * be told apart. Every share is its own message with its own row and recognition, so the row
+ * being answered names the share exactly. Commands and chat are not quoted: a chat turn answers
+ * several typed lines at once, and a command's answer follows the command.
+ */
+function quotedMid(message: StoredMessage): string | null {
+  const kind = interpret(message).kind;
+  return kind === "recognize" || kind === "unsupported" ? message.mid : null;
+}
 
 /** How a share ended for the person: places (and what paid for them), or why there were none. */
 type RecognitionOutcome =
