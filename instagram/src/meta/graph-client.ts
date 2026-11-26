@@ -76,8 +76,16 @@ export class GraphApiError extends Error {
  */
 export type SenderAction = "mark_seen" | "typing_on" | "typing_off";
 
+/**
+ * How one message goes out. `replyTo` is the mid of the person's message it answers: Instagram
+ * shows it as a quoted reply to that message (`reply_to`, valid for text, media and templates).
+ */
+export interface SendOptions {
+  replyTo?: string | null;
+}
+
 export interface Messenger {
-  send(recipientId: string, message: OutboundMessage): Promise<void>;
+  send(recipientId: string, message: OutboundMessage, options?: SendOptions): Promise<void>;
   senderAction(recipientId: string, action: SenderAction): Promise<void>;
 }
 
@@ -95,8 +103,12 @@ export class InstagramMessenger implements Messenger {
     this.tokens = options.tokens;
   }
 
-  async send(recipientId: string, message: OutboundMessage): Promise<void> {
-    await this.post({ recipient: { id: recipientId }, message: toGraphMessage(message) });
+  async send(recipientId: string, message: OutboundMessage, options: SendOptions = {}): Promise<void> {
+    await this.post({
+      recipient: { id: recipientId },
+      message: toGraphMessage(message),
+      ...(options.replyTo ? { reply_to: { mid: options.replyTo } } : {}),
+    });
   }
 
   async senderAction(recipientId: string, action: SenderAction): Promise<void> {

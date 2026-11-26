@@ -1,7 +1,7 @@
 import type { DmEventName, DmEventProps } from "../../src/analytics/events.ts";
 import type { Analytics, DmProfile, EventAt } from "../../src/analytics/mixpanel.ts";
 import type { MessageStore, QueuedMessage, Settlement, StoredMessage } from "../../src/conversation/store.ts";
-import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply, SenderAction } from "../../src/meta/graph-client.ts";
+import type { InstagramProfile, Messenger, OutboundMessage, ProfileReader, QuickReply, SenderAction, SendOptions } from "../../src/meta/graph-client.ts";
 import type { Billing, Recognition, RecognitionSource, ReplyPlan, StashhApi, TurnMessage } from "../../src/stashh/client.ts";
 
 interface Row extends StoredMessage {
@@ -211,15 +211,21 @@ export class FakeStashh implements StashhApi {
 
 export class FakeMessenger implements Messenger {
   sent: Array<{ to: string; message: OutboundMessage }> = [];
+  /** The mid each delivered message quoted (`reply_to`), beside `sent`; null for an unquoted one. */
+  quotes: Array<string | null> = [];
+  /** The quote of every send attempt, refused ones included. */
+  attemptedQuotes: Array<string | null> = [];
   /** Every presence signal sent, in order. */
   actions: Array<{ to: string; action: SenderAction }> = [];
   /** Errors to throw on upcoming sends, in order; `undefined` lets that send succeed. */
   sendSteps: Array<Error | undefined> = [];
 
-  async send(recipientId: string, message: OutboundMessage): Promise<void> {
+  async send(recipientId: string, message: OutboundMessage, options: SendOptions = {}): Promise<void> {
+    this.attemptedQuotes.push(options.replyTo ?? null);
     const step = this.sendSteps.shift();
     if (step) throw step;
     this.sent.push({ to: recipientId, message });
+    this.quotes.push(options.replyTo ?? null);
   }
 
   async senderAction(recipientId: string, action: SenderAction): Promise<void> {

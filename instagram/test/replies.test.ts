@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { LIMITS, toGraphMessage } from "../src/meta/graph-client.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { InstagramMessenger, LIMITS, toGraphMessage } from "../src/meta/graph-client.ts";
 import { truncateGraphemes, truncateUtf8 } from "../src/meta/text.ts";
 import { composeRecognitionReply, renderPlan, toCard } from "../src/replies/compose.ts";
 import { sourceKindOf } from "../src/replies/copy.tr.ts";
@@ -74,6 +74,28 @@ describe("toGraphMessage", () => {
     expect(body).toEqual({
       attachment: { type: "template", payload: { template_type: "generic", elements: [{ title: "A", buttons: [] }] } },
     });
+  });
+});
+
+describe("InstagramMessenger.send", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function bodyOf(replyTo?: string | null): Promise<Record<string, unknown>> {
+    const fetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const messenger = new InstagramMessenger({ apiVersion: "v25.0", tokens: { accessToken: async () => "token" } });
+    await messenger.send("igsid-1", { kind: "text", text: "Merhaba" }, replyTo === undefined ? undefined : { replyTo });
+    const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
+    return JSON.parse(String(init.body)) as Record<string, unknown>;
+  }
+
+  it("quotes the message it answers with reply_to beside the message", async () => {
+    expect(await bodyOf("mid-reel")).toEqual({ recipient: { id: "igsid-1" }, message: { text: "Merhaba" }, reply_to: { mid: "mid-reel" } });
+  });
+
+  it("sends no reply_to without a quote", async () => {
+    expect(await bodyOf()).not.toHaveProperty("reply_to");
+    expect(await bodyOf(null)).not.toHaveProperty("reply_to");
   });
 });
 
