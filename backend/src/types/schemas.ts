@@ -14,6 +14,12 @@ export interface SourceMediaItem {
   url: string;
 }
 
+/** Background music metadata from the platform, when the reel uses a known track. */
+export interface MusicInfo {
+  title: string;
+  artist: string;
+}
+
 export interface SourceContent {
   /** What the model reads, in post order: one item for a Reel, photo or story, one per slide for a carousel. */
   media: SourceMediaItem[];
@@ -32,6 +38,8 @@ export interface SourceContent {
   platform: SourcePlatform;
   /** The post's author on its platform, without @, when the source names one. */
   author_username?: string | null;
+  /** Background music on a reel, from the platform's own metadata (`clips_metadata.music_info`). */
+  music?: MusicInfo | null;
 }
 
 // ── Transcript ────────────────────────────────────────────
