@@ -6,6 +6,9 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   /** Video-capable model with structured output support, as an OpenRouter model id. */
   OPENROUTER_MODEL: z.string().min(1).default("google/gemini-3.8-flash"),
+  /** Speech-to-text model for video audio, called before the vision model so the transcript
+   *  reaches Gemini as text. The model must accept the OpenAI `/audio/transcriptions` shape. */
+  WHISPER_MODEL: z.string().min(1).default("openai/whisper-large-v3-turbo"),
   /**
    * The DM assistant's model, as an OpenRouter model id. Needs tool calling with a forced
    * tool choice (`tool_choice: required`): Haiku 5.5 and GPT-6 Luna take it; Opus 5.5 and

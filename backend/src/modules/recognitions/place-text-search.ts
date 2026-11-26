@@ -212,11 +212,24 @@ function pickBest(
   return { best: bestScore >= MINIMUM_NAME_SIMILARITY ? best : null, score: bestScore, considered };
 }
 
-/** The text queries to try, in order: the name as the post wrote it, then the name with its category. */
+/**
+ * The text queries to try, most specific first:
+ *  1. name + full location hint  ("La vie Praline, Akaretler, Beşiktaş, İstanbul, Türkiye")
+ *  2. name + category + hint     ("La vie Praline dessert, Akaretler, Beşiktaş, İstanbul, Türkiye")
+ *  3. name alone                 ("La vie Praline")  — catches listings Google matches better
+ *       without the neighbourhood-district-city-country chain
+ *  4. @handle humanised + hint   ("lavie praline, Akaretler, …")  — small/new venues whose
+ *       listing name differs from what the post calls them
+ */
 function queriesFor(extracted: ExtractedPlace): string[] {
   const where = extracted.location_hint ? `, ${extracted.location_hint}` : "";
   const queries = [`${extracted.name}${where}`];
   if (extracted.category !== "other") queries.push(`${extracted.name} ${CATEGORY_WORD[extracted.category]}${where}`);
+  if (extracted.location_hint) queries.push(extracted.name);
+  if (extracted.instagram_username) {
+    const humanised = extracted.instagram_username.replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
+    if (humanised) queries.push(`${humanised}${where}`);
+  }
   return queries;
 }
 

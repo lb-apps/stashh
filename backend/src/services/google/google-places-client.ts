@@ -67,7 +67,8 @@ export class GooglePlacesClient implements IGooglePlacesClient {
     });
 
     if (!response.ok) {
-      this.log?.warn({ query, status: response.status }, "text search failed");
+      const body = await response.text().catch(() => "");
+      this.log?.error({ query, status: response.status, body: body.slice(0, 300) }, "text search failed");
       return [];
     }
 
@@ -92,7 +93,8 @@ export class GooglePlacesClient implements IGooglePlacesClient {
     });
 
     if (!response.ok) {
-      this.log?.warn({ center: params.center, status: response.status }, "nearby search failed");
+      const body = await response.text().catch(() => "");
+      this.log?.error({ center: params.center, status: response.status, body: body.slice(0, 300) }, "nearby search failed");
       return [];
     }
 
@@ -112,7 +114,8 @@ export class GooglePlacesClient implements IGooglePlacesClient {
     });
 
     if (!response.ok) {
-      this.log?.warn({ googlePlaceId, status: response.status }, "place details failed");
+      const body = await response.text().catch(() => "");
+      this.log?.error({ googlePlaceId, status: response.status, body: body.slice(0, 300) }, "place details failed");
       return null;
     }
 

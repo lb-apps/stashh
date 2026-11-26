@@ -36,6 +36,16 @@ export function PlaceItem({ place }: { place: RecognitionPlace }) {
             ))}
           </div>
         )}
+        {place.transcript_mentions && place.transcript_mentions.length > 0 && (
+          <div className="mt-1.5 grid gap-0.5 text-caption text-muted-foreground">
+            {place.transcript_mentions.map((seg, i) => (
+              <p key={i}>
+                <span className="numeric font-semibold">{Math.floor(seg.start_s / 60)}:{Math.floor(seg.start_s % 60).toString().padStart(2, "0")}</span>
+                {" "}{seg.text}
+              </p>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5 pt-2">
           <Button asChild variant="outline" size="xs">
             <a href={maps} target="_blank" rel="noreferrer">
