@@ -141,7 +141,7 @@ async function processRecognition(
     const sourceContent = await tl.step(
       "content fetched",
       (stepLog) => fetchSourceContent(recognition, stepLog),
-      (content) => ({ method: content.fetch_method, media: content.media.length, captionLength: content.caption?.length ?? 0 }),
+      (content) => ({ method: content.fetch_method, media: content.media.length, captionLength: content.caption?.length ?? 0, music: content.music?.title ?? null }),
     );
     fetchMethod = sourceContent.fetch_method;
 
@@ -158,7 +158,7 @@ async function processRecognition(
       async (stepLog) => {
         // A feed post shared in a DM is one item of the post, not all of it.
         const sharedItem = sourceContent.fetch_method === "supplied" && sourceContent.source_type === "post";
-        analyzed = await analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform, { sharedItem });
+        analyzed = await analyzeContent(sourceContent.media, sourceContent.caption, stepLog, sourceContent.platform, { sharedItem, music: sourceContent.music });
         // Read from the caption alone and nothing found: the video may still name a venue, so
         // this is the fetch failing, retried like one, not "no venue in this post".
         if (sourceContent.media.length === 0 && analyzed.places.length === 0) {

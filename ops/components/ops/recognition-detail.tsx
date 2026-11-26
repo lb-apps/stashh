@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { DASH, formatBytes, formatDateTime, formatDuration, formatInt, formatSource, formatUsd } from "@/lib/format";
 import { CHANNEL, FETCH_METHOD, MENU_STATUS, RUN_OUTCOME, SOURCE_TYPE, TASK_STATUS, menuTypeLabel, stepLabel } from "@/lib/labels";
-import type { MenuDetail, MenuDetailCategory, PlaceMenuSummary, RecognitionDetail, RecognitionRunDetail } from "@/lib/ops-types";
+import type { MenuDetail, MenuDetailCategory, PlaceMenuSummary, RecognitionDetail, RecognitionRunDetail, TranscriptSegment } from "@/lib/ops-types";
 import { STEP_COLORS } from "./charts/shared";
 import { PlaceItem } from "./place-item";
 import { SOURCE_ICON, Thumb } from "./recognition-thumb";
@@ -152,6 +152,8 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
           </ItemGroup>
         )}
       </Section>
+
+      {detail.transcript && <TranscriptSection transcript={detail.transcript} />}
 
       {detail.menus && Object.keys(detail.menus).length > 0 && <MenuDiscoverySection detail={detail} />}
 
@@ -343,6 +345,42 @@ function MenuCategoryBlock({ category }: { category: MenuDetailCategory }) {
         )}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function TranscriptSection({ transcript }: { transcript: { full_text: string; segments: TranscriptSegment[] } }) {
+  const [open, setOpen] = useState(false);
+  const hasSegments = transcript.segments.length > 0;
+  return (
+    <Section label={`Transcript · ${transcript.segments.length} segments`}>
+      <Collapsible open={open} onOpenChange={setOpen} className="grid gap-2">
+        <p className={`text-caption whitespace-pre-line ${!open ? "line-clamp-4" : ""}`}>{transcript.full_text}</p>
+        {hasSegments && (
+          <CollapsibleContent>
+            <div className="mt-2 grid gap-1">
+              {transcript.segments.map((seg, i) => (
+                <div key={i} className="flex items-start gap-2 text-caption">
+                  <span className="numeric shrink-0 text-muted-foreground">{formatTimestamp(seg.start_s)}</span>
+                  <span>{seg.text}</span>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        )}
+        <CollapsibleTrigger asChild>
+          <Button variant="link" size="sm" className="h-auto w-fit p-0">
+            {open ? "Hide segments" : "Show segments"}
+            <ChevronDown aria-hidden className={open ? "rotate-180" : undefined} />
+          </Button>
+        </CollapsibleTrigger>
+      </Collapsible>
+    </Section>
   );
 }
 

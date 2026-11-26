@@ -99,6 +99,24 @@ export function extractVideoUrl(html: string, shortcode: string): string | null 
   return null;
 }
 
+/**
+ * The reel's background music, from Instagram's own `clips_metadata.music_info`.
+ * Reels that use a known track carry the song title and artist here; reels with
+ * original audio or no music return null.
+ */
+export function extractMusicInfo(html: string, shortcode: string): { title: string; artist: string } | null {
+  const own = findMedia(html, shortcode);
+  if (!own) return null;
+  const clips = own["clips_metadata"] as Record<string, unknown> | undefined;
+  const musicInfo = (clips?.["music_info"] ?? clips?.["original_sound_info"]) as Record<string, unknown> | undefined;
+  const asset = (musicInfo?.["music_asset_info"] ?? musicInfo) as Record<string, unknown> | undefined;
+  if (!asset) return null;
+  const title = typeof asset["title"] === "string" ? asset["title"].trim() : null;
+  const artist = typeof asset["display_artist"] === "string" ? asset["display_artist"].trim() : null;
+  if (!title) return null;
+  return { title, artist: artist ?? "" };
+}
+
 /** The media object with this shortcode in the page's JSON script blocks, if any. */
 function findMedia(html: string, shortcode: string): Record<string, unknown> | null {
   for (const block of html.matchAll(/<script type="application\/json"[^>]*>([\s\S]*?)<\/script>/g)) {
@@ -393,6 +411,7 @@ export async function fetchInstagramContent(
   const caption = channelCaption ?? (html ? extractCaption(html) : null);
   const authorUsername = extractAuthor(url, html);
   const scrapedVideoUrl = html ? extractVideoUrl(html, shortcode) : null;
+  const music = html ? extractMusicInfo(html, shortcode) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
   let thumbnailUrl = html ? extractThumbnail(html) : null;
@@ -440,6 +459,7 @@ export async function fetchInstagramContent(
       source_type: sourceType,
       platform: "instagram",
       author_username: authorUsername,
+      music,
     };
   }
 
@@ -451,5 +471,6 @@ export async function fetchInstagramContent(
     source_type: sourceType,
     platform: "instagram",
     author_username: authorUsername,
+    music,
   };
 }
