@@ -364,11 +364,13 @@ describe("failures and retries", () => {
     const mid = await reel();
     await tick();
     stashh.getSteps.push(recognition("completed", [place(1)]));
-    messenger.sendSteps.push(new GraphApiError(400, 10, "outside of allowed window"));
+    // Refused quoted, then refused again unquoted: the window is closed either way.
+    messenger.sendSteps.push(new GraphApiError(400, 10, "outside of allowed window"), new GraphApiError(400, 10, "outside of allowed window"));
     await next(mid);
 
     expect(store.row(mid).status).toBe("failed");
     expect(messenger.sent).toHaveLength(0);
+    expect(messenger.attemptedQuotes).toEqual([mid, null]);
   });
 
   it("resumes a half-sent reply without repeating what was delivered", async () => {
@@ -491,6 +493,142 @@ describe("other intents", () => {
     await reel();
     const stored = await store.insert([...store.rows.values()].map((r) => ({ ...r, raw: {} })));
     expect(stored).toBe(0);
+  });
+});
+
+describe("quoting the share each answer belongs to", () => {
+  const RECOGNITION_A = "00000000-0000-4000-8000-0000000000a1";
+  const RECOGNITION_B = "00000000-0000-4000-8000-0000000000b2";
+  const cardTitles = () => messenger.sent.map(({ message }) => (message.kind === "carousel" ? message.cards.map((c) => c.title).join(",") : message.kind));
+
+  it("quotes the Reel in the first message of its answer, and only there", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
+    expect(messenger.quotes).toEqual([mid, null]);
+  });
+
+  it("answers Reels sent in a row each under its own Reel, in the order they finish", async () => {
+    stashh.createSteps.push({ recognitionId: RECOGNITION_A }, { recognitionId: RECOGNITION_B });
+    const a = await reel();
+    const b = await reel();
+    // One sender's messages run one at a time: each tick submits one Reel.
+    await tick();
+    await tick();
+    expect(store.row(a).recognitionId).toBe(RECOGNITION_A);
+    expect(store.row(b).recognitionId).toBe(RECOGNITION_B);
+
+    // The first Reel is still being read when the second one finishes.
+    stashh.getSteps.push(recognition("processing"));
+    await next(a);
+    stashh.getSteps.push({ ...recognition("completed", [place(2)]), recognition_id: RECOGNITION_B });
+    await next(b);
+    stashh.getSteps.push({ ...recognition("completed", [place(1)]), recognition_id: RECOGNITION_A });
+    await next(a);
+
+    expect(cardTitles()).toEqual(["Mekân 2", "button", "Mekân 1", "button"]);
+    expect(messenger.quotes).toEqual([b, null, a, null]);
+  });
+
+  it("quotes the Reel again where a half-sent answer resumes after another Reel's answer", async () => {
+    stashh.createSteps.push({ recognitionId: RECOGNITION_A }, { recognitionId: RECOGNITION_B });
+    const a = await reel();
+    const b = await reel();
+    await tick();
+    await tick();
+
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    messenger.sendSteps.push(undefined, new GraphApiError(500, 2, "temporarily unavailable"));
+    await next(a);
+    expect(store.row(a)).toMatchObject({ status: "submitted", repliesSent: 1 });
+
+    stashh.getSteps.push(recognition("completed", [place(2)]));
+    await next(b);
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(a);
+
+    expect(cardTitles()).toEqual(["Mekân 1", "Mekân 2", "button", "button"]);
+    expect(messenger.quotes).toEqual([a, b, null, a]);
+  });
+
+  it("quotes the apology for a Reel that could not be read", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("failed", null, "boom"));
+    await next(mid);
+
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["text"]);
+    expect(messenger.quotes).toEqual([mid]);
+  });
+
+  it("quotes the apology for a share that fails for good on our side", async () => {
+    stashh.createSteps.push(new StashhApiError(400, "VALIDATION_ERROR", "bad url"));
+    const mid = await reel();
+    await tick();
+
+    expect(messenger.quotes).toEqual([mid]);
+  });
+
+  it("quotes the refusal of a share when the free analyses are used up", async () => {
+    stashh.createSteps.push(quotaError());
+    const mid = await reel();
+    await tick();
+
+    expect(messenger.quotes).toEqual([mid]);
+  });
+
+  it("quotes a pasted link and a share it cannot read", async () => {
+    const link = await deliver({ text: `şuna bak ${REEL_URL}` });
+    await tick();
+    stashh.getSteps.push(recognition("completed", []));
+    await next(link);
+    const unreadable = await deliver({ attachments: [{ type: "story_mention", payload: { url: "https://lookaside.example/x" } }] });
+    await tick();
+
+    expect(messenger.quotes).toEqual([link, unreadable]);
+  });
+
+  it("sends the answer unquoted when Instagram refuses the quote", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    messenger.sendSteps.push(new GraphApiError(400, 100, "Invalid parameter"));
+    await next(mid);
+
+    expect(store.row(mid)).toMatchObject({ status: "replied", repliesSent: 2 });
+    expect(messenger.sent.map((s) => s.message.kind)).toEqual(["carousel", "button"]);
+    expect(messenger.attemptedQuotes).toEqual([mid, null, null]);
+  });
+
+  it("leaves a retryable failure of a quoted message to the retry, which quotes again", async () => {
+    const mid = await reel();
+    await tick();
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    messenger.sendSteps.push(new GraphApiError(503, 2, "temporarily unavailable"));
+    await next(mid);
+    expect(store.row(mid)).toMatchObject({ status: "submitted", repliesSent: 0, attempts: 1 });
+
+    stashh.getSteps.push(recognition("completed", [place(1)]));
+    await next(mid);
+    expect(messenger.quotes).toEqual([mid, null]);
+    expect(messenger.attemptedQuotes).toEqual([mid, mid, null]);
+  });
+
+  it("does not quote chat, commands or help", async () => {
+    stashh.turnSteps.push({ messages: [{ kind: "text", text: "Merhaba!" }] });
+    await deliver({ text: "merhaba" });
+    time.advance(CHAT_DEBOUNCE_MS);
+    await tick();
+    await deliver({ text: "harita" });
+    await tick();
+    await deliver({});
+    await tick();
+
+    expect(messenger.sent).toHaveLength(3);
+    expect(messenger.quotes).toEqual([null, null, null]);
   });
 });
 
