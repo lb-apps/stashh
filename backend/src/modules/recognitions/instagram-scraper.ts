@@ -78,26 +78,58 @@ function pageHeaders(): Record<string, string> {
   return { ...BROWSER_HEADERS, Cookie: `sessionid=${sessionId}` };
 }
 
-function extractVideoUrl(html: string): string | null {
-  const p1 = html.match(
-    /"video_versions"\s*:\s*\[\s*\{\s*"width"\s*:\s*\d+\s*,\s*"height"\s*:\s*\d+\s*,\s*"url"\s*:\s*"([^"]+)"/,
-  );
-  if (p1?.[1]) return JSON.parse(`"${p1[1]}"`);
+/**
+ * The reel's own video on its page. A signed-in page also carries the reels Instagram
+ * suggests next, each with its own `video_versions`, so the video is read only from the
+ * media object whose `code` is this shortcode; the og:video tag describes the page's own
+ * media too. Nothing else in the page is taken, since it may be another reel: the
+ * downloader resolves the reel by its URL instead.
+ */
+export function extractVideoUrl(html: string, shortcode: string): string | null {
+  const own = findMedia(html, shortcode);
+  const versions = own?.["video_versions"];
+  if (Array.isArray(versions)) {
+    const url = (versions[0] as { url?: unknown } | undefined)?.url;
+    if (typeof url === "string" && url.startsWith("https://")) return url;
+  }
 
-  const p2 = html.match(/"video_url"\s*:\s*"([^"]+\.mp4[^"]*)"/);
-  if (p2?.[1]) return JSON.parse(`"${p2[1]}"`);
+  const og = html.match(/<meta\s+property="og:video(?::(?:url|secure_url))?"\s+content="([^"]+)"/);
+  if (og?.[1]) return decodeHtmlEntities(og[1]);
 
-  const p3 = html.match(/"contentUrl"\s*:\s*"([^"]+\.mp4[^"]*)"/);
-  if (p3?.[1]) return JSON.parse(`"${p3[1]}"`);
+  return null;
+}
 
-  const p4 = html.match(
-    /<meta\s+property="og:video(?::(?:url|secure_url))?"\s+content="([^"]+)"/,
-  );
-  if (p4?.[1]) return decodeHtmlEntities(p4[1]!);
+/** The media object with this shortcode in the page's JSON script blocks, if any. */
+function findMedia(html: string, shortcode: string): Record<string, unknown> | null {
+  for (const block of html.matchAll(/<script type="application\/json"[^>]*>([\s\S]*?)<\/script>/g)) {
+    let data: unknown;
+    try {
+      data = JSON.parse(block[1]!);
+    } catch {
+      continue;
+    }
+    const found = findByCode(data, shortcode);
+    if (found) return found;
+  }
+  return null;
+}
 
-  const p5 = html.match(/https:\\\/\\\/[^"']+\.mp4[^"'\\]*/);
-  if (p5?.[0]) return decodeHtmlEntities(p5[0].replace(/\\\//g, "/"));
-
+/** Depth-first search for the object carrying `code: shortcode` and its videos. */
+function findByCode(node: unknown, shortcode: string): Record<string, unknown> | null {
+  if (!node || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findByCode(item, shortcode);
+      if (found) return found;
+    }
+    return null;
+  }
+  const record = node as Record<string, unknown>;
+  if (record["code"] === shortcode && Array.isArray(record["video_versions"])) return record;
+  for (const value of Object.values(record)) {
+    const found = findByCode(value, shortcode);
+    if (found) return found;
+  }
   return null;
 }
 
@@ -360,7 +392,7 @@ export async function fetchInstagramContent(
 
   const caption = channelCaption ?? (html ? extractCaption(html) : null);
   const authorUsername = extractAuthor(url, html);
-  const scrapedVideoUrl = html ? extractVideoUrl(html) : null;
+  const scrapedVideoUrl = html ? extractVideoUrl(html, shortcode) : null;
   const canonicalUrl = `https://www.instagram.com/${sourceType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
   let thumbnailUrl = html ? extractThumbnail(html) : null;
