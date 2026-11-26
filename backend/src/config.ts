@@ -96,6 +96,12 @@ const envSchema = z.object({
     .transform((value) => value.replace(/\/$/, "")),
   MENU_SERVICE_URL: z.string().url().optional(),
   MENU_SERVICE_TOKEN: z.string().min(32).optional(),
+  /**
+   * Instagram `sessionid` cookie value. When set, the scraper sends it with page requests so
+   * Instagram returns full HTML with progressive (muxed) video URLs instead of an empty shell
+   * or DASH video-only segments. Without it, most reels download without audio.
+   */
+  INSTAGRAM_SESSION_ID: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
