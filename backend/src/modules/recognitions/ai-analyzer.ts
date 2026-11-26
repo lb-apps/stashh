@@ -437,7 +437,15 @@ export async function analyzeContent(
   const output = modelOutputSchema.safeParse(json);
   if (!output.success) throw new Error(`Model JSON does not match the schema: ${output.error.issues[0]?.message ?? "invalid"}`);
 
-  log.info({ duration: Date.now() - t, model: completion.model, kind: mediaKind, media: items.length }, "media analyzed");
+  log.info({
+    duration: Date.now() - t,
+    model: completion.model,
+    kind: mediaKind,
+    media: items.length,
+    hasTranscript: output.data.transcript != null,
+    transcriptChars: output.data.transcript?.full_text?.length ?? 0,
+    transcriptSegments: output.data.transcript?.segments?.length ?? 0,
+  }, "media analyzed");
 
   const checked = validateModelOutput(output.data, caption);
   if (checked.addressesTheAi || checked.dropped.places || checked.dropped.tips) {

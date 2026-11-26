@@ -56,7 +56,7 @@ function decodeHtmlEntities(str: string): string {
 
 // ─── Instagram scraper ──────────────────────────────────────────────────────
 
-const BROWSER_HEADERS = {
+const BROWSER_HEADERS: Record<string, string> = {
   "User-Agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   Accept:
@@ -71,6 +71,12 @@ const BROWSER_HEADERS = {
   "Sec-Fetch-User": "?1",
   "Upgrade-Insecure-Requests": "1",
 };
+
+function pageHeaders(): Record<string, string> {
+  const sessionId = config.INSTAGRAM_SESSION_ID;
+  if (!sessionId) return BROWSER_HEADERS;
+  return { ...BROWSER_HEADERS, Cookie: `sessionid=${sessionId}` };
+}
 
 function extractVideoUrl(html: string): string | null {
   const p1 = html.match(
@@ -103,7 +109,7 @@ function extractVideoUrl(html: string): string | null {
 async function isVideoUrlPlayable(videoUrl: string, log: Logger): Promise<boolean> {
   try {
     const res = await fetch(videoUrl, {
-      headers: { ...BROWSER_HEADERS, Accept: "*/*", Range: "bytes=0-1023" },
+      headers: { ...pageHeaders(), Accept: "*/*", Range: "bytes=0-1023" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok && res.status !== 206) {
@@ -291,7 +297,7 @@ async function fetchInstagramHtml(shortcode: string, log: Logger): Promise<strin
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, { headers: BROWSER_HEADERS });
+      const res = await fetch(url, { headers: pageHeaders() });
       lastStatus = res.status;
       if (!res.ok) {
         log.warn({ url, status: res.status }, "HTTP error");
