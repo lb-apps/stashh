@@ -51,6 +51,13 @@ class FakePlacesRepository {
   async getPlaceById(id: string) {
     return this.places.find((p) => p.id === id) ?? null;
   }
+  async insertPlaceIfAbsent(row: Partial<PlaceRow> & { google_place_id: string | null }) {
+    const existing = this.places.find((p) => p.google_place_id === row.google_place_id);
+    if (existing) return existing;
+    const inserted = { ...place(`place-${this.places.length + 1}`, row.google_place_id ?? ""), ...row } as PlaceRow;
+    this.places.push(inserted);
+    return inserted;
+  }
   async tryInsertSavedPlace(row: SavedPlaceInsert) {
     const existing = this.saved.find((s) => s.owner_user_id === row.owner_user_id && s.place_id === row.place_id);
     if (existing) return { row: existing, created: false };
@@ -140,6 +147,27 @@ describe("PlacesService.addPlaces from a recognition", () => {
     await expect(service.addPlaces("someone-else", { source: "recognition", recognition_result_id: RESULT, place_ids: ["g-a"] })).rejects.toMatchObject({
       status: 403,
     });
+  });
+});
+
+describe("PlacesService.ensureRecognitionPlaces", () => {
+  it("returns a row for every place, creating only the missing ones, and saves nothing", async () => {
+    const { repo, service } = setup();
+    const ids = await service.ensureRecognitionPlaces([resultPlace("g-a"), resultPlace("g-new"), resultPlace("g-a")]);
+
+    expect(ids.get("g-a")).toBe("place-a");
+    expect(ids.get("g-new")).toBe("place-3");
+    expect(ids.size).toBe(2);
+    expect(repo.places).toHaveLength(3);
+    expect(repo.saved).toHaveLength(0);
+  });
+
+  it("never overwrites a place that already exists", async () => {
+    const { repo, service } = setup();
+    repo.places[0]!.recommendations = [{ summary: "Try the flat white", kind: "drink" }];
+    await service.ensureRecognitionPlaces([{ ...resultPlace("g-a"), recommendations: [] }]);
+
+    expect(repo.places[0]!.recommendations).toEqual([{ summary: "Try the flat white", kind: "drink" }]);
   });
 });
 

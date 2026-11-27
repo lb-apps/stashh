@@ -551,6 +551,7 @@ export type Database = {
           video_url: string | null
           author_username: string | null
           transcript: Json | null
+          addresses_the_ai: boolean
         }
         Insert: {
           caption?: string | null
@@ -565,6 +566,7 @@ export type Database = {
           video_url?: string | null
           author_username?: string | null
           transcript?: Json | null
+          addresses_the_ai?: boolean
         }
         Update: {
           caption?: string | null
@@ -579,6 +581,192 @@ export type Database = {
           video_url?: string | null
           author_username?: string | null
           transcript?: Json | null
+          addresses_the_ai?: boolean
+        }
+        Relationships: []
+      }
+      recognition_transcripts: {
+        Row: {
+          created_at: string
+          full_text: string
+          id: string
+          language: string | null
+          model: string | null
+          result_id: string
+          segments: Json
+        }
+        Insert: {
+          created_at?: string
+          full_text: string
+          id?: string
+          language?: string | null
+          model?: string | null
+          result_id: string
+          segments?: Json
+        }
+        Update: {
+          created_at?: string
+          full_text?: string
+          id?: string
+          language?: string | null
+          model?: string | null
+          result_id?: string
+          segments?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recognition_transcripts_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: true
+            referencedRelation: "recognition_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recognition_result_places: {
+        Row: {
+          confidence: number | null
+          place_id: string
+          position: number
+          result_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          place_id: string
+          position: number
+          result_id: string
+        }
+        Update: {
+          confidence?: number | null
+          place_id?: string
+          position?: number
+          result_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recognition_result_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recognition_result_places_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_mentions: {
+        Row: {
+          caption_end: number | null
+          caption_start: number | null
+          created_at: string
+          end_s: number | null
+          id: string
+          on_screen_text: string | null
+          place_id: string
+          result_id: string
+          slide_index: number | null
+          source: string
+          start_s: number | null
+          transcript_id: string | null
+        }
+        Insert: {
+          caption_end?: number | null
+          caption_start?: number | null
+          created_at?: string
+          end_s?: number | null
+          id?: string
+          on_screen_text?: string | null
+          place_id: string
+          result_id: string
+          slide_index?: number | null
+          source: string
+          start_s?: number | null
+          transcript_id?: string | null
+        }
+        Update: {
+          caption_end?: number | null
+          caption_start?: number | null
+          created_at?: string
+          end_s?: number | null
+          id?: string
+          on_screen_text?: string | null
+          place_id?: string
+          result_id?: string
+          slide_index?: number | null
+          source?: string
+          start_s?: number | null
+          transcript_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_mentions_result_id_place_id_fkey"
+            columns: ["result_id", "place_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_result_places"
+            referencedColumns: ["result_id", "place_id"]
+          },
+          {
+            foreignKeyName: "place_mentions_transcript_id_fkey"
+            columns: ["transcript_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_transcripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evidence_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          finished_at: string | null
+          id: number
+          kind: string
+          last_error: string | null
+          locked_until: string | null
+          model: string | null
+          prompt_tokens: number | null
+          status: string
+          subject_id: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          finished_at?: string | null
+          id?: never
+          kind: string
+          last_error?: string | null
+          locked_until?: string | null
+          model?: string | null
+          prompt_tokens?: number | null
+          status?: string
+          subject_id: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          finished_at?: string | null
+          id?: never
+          kind?: string
+          last_error?: string | null
+          locked_until?: string | null
+          model?: string | null
+          prompt_tokens?: number | null
+          status?: string
+          subject_id?: string
         }
         Relationships: []
       }
@@ -1210,6 +1398,66 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      claim_evidence_jobs: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          attempts: number
+          available_at: string
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          finished_at: string | null
+          id: number
+          kind: string
+          last_error: string | null
+          locked_until: string | null
+          model: string | null
+          prompt_tokens: number | null
+          status: string
+          subject_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "evidence_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      enqueue_result_attribution: {
+        Args: { p_result_ids: string[] }
+        Returns: number
+      }
+      finish_evidence_job: {
+        Args: {
+          p_completion_tokens: number | null
+          p_cost_usd: number | null
+          p_error: string | null
+          p_id: number
+          p_model: string | null
+          p_outcome: string
+          p_prompt_tokens: number | null
+          p_retry_seconds: number
+        }
+        Returns: undefined
+      }
+      replace_result_mentions: {
+        Args: {
+          p_caption_md5: string
+          p_mentions: Json
+          p_result_id: string
+          p_transcript_id: string | null
+        }
+        Returns: boolean
+      }
+      save_recognition_result: {
+        Args: {
+          p_places: Json
+          p_result: Json
+          p_source_url: string
+          p_transcript: Json | null
+        }
+        Returns: string
       }
       claim_recognitions: {
         Args: { p_claim_limit?: number; p_worker_identifier: string }

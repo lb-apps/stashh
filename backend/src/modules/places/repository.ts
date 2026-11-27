@@ -120,16 +120,21 @@ export class PlacesRepository {
   }
 
   /**
-   * Upserts canonical place by google_place_id (service role — RLS has no insert for users).
+   * Inserts a canonical place, or returns the one that already holds its google_place_id (service
+   * role — RLS has no insert for users). Never overwrites: two first sightings of a place racing
+   * each other must not wipe what the place has gathered since (its tips).
    */
-  async upsertPlace(row: PlaceInsert): Promise<PlaceRow> {
+  async insertPlaceIfAbsent(row: PlaceInsert): Promise<PlaceRow> {
     const { data, error } = await this.serviceSupabase
       .from("places")
-      .upsert(row, { onConflict: "google_place_id" })
+      .upsert(row, { onConflict: "google_place_id", ignoreDuplicates: true })
       .select("*")
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    return data;
+    if (data) return data;
+    const existing = row.google_place_id ? await this.getPlaceByGooglePlaceId(row.google_place_id) : null;
+    if (!existing) throw new Error(`Place ${row.google_place_id ?? "(no google_place_id)"} was neither inserted nor found`);
+    return existing;
   }
 
   async updatePlaceThumbnailIfEmpty(placeId: string, thumbnailUrl: string): Promise<void> {

@@ -1,3 +1,52 @@
+# Place evidence — transcripts tied to places, tips from every reel
+
+Plan written and approved 2026-11-27 (design: https://claude.ai/artifact/A1NnGuwTNdz66iPaBffAF9). Branch
+`feat/place-evidence` from `origin/develop`, in a worktree (`.claude/worktrees/feat-place-evidence`): the main
+checkout holds someone else's uncommitted `tasks/lessons.md` and `scripts/`.
+
+**Why.** `places.recommendations` is written once, when the place row is created, and never again: of the 94
+places that appear in 2+ results, 40 have tips in those results that never reached the place (Galata Tower:
+8 results, 0 tips). Since 297589b the Whisper transcript feeds nothing; per-place mentions carry Gemini's own
+timestamps, which do not line up with the stored Whisper transcript.
+
+**Decisions (owner, 2026-11-27).**
+- The transcript belongs to the reel, is kept in full, and is never copied onto a place.
+- Which time span (caption line, on-screen text) is about which place is a relation of its own, `place_mentions`.
+- A recognised place gets its `places` row at recognition time, so the relation is a real foreign key.
+- Models return indices; code turns them into time and character ranges. Evidence text is always the original.
+- Tips are rebuilt in the background from the evidence of every reel a place appears in.
+- One `evidence_jobs` queue (`attribute` | `digest`) instead of a digest queue plus an attributed-at sweep.
+- Gemini no longer transcribes; Whisper is the only transcript.
+- Stories: no transcript, no mentions, until Meta's terms are checked.
+- Shared database: migrations are additive first; the owner applies them; the old column goes after deploy.
+
+## Phase 1 — collect the evidence (UI unchanged)
+
+- [ ] Migration `…_place_evidence.sql`: `recognition_results.addresses_the_ai`, `recognition_transcripts`
+      (copy of the 117 existing), `recognition_result_places`, `place_mentions`, `evidence_jobs`,
+      `claim_evidence_jobs`, `save_recognition_result`, `replace_result_mentions`; service role only
+- [ ] `database.ts` by hand
+- [ ] Places: `ensurePlace` split out of `resolveAndSavePlace`, insert-if-absent, `ensureRecognitionPlaces`
+- [ ] Analyzer: no transcript / `transcript_mentions`; `on_screen_text` per venue; `addresses_the_ai` returned
+- [ ] Whisper: 20 000 chars / 400 segments, model id kept, stale comments fixed
+- [ ] Worker: ensure places → `save_recognition_result` → auto-save → complete
+- [ ] `evidence/jobs.ts` loop, `evidence/attribution.ts` (single-place shortcut, indices → ranges)
+- [ ] `RECOGNITION_TEXT_MODEL` in config, `.env.example`, deployment docs
+- [ ] Ops: `recognition_ops_detail` from the new tables, per-place mentions in `place-item.tsx`
+- [ ] `backend/scripts/backfill-evidence.ts` (`--dry-run`), run with the owner's go-ahead
+- [ ] Red team: `attribution` suite, on-screen cases in the analyzer suite
+- [ ] Docs: `ai-safety.md`, CLAUDE.md "Recognition evidence"
+- [ ] Typecheck, tests, red team; owner applies the migration; end-to-end on the local backend + ops
+- [ ] PR → `develop`; after deploy, the owner drops `recognition_results.transcript`
+
+## Phase 2 — tips from the evidence (own PR)
+
+- [ ] `digest` jobs after attribution (2 min debounce, 10 min cap), `place_digests`
+- [ ] `evidence/digest.ts`: latest 20 results, no `addresses_the_ai`, original text, sources checked, authors counted
+- [ ] Analyzer stops writing tips (`[]` kept in the result), place creation stops writing them
+- [ ] Red team R2/R5/R8 move to a `digest` suite
+- [ ] One-off digest of every place; before/after for Galata Tower, Porselano, Scald Coffee
+
 # Credits, a daily allowance and RevenueCat (Free + Premium)
 
 Plan written 2026-11-25; owner's go-ahead the same day ("best practice, 2026 architecture, separate branch"). Branch `feat/credits` from `origin/develop`, in a

@@ -2,9 +2,10 @@ import type { Logger } from "../../lib/logger.js";
 import type { Transcript, TranscriptSegment } from "../../types/schemas.js";
 import { cleanUntrustedText } from "../../lib/untrusted-text.js";
 
-const MAX_FULL_TEXT_CHARS = 5_000;
+// The transcript is kept in full: bounds that only stop a runaway response, not a long reel.
+const MAX_FULL_TEXT_CHARS = 20_000;
 const MAX_SEGMENT_CHARS = 500;
-const MAX_SEGMENTS = 100;
+const MAX_SEGMENTS = 400;
 const NO_SPEECH_THRESHOLD = 0.6;
 
 interface WhisperSegment {
@@ -16,13 +17,14 @@ interface WhisperSegment {
 
 interface WhisperVerboseResponse {
   text: string;
+  language?: string;
   segments?: WhisperSegment[];
 }
 
 /**
- * Transcribe audio from a video buffer using OpenRouter's STT endpoint.
- * Runs before Gemini so the transcript reaches the vision model as prompt text.
- * The endpoint accepts mp4 directly — no ffmpeg extraction needed.
+ * Transcribes a video's speech through OpenRouter's speech-to-text endpoint. It runs alongside the
+ * vision model and is the only transcript a result keeps. Takes the MP3 `extract-media` pulls out
+ * of the video, or the video itself when that failed (the endpoint accepts mp4).
  */
 export async function transcribeVideo(
   mediaBuffer: Buffer,
@@ -96,5 +98,5 @@ export async function transcribeVideo(
     "whisper transcription complete",
   );
 
-  return { full_text: fullText, segments };
+  return { full_text: fullText, segments, model, language: result.language?.trim() || null };
 }

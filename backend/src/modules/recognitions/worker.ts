@@ -22,6 +22,10 @@ import type { RecognitionStage, RecognitionTaskRow, RecognitionTaskOptions } fro
 import type { AIAnalysisResult, SourceContent } from "../../types/schemas.js";
 import { uploadSourceThumbnail } from "../../lib/sourceThumbnailUploader.js";
 import { triggerMenuDiscovery } from "../../lib/menu-client.js";
+import { createOpenRouterClient } from "../../lib/openrouter.js";
+import { buildResultPlaces } from "./evidence/result-places.js";
+import { runAttributeJob } from "./evidence/attribute-job.js";
+import { startEvidenceJobs, type EvidenceJobsLoop } from "./evidence/jobs.js";
 
 let shouldKeepRunning = true;
 let wakeResolver: (() => void) | null = null;
@@ -81,6 +85,7 @@ async function processRecognition(
   recognition: RecognitionTaskRow,
   googlePlacesClient: GooglePlacesClient,
   googlePhotoMediaClient: GooglePhotoMediaClient,
+  evidenceJobs: EvidenceJobsLoop,
   workerLog: Logger,
 ): Promise<void> {
   const taskOptions = (recognition.options ?? {}) as RecognitionTaskOptions;
@@ -214,7 +219,6 @@ async function processRecognition(
       location_hint: place.location_hint,
       instagram_username: place.instagram_username,
       recommendations: place.recommendations,
-      transcript_mentions: place.transcript_mentions,
       confidence_score: place.confidence_score,
       source: place.source,
       matched_place: placeMatches.get(place.name) ?? null,
@@ -225,17 +229,27 @@ async function processRecognition(
     );
 
     await stage("saving");
+    // Every matched place gets its canonical row now, saved or not, so the result's places and
+    // their mentions point at real rows.
+    const placeIds = await tl.step(
+      "places ensured",
+      () => placesService.ensureRecognitionPlaces(places),
+      (ids) => ({ total: places.length, rows: ids.size }),
+    );
+    const resultPlaces = buildResultPlaces(analysis.places, placeMatches, placeIds);
     const resultId = await tl.step(
       "result saved",
       () =>
         sourceThumbnail.then((thumbnailUrl) =>
-          recognitionService.upsertRecognitionResult(recognition.source_url, places, sourceContent, analysis, thumbnailUrl),
+          recognitionService.saveRecognitionResult(recognition.source_url, places, resultPlaces, sourceContent, analysis, thumbnailUrl),
         ),
-      (id) => ({ resultId: id }),
+      (id) => ({ resultId: id, places: resultPlaces.length, transcript: Boolean(analysis.transcript) }),
     );
     if (taskOptions.auto_save) await savePlaces(places);
 
     await recognitionService.processRecognitionSuccess({ recognitionId: recognition.id, resultId });
+    // The save queued attribution; it runs after the reply, in this process when it has room.
+    evidenceJobs.wake();
 
     tl.done();
     await recognitionService.recordRun(
@@ -300,6 +314,18 @@ async function runWorker(): Promise<void> {
   const placesService = createPlacesServiceWithServiceRole();
   const googlePlacesClient = new GooglePlacesClient(config.GOOGLE_PLACES_API_KEY);
   const googlePhotoMediaClient = new GooglePhotoMediaClient(config.GOOGLE_PLACES_API_KEY);
+
+  const evidenceDb = createSupabaseServiceClient();
+  const textModel = createOpenRouterClient({ apiKey: config.OPENROUTER_API_KEY });
+  const evidenceJobs = startEvidenceJobs({
+    db: evidenceDb,
+    log: workerLog.child({ loop: "evidence" }),
+    concurrency: workerConcurrency,
+    pollMs: pollMaximumMilliseconds,
+    handlers: {
+      attribute: (job, log) => runAttributeJob(job.subject_id, { db: evidenceDb, model: textModel, modelId: config.RECOGNITION_TEXT_MODEL }, log),
+    },
+  });
 
   const realtimeClient = createSupabaseRealtimeClient();
   let realtimeChannel: RealtimeChannel | null = null;
@@ -367,7 +393,7 @@ async function runWorker(): Promise<void> {
       for (const recognition of claimedRecognitions) {
         if (!shouldKeepRunning) break;
         trackInFlightTask(
-          processRecognition(recognitionService, placesService, recognition, googlePlacesClient, googlePhotoMediaClient, workerLog),
+          processRecognition(recognitionService, placesService, recognition, googlePlacesClient, googlePhotoMediaClient, evidenceJobs, workerLog),
         );
       }
     } catch (error) {
@@ -379,6 +405,7 @@ async function runWorker(): Promise<void> {
   if (inFlightTasks.size > 0) {
     await Promise.allSettled(Array.from(inFlightTasks));
   }
+  await evidenceJobs.stop();
 
   if (realtimeClient && realtimeChannel) {
     await realtimeClient.removeChannel(realtimeChannel);

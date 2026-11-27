@@ -274,10 +274,29 @@ credit. Only an analysis that finds a place counts. Guide: [docs/api-screen-map.
 - **Only the backend writes recognition tasks.** People read their own through RLS and nothing else;
   the worker wakes on an empty Realtime broadcast (`recognition-worker`), never on table changes.
 
+## Recognition evidence
+
+What a reel says about each place it features, kept so a place's tips can be rebuilt from every
+reel it appears in (`recognition_transcripts`, `recognition_result_places`, `place_mentions`,
+`evidence_jobs`; plan in `tasks/todo.md`, "Place evidence").
+
+- **The transcript belongs to the reel.** Whisper writes it; Gemini finds venues and does not
+  transcribe. Never copy a transcript onto a place.
+- **A place's evidence is `place_mentions`:** references into the reel's own words (a transcript
+  span, a caption range in code points, on-screen text), never text a model wrote.
+- **Models that tie parts to places answer with labels** (`S3 → P1`); code turns them into ranges
+  and drops a label it did not give.
+- Every matched place gets its `places` row at recognition time (`ensureRecognitionPlaces`),
+  insert-if-absent: a creation never overwrites a row.
+- An analysis is written in one transaction (`save_recognition_result`). Work after the reply
+  runs from `evidence_jobs` (`backend/src/modules/recognitions/evidence/`): leased, retried,
+  idempotent.
+- Stories keep no transcript and no mentions.
+
 ## AI safety
 
-Two models read text strangers wrote (the recognition analyzer: posts; the DM assistant: DMs and
-post tips). The boundary is code after the model, not the prompt — [docs/security/ai-safety.md](docs/security/ai-safety.md).
+Three models read text strangers wrote (the recognition analyzer: posts; attribution: a post's
+transcript and caption; the DM assistant: DMs and post tips). The boundary is code after the model, not the prompt — [docs/security/ai-safety.md](docs/security/ai-safety.md).
 - An irreversible assistant tool gets a `reply.confirm` action and a real-tap check in code; the
   model never writes `CONFIRM:` / `ERASE_CONFIRM` payloads.
 - Text not written by the sender goes through `cleanUntrustedText` (`backend/src/lib/untrusted-text.ts`)

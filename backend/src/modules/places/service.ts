@@ -345,6 +345,20 @@ export class PlacesService {
     return Promise.all(unique.map((item) => this.resolveAndSavePlace(item.google_place_id, ownerUserId, item, sourceTaskId)));
   }
 
+  /**
+   * The canonical rows of the places a recognition found, created when missing, keyed by
+   * google_place_id. The worker calls it before it saves the result, so the result's places and
+   * their mentions point at real rows whether or not anyone saves them. Saves nothing to a library
+   * and starts no menu discovery: both still happen when a place is saved.
+   */
+  async ensureRecognitionPlaces(items: RecognitionResultPlace[]): Promise<Map<string, string>> {
+    const unique = [...new Map(items.map((item) => [item.google_place_id, item])).values()];
+    const entries = await Promise.all(
+      unique.map(async (item) => [item.google_place_id, (await this.ensurePlace(item.google_place_id, item)).row.id] as const),
+    );
+    return new Map(entries);
+  }
+
   /** Validates that the user has saved the place identified by canonical places.id. */
   async assertSavedPlaceOwnership(placeId: string, ownerUserId: string): Promise<void> {
     const row = await this.placesRepo.getSavedPlaceByCanonicalId(placeId, ownerUserId);
@@ -365,29 +379,34 @@ export class PlacesService {
     return row.saved_place.id;
   }
 
+  /** The canonical row for a Google place: the existing one (enriched when it lacks location data), or a new one. */
+  private async ensurePlace(
+    googlePlaceId: string,
+    fromRecognition: RecognitionResultPlace | null,
+  ): Promise<{ row: PlaceRow; source: "existing" | "google" | "recognition" }> {
+    const existingCanonical = await this.placesRepo.getPlaceByGooglePlaceId(googlePlaceId);
+    if (existingCanonical) {
+      const row = await this.enrichExistingPlace(existingCanonical, googlePlaceId);
+      this.log.info({ googlePlaceId, placeId: row.id }, "places: reused existing canonical place");
+      return { row, source: "existing" };
+    }
+    if (!fromRecognition) {
+      const row = await this.createPlaceFromGoogle(googlePlaceId);
+      this.log.info({ googlePlaceId, placeId: row.id }, "places: created new place from Google API");
+      return { row, source: "google" };
+    }
+    const row = await this.createPlaceFromRecognition(googlePlaceId, fromRecognition);
+    this.log.info({ googlePlaceId, placeId: row.id }, "places: created new place from recognition result");
+    return { row, source: "recognition" };
+  }
+
   private async resolveAndSavePlace(
     googlePlaceId: string,
     ownerUserId: string,
     fromRecognition: RecognitionResultPlace | null,
     sourceTaskId: string | null,
   ): Promise<AddPlaceResultEntry> {
-    const existingCanonical = await this.placesRepo.getPlaceByGooglePlaceId(googlePlaceId);
-    let placeRow: PlaceRow;
-    let place_source: string;
-
-    if (existingCanonical) {
-      placeRow = await this.enrichExistingPlace(existingCanonical, googlePlaceId);
-      place_source = "existing";
-      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: reused existing canonical place");
-    } else if (!fromRecognition) {
-      placeRow = await this.createPlaceFromGoogle(googlePlaceId);
-      place_source = "google";
-      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from Google API");
-    } else {
-      placeRow = await this.createPlaceFromRecognition(googlePlaceId, fromRecognition);
-      place_source = "recognition";
-      this.log.info({ googlePlaceId, placeId: placeRow.id }, "places: created new place from recognition result");
-    }
+    const { row: placeRow, source: place_source } = await this.ensurePlace(googlePlaceId, fromRecognition);
 
     const { created } = await this.placesRepo.tryInsertSavedPlace({
       owner_user_id: ownerUserId,
@@ -446,7 +465,7 @@ export class PlacesService {
     }
     const insert = mapGooglePlaceV1ToPlacesInsert(details);
 
-    const placeRow = await this.placesRepo.upsertPlace({
+    const placeRow = await this.placesRepo.insertPlaceIfAbsent({
       ...insert,
       thumbnail_url: insert.thumbnail_url ?? null,
     });
@@ -473,7 +492,7 @@ export class PlacesService {
       insert = backfillPlacesInsertFromApi(partial, mapGooglePlaceV1ToPlacesInsert(apiDetails));
     }
 
-    return this.placesRepo.upsertPlace({
+    return this.placesRepo.insertPlaceIfAbsent({
       ...insert,
       thumbnail_url: insert.thumbnail_url ?? null,
     });

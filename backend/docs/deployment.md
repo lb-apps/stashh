@@ -26,6 +26,9 @@ Validated at boot by [`src/config.ts`](../src/config.ts); the process exits on a
 Required: `OPENROUTER_API_KEY`, `GOOGLE_PLACES_API_KEY`, `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`. `OPENROUTER_MODEL` defaults to
 `google/gemini-3.8-flash`; any replacement must accept video input and structured outputs.
+`WHISPER_MODEL` (speech to text) defaults to `openai/whisper-large-v3-turbo`.
+`RECOGNITION_TEXT_MODEL`, the text model that ties a result's transcript and caption to its
+places, defaults to `google/gemini-3.8-flash`; any replacement must accept structured outputs.
 
 Internal API (the Instagram channel and the ops dashboard): `INTERNAL_API_TOKENS` —
 comma-separated, each ≥ 32 chars. List the old and new token together while rotating, then
