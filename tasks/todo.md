@@ -22,22 +22,43 @@ timestamps, which do not line up with the stored Whisper transcript.
 
 ## Phase 1 — collect the evidence (UI unchanged)
 
-- [ ] Migration `…_place_evidence.sql`: `recognition_results.addresses_the_ai`, `recognition_transcripts`
-      (copy of the 117 existing), `recognition_result_places`, `place_mentions`, `evidence_jobs`,
+- [x] Migration `…_place_evidence.sql`: `recognition_results.addresses_the_ai`, `recognition_transcripts`
+      (copy of the existing, 119 on apply), `recognition_result_places`, `place_mentions`, `evidence_jobs`,
       `claim_evidence_jobs`, `save_recognition_result`, `replace_result_mentions`; service role only
-- [ ] `database.ts` by hand
-- [ ] Places: `ensurePlace` split out of `resolveAndSavePlace`, insert-if-absent, `ensureRecognitionPlaces`
-- [ ] Analyzer: no transcript / `transcript_mentions`; `on_screen_text` per venue; `addresses_the_ai` returned
-- [ ] Whisper: 20 000 chars / 400 segments, model id kept, stale comments fixed
-- [ ] Worker: ensure places → `save_recognition_result` → auto-save → complete
-- [ ] `evidence/jobs.ts` loop, `evidence/attribution.ts` (single-place shortcut, indices → ranges)
-- [ ] `RECOGNITION_TEXT_MODEL` in config, `.env.example`, deployment docs
-- [ ] Ops: `recognition_ops_detail` from the new tables, per-place mentions in `place-item.tsx`
-- [ ] `backend/scripts/backfill-evidence.ts` (`--dry-run`), run with the owner's go-ahead
-- [ ] Red team: `attribution` suite, on-screen cases in the analyzer suite
-- [ ] Docs: `ai-safety.md`, CLAUDE.md "Recognition evidence"
-- [ ] Typecheck, tests, red team; owner applies the migration; end-to-end on the local backend + ops
+- [x] `database.ts` by hand
+- [x] Places: `ensurePlace` split out of `resolveAndSavePlace`, insert-if-absent, `ensureRecognitionPlaces`
+- [x] Analyzer: no transcript / `transcript_mentions`; `on_screen_text` per venue; `addresses_the_ai` returned
+- [x] Whisper: 20 000 chars / 400 segments, model and language kept, stale comments fixed
+- [x] Worker: ensure places → `save_recognition_result` → auto-save → complete
+- [x] `evidence/jobs.ts` loop, `evidence/attribution.ts` (single-place shortcut, indices → ranges)
+- [x] `RECOGNITION_TEXT_MODEL` in config, `.env.example`, deployment docs
+- [x] Ops: `recognition_ops_detail` from the new tables, per-place mentions in `place-item.tsx`
+- [x] `backend/scripts/backfill-evidence.ts` (`--dry-run`)
+- [ ] Run the backfill (owner's go-ahead): dry run 2026-11-27 — 556 results to link, 44 new places,
+      553 attribution jobs (67 multi-place → model calls), under $1
+- [x] Red team: `attribution` suite, on-screen case in the analyzer suite
+- [x] Docs: `ai-safety.md`, CLAUDE.md "Recognition evidence"
+- [x] Found in the end-to-end run, fixed: Whisper down erased the stored transcript (`…_save_result_keeps_transcript.sql`)
+- [x] Typecheck, tests, red team; owner applied the three migrations; end-to-end on real reels
+- [ ] Ops detail sheet looked at in the browser (:3003 was the main checkout's ops; data checked in SQL)
 - [ ] PR → `develop`; after deploy, the owner drops `recognition_results.transcript`
+
+### Review (2026-11-27)
+
+- **Migrations** ran first on a throwaway local Postgres 17 with stub tables (save, re-save, duplicate
+  place, stale-write refusal, stories, retry with a waiting twin, CHECKs, role lockdown), then the owner
+  applied them; `execute_sql` confirmed tables, functions, grants and the 119 copied transcripts.
+- **End to end** without the HTTP server (ports 3000/3003 belonged to the main checkout): a script ran
+  the worker's steps for real reels, then the real job loop. On-screen text turned out rich — prices,
+  hours, "closed on Mondays" — none of it in the speech. The six-place reel tied every place's speech
+  span, screen text and caption lines; a caption line naming two places went to both. Attribution cost
+  $0.001–0.003 per multi-place reel; single-place reels made no call.
+- **Bug it caught:** a Whisper network failure read as "no speech", so the re-analysis erased three good
+  transcripts (restored from the old column, attributed again). Whisper now retries once and, still
+  down, the stored transcript is kept (`{ keep: true }`).
+- **Red team:** analyzer 0 of 11, attribution 0 of 4 landed (Gemini 3.8 Flash).
+- Testing locally on the shared database competes with production for recognition tasks; the end-to-end
+  script avoided the queue for that reason.
 
 ## Phase 2 — tips from the evidence (own PR)
 
