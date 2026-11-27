@@ -202,8 +202,22 @@ export interface RecognitionPlace {
   instagram_username?: string | null;
   google_maps_uri?: string | null;
   recommendations?: { summary: string; kind: string }[];
-  transcript_mentions?: TranscriptSegment[];
 }
+
+export type MentionSource = "speech" | "caption" | "on_screen";
+
+/** A part of the reel tied to one place, with its words cut from the reel's own transcript, caption or screen. */
+export interface PlaceMention {
+  source: MentionSource;
+  /** speech: the span; on_screen: when a video shows it. */
+  start_s: number | null;
+  end_s: number | null;
+  /** on_screen on a carousel: the slide, from 0. */
+  slide_index: number | null;
+  text: string | null;
+}
+
+export type EvidenceJobStatus = "queued" | "running" | "done" | "failed";
 
 export interface RecognitionRunDetail {
   id: string;
@@ -248,7 +262,18 @@ export interface RecognitionDetail {
   finished_at: string | null;
   source: { caption: string | null; thumbnail_url: string | null; video_url: string | null; source_type: string | null; result_created_at: string } | null;
   places: RecognitionPlace[];
-  transcript?: { full_text: string; segments: TranscriptSegment[] } | null;
+  transcript?: { full_text: string; segments: TranscriptSegment[]; model: string | null } | null;
+  /** Per google_place_id. */
+  mentions?: Record<string, PlaceMention[]>;
+  /** The result's latest attribution job. */
+  attribution?: {
+    status: EvidenceJobStatus;
+    attempts: number;
+    last_error: string | null;
+    model: string | null;
+    cost_usd: number | null;
+    finished_at: string | null;
+  } | null;
   runs: RecognitionRunDetail[];
   menus?: Record<string, PlaceMenuSummary[]>;
 }

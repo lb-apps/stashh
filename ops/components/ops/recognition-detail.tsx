@@ -13,8 +13,8 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/comp
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DASH, formatBytes, formatDateTime, formatDuration, formatInt, formatSource, formatUsd } from "@/lib/format";
-import { CHANNEL, FETCH_METHOD, MENU_STATUS, RUN_OUTCOME, SOURCE_TYPE, TASK_STATUS, menuTypeLabel, stepLabel } from "@/lib/labels";
+import { DASH, formatBytes, formatClock, formatDateTime, formatDuration, formatInt, formatSource, formatUsd } from "@/lib/format";
+import { CHANNEL, EVIDENCE_JOB_STATUS, FETCH_METHOD, MENU_STATUS, RUN_OUTCOME, SOURCE_TYPE, TASK_STATUS, menuTypeLabel, stepLabel } from "@/lib/labels";
 import type { MenuDetail, MenuDetailCategory, PlaceMenuSummary, RecognitionDetail, RecognitionRunDetail, TranscriptSegment } from "@/lib/ops-types";
 import { STEP_COLORS } from "./charts/shared";
 import { PlaceItem } from "./place-item";
@@ -98,7 +98,10 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
   const firstRun = detail.runs[0];
   const lastRun = detail.runs.at(-1);
   const waited = firstRun ? Date.parse(firstRun.started_at) - Date.parse(detail.created_at) : null;
-  const cost = detail.runs.reduce((sum, run) => sum + (run.cost_usd ?? 0), 0);
+  const attribution = detail.attribution ?? null;
+  // What the recognition cost, attribution of its parts to its places included.
+  const cost = detail.runs.reduce((sum, run) => sum + (run.cost_usd ?? 0), 0) + (attribution?.cost_usd ?? 0);
+  const hasCost = detail.runs.some((r) => r.cost_usd != null) || attribution?.cost_usd != null;
   const isUrl = detail.source_url.startsWith("http");
 
   // Read top to bottom: what was read (source, caption), what was found, how the run went.
@@ -147,7 +150,7 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
         ) : (
           <ItemGroup className="gap-2">
             {detail.places.map((place) => (
-              <PlaceItem key={place.google_place_id} place={place} />
+              <PlaceItem key={place.google_place_id} place={place} mentions={detail.mentions?.[place.google_place_id]} />
             ))}
           </ItemGroup>
         )}
@@ -163,9 +166,15 @@ function DetailBody({ detail }: { detail: RecognitionDetail }) {
           className="grid-cols-2 sm:grid-cols-2"
           stats={[
             { label: "Duration", value: formatDuration(lastRun?.total_ms) },
-            { label: "Cost", value: detail.runs.some((r) => r.cost_usd != null) ? formatUsd(cost) : DASH },
+            { label: "Cost", value: hasCost ? formatUsd(cost) : DASH },
           ]}
         />
+        {attribution && attribution.status !== "done" && (
+          <p className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+            <Badge variant={EVIDENCE_JOB_STATUS[attribution.status].variant}>{EVIDENCE_JOB_STATUS[attribution.status].label}</Badge>
+            {attribution.last_error && <span className="min-w-0 break-words">{attribution.last_error}</span>}
+          </p>
+        )}
         <p className="text-caption text-muted-foreground">
           {formatDateTime(detail.created_at)} · waited {formatDuration(waited)} in the queue
         </p>
@@ -348,12 +357,6 @@ function MenuCategoryBlock({ category }: { category: MenuDetailCategory }) {
   );
 }
 
-function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 function TranscriptSection({ transcript }: { transcript: { full_text: string; segments: TranscriptSegment[] } }) {
   const [open, setOpen] = useState(false);
   const hasSegments = transcript.segments.length > 0;
@@ -366,7 +369,7 @@ function TranscriptSection({ transcript }: { transcript: { full_text: string; se
             <div className="mt-2 grid gap-1">
               {transcript.segments.map((seg, i) => (
                 <div key={i} className="flex items-start gap-2 text-caption">
-                  <span className="numeric shrink-0 text-muted-foreground">{formatTimestamp(seg.start_s)}</span>
+                  <span className="numeric shrink-0 text-muted-foreground">{formatClock(seg.start_s)}</span>
                   <span>{seg.text}</span>
                 </div>
               ))}
