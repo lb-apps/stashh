@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database, Json } from "../../types/database.js";
 import { recognitionQuotaSchema, type RecognitionQuota } from "../billing/types.js";
-import type { SourceType } from "../../types/schemas.js";
+import type { SourceType, Transcript } from "../../types/schemas.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
@@ -53,8 +53,16 @@ interface FailRecognitionParams {
   errorMessage: string;
 }
 
-interface UpsertRecognitionResultParams {
+/** One place a result features, in post order, with the text the post shows for it. */
+export interface SavedResultPlace {
+  place_id: string;
+  confidence: number;
+  on_screen: Array<{ text: string; at_s: number | null; slide_index: number | null }>;
+}
+
+interface SaveRecognitionResultParams {
   sourceUrl: string;
+  /** The snapshot the API, the DM reply, the cache and the charge trigger read. */
   places: Json;
   /** The post announced venues whose names were not in what the model read. */
   namesElsewhere: boolean;
@@ -65,7 +73,10 @@ interface UpsertRecognitionResultParams {
   sourceThumbnailUrl: string | null;
   /** Written only when present, so a share that does not name the author keeps an earlier one. */
   authorUsername: string | null;
-  transcript: Json | null;
+  addressesTheAi: boolean;
+  /** "keep" leaves the stored transcript as it is: Whisper was down, the reel's speech has not changed. */
+  transcript: Transcript | null | "keep";
+  resultPlaces: SavedResultPlace[];
 }
 
 /** One of the owner's recognitions in a list: the task and its result's cover and count. */
@@ -223,27 +234,29 @@ export class RecognitionRepository {
     return data;
   }
 
-  async upsertRecognitionResult(params: UpsertRecognitionResultParams): Promise<RecognitionResultRow> {
-    const { data, error } = await this.supabaseClient
-      .from("recognition_results")
-      .upsert(
-        {
-          source_url: params.sourceUrl,
-          places: params.places,
-          names_elsewhere: params.namesElsewhere,
-          video_url: params.videoUrl,
-          caption: params.caption,
-          source_type: params.sourceType,
-          ...(params.sourceThumbnailUrl ? { source_thumbnail_url: params.sourceThumbnailUrl } : {}),
-          ...(params.authorUsername ? { author_username: params.authorUsername } : {}),
-          transcript: params.transcript,
-        },
-        { onConflict: "source_url" },
-      )
-      .select("*")
-      .single();
+  /**
+   * Writes an analysis in one transaction (`save_recognition_result`): the result, its transcript,
+   * the places it features and their on-screen text, replacing whatever an earlier analysis of the
+   * same source left. Returns the result's id.
+   */
+  async saveRecognitionResult(params: SaveRecognitionResultParams): Promise<string> {
+    const { data, error } = await this.supabaseClient.rpc("save_recognition_result", {
+      p_source_url: params.sourceUrl,
+      p_result: {
+        places: params.places,
+        names_elsewhere: params.namesElsewhere,
+        video_url: params.videoUrl,
+        caption: params.caption,
+        source_type: params.sourceType,
+        source_thumbnail_url: params.sourceThumbnailUrl,
+        author_username: params.authorUsername,
+        addresses_the_ai: params.addressesTheAi,
+      },
+      p_transcript: params.transcript === "keep" ? { keep: true } : params.transcript ? (params.transcript as unknown as Json) : null,
+      p_places: params.resultPlaces as unknown as Json,
+    });
     if (error) throw error;
-    return data;
+    return z.string().uuid().parse(data);
   }
 
   async setStage(recognitionId: string, stage: RecognitionStage): Promise<void> {

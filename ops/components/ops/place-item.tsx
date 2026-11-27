@@ -2,12 +2,16 @@ import { ExternalLink, MapPin, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { formatRating } from "@/lib/format";
-import type { RecognitionPlace } from "@/lib/ops-types";
+import { formatClock, formatRating } from "@/lib/format";
+import { MENTION_SOURCE } from "@/lib/labels";
+import type { PlaceMention, RecognitionPlace } from "@/lib/ops-types";
 import { Thumb } from "./recognition-thumb";
 
-/** A found place as a sunken row: photo, name, rating, where it is, what to order. */
-export function PlaceItem({ place }: { place: RecognitionPlace }) {
+/**
+ * A found place as a sunken row: photo, name, rating, where it is, what to order and, in the run
+ * detail, the parts of the reel tied to it.
+ */
+export function PlaceItem({ place, mentions }: { place: RecognitionPlace; mentions?: PlaceMention[] }) {
   const maps =
     place.google_maps_uri ??
     `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query: place.name, query_place_id: place.google_place_id })}`;
@@ -36,13 +40,13 @@ export function PlaceItem({ place }: { place: RecognitionPlace }) {
             ))}
           </div>
         )}
-        {place.transcript_mentions && place.transcript_mentions.length > 0 && (
-          <div className="mt-1.5 grid gap-0.5 text-caption text-muted-foreground">
-            {place.transcript_mentions.map((seg, i) => (
-              <p key={i}>
-                <span className="numeric font-semibold">{Math.floor(seg.start_s / 60)}:{Math.floor(seg.start_s % 60).toString().padStart(2, "0")}</span>
-                {" "}{seg.text}
-              </p>
+        {mentions && mentions.length > 0 && (
+          <div className="mt-2 grid gap-1.5">
+            {mentions.map((mention, i) => (
+              <div key={i} className="grid gap-0.5">
+                <span className="micro-label">{mentionWhere(mention)}</span>
+                <p className="text-caption">{mention.text || "—"}</p>
+              </div>
             ))}
           </div>
         )}
@@ -63,4 +67,17 @@ export function PlaceItem({ place }: { place: RecognitionPlace }) {
       </ItemContent>
     </Item>
   );
+}
+
+/** Where in the reel a mention sits: "Said · 0:03–0:14", "On screen · slide 2", "Caption". */
+function mentionWhere(mention: PlaceMention): string {
+  const label = MENTION_SOURCE[mention.source];
+  if (mention.source === "speech" && mention.start_s != null && mention.end_s != null) {
+    return `${label} · ${formatClock(mention.start_s)}–${formatClock(mention.end_s)}`;
+  }
+  if (mention.source === "on_screen") {
+    if (mention.slide_index != null) return `${label} · slide ${mention.slide_index + 1}`;
+    if (mention.start_s != null) return `${label} · ${formatClock(mention.start_s)}`;
+  }
+  return label;
 }

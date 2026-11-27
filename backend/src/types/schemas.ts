@@ -50,9 +50,14 @@ export interface TranscriptSegment {
   end_s: number;
 }
 
+/** A reel's spoken transcript; a segment's position in `segments` is its index. */
 export interface Transcript {
   full_text: string;
   segments: TranscriptSegment[];
+  /** The speech-to-text model that wrote it. */
+  model: string;
+  /** The spoken language as the model detected it, when it says. */
+  language: string | null;
 }
 
 // ── AI extraction result ───────────────────────────────────
@@ -97,7 +102,15 @@ export interface ExtractedPlace {
   recommendations: VenueRecommendation[];
   confidence_score: number;
   source: "caption" | "video" | "both";
-  transcript_mentions: TranscriptSegment[];
+  /** Text the post shows for this venue on screen or on a slide, as the model read it. */
+  on_screen: OnScreenText[];
+}
+
+/** Text a post shows for one venue: on a video (at `at_s`) or on a carousel slide (`slide_index`, 0-based). */
+export interface OnScreenText {
+  text: string;
+  at_s: number | null;
+  slide_index: number | null;
 }
 
 export interface AIAnalysisResult {
@@ -120,7 +133,12 @@ export interface AIAnalysisResult {
   model: string;
   provider: string | null;
   usage: ModelUsage | null;
+  /** Whisper's transcript of the video's speech; null for photos, music only, or when Whisper failed. */
   transcript: Transcript | null;
+  /** Whisper could not answer (after a retry); the source's stored transcript is kept, not erased. */
+  transcript_failed: boolean;
+  /** The post spoke to the model or asked for its output to change; its tips were dropped. */
+  addresses_the_ai: boolean;
 }
 
 // ── Google Places enrichment ───────────────────────────────
@@ -147,7 +165,6 @@ export interface ExtractedPlaceWithMatch {
   recommendations: VenueRecommendation[];
   confidence_score: number;
   source: "caption" | "video" | "both";
-  transcript_mentions: TranscriptSegment[];
   matched_place: MatchedPlace | null;
 }
 

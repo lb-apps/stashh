@@ -1,5 +1,5 @@
 import type { BadgeVariantName } from "@/components/ui/badge";
-import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, FetchMethod, MenuDiscoveryStatus, RunOutcome, SourceType, TaskStatus } from "./ops-types";
+import type { AssistantTurnStatus, Channel, DependencyHealth, DmContent, EvidenceJobStatus, FetchMethod, MentionSource, MenuDiscoveryStatus, RunOutcome, SourceType, TaskStatus } from "./ops-types";
 import type { BillingTask, CreditReason, Plan, PlanSource } from "./billing-types";
 
 type DependencyKey = DependencyHealth["key"];
@@ -30,6 +30,21 @@ export const RUN_OUTCOME: Record<RunOutcome, { label: string; variant: BadgeVari
   completed: { label: "Fresh run", variant: "info" },
   cache_hit: { label: "Cache", variant: "secondary" },
   failed: { label: "Failed", variant: "danger" },
+};
+
+/** Where a part of the reel tied to a place comes from. */
+export const MENTION_SOURCE: Record<MentionSource, string> = {
+  speech: "Said",
+  caption: "Caption",
+  on_screen: "On screen",
+};
+
+/** The attribution job that ties a reel's speech and caption to its places. */
+export const EVIDENCE_JOB_STATUS: Record<EvidenceJobStatus, { label: string; variant: BadgeVariantName }> = {
+  queued: { label: "Attribution queued", variant: "warning" },
+  running: { label: "Attributing", variant: "info" },
+  done: { label: "Attributed", variant: "success" },
+  failed: { label: "Attribution failed", variant: "danger" },
 };
 
 export const FETCH_METHOD: Record<FetchMethod, string> = {

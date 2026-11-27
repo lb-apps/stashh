@@ -45,6 +45,13 @@ export function formatUsd(value: number | null | undefined): string {
   return value == null ? DASH : usd.format(value);
 }
 
+/** A point in a video, as m:ss. */
+export function formatClock(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function formatRating(value: number | null | undefined): string {
   return value == null ? DASH : rating.format(value);
 }

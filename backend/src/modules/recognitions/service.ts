@@ -2,8 +2,8 @@ import { config } from "../../config.js";
 import { AppHttpError } from "../../errors/appHttpError.js";
 import type { Logger } from "../../lib/logger.js";
 import type { Json } from "../../types/database.js";
-import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, TranscriptSegment, VenueRecommendation, SourceContent } from "../../types/schemas.js";
-import type { RecognitionRepository, RecognitionSummaryRow, RecognitionWithResult } from "./repository.js";
+import type { AIAnalysisResult, RecognitionPipelineResponse, MatchedPlace, VenueRecommendation, SourceContent } from "../../types/schemas.js";
+import type { RecognitionRepository, RecognitionSummaryRow, RecognitionWithResult, SavedResultPlace } from "./repository.js";
 import type { RecognitionRunInsert } from "./run-record.js";
 import type {
   RecognitionResultRow,
@@ -77,7 +77,6 @@ export interface RecognitionResultPlace {
   thumbnail_url: string | null;
   instagram_username: string | null;
   recommendations: VenueRecommendation[];
-  transcript_mentions: TranscriptSegment[];
 }
 
 function normalizeErrorMessage(error: unknown): string {
@@ -220,19 +219,23 @@ export class RecognitionService {
           thumbnail_url: thumbnailUrls.get(place.google_place_id) ?? null,
           instagram_username: entry.instagram_username,
           recommendations: entry.recommendations,
-          transcript_mentions: entry.transcript_mentions,
         };
       });
   }
 
-  async upsertRecognitionResult(
+  /**
+   * Saves what an analysis found, with its transcript and each place's evidence, in one write.
+   * `resultPlaces` are the canonical rows of `places`, in post order.
+   */
+  async saveRecognitionResult(
     sourceUrl: string,
     places: RecognitionResultPlace[],
+    resultPlaces: SavedResultPlace[],
     sourceContent: SourceContent,
-    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere" | "transcript">,
+    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere" | "transcript" | "transcript_failed" | "addresses_the_ai">,
     sourceThumbnailUrl: string | null,
   ): Promise<string> {
-    const result = await this.recognitionRepository.upsertRecognitionResult({
+    return this.recognitionRepository.saveRecognitionResult({
       sourceUrl,
       places: places as unknown as Json,
       namesElsewhere: analysis.names_elsewhere,
@@ -242,9 +245,10 @@ export class RecognitionService {
       sourceType: sourceContent.source_type,
       sourceThumbnailUrl,
       authorUsername: sourceContent.author_username ?? null,
-      transcript: analysis.transcript as unknown as Json ?? null,
+      addressesTheAi: analysis.addresses_the_ai,
+      transcript: analysis.transcript_failed ? "keep" : analysis.transcript,
+      resultPlaces,
     });
-    return result.id;
   }
 
   /**

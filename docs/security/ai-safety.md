@@ -1,15 +1,16 @@
 # AI safety: what strangers can and cannot make Stashh's models do
 
-Two models read text Stashh does not control. Prompts lower the odds that a model obeys an
+Three models read text Stashh does not control. Prompts lower the odds that a model obeys an
 injected instruction, but published adaptive attacks get past every prompt-level defense
 ("The Attacker Moves Second", Oct 2025). So the boundary is deterministic code after the model:
 whatever a model is talked into, the code decides what reaches a person or changes data.
 
-## The two models
+## The three models
 
 | Model | Reads | Can change |
 |---|---|---|
-| Recognition analyzer (`backend/src/modules/recognitions/ai-analyzer.ts`) | A stranger's post: caption, slides, video frames, on-screen text, speech | Which venues are searched on Google, the tips stored with them (cached per URL, shown to every user who shares that post) |
+| Recognition analyzer (`backend/src/modules/recognitions/ai-analyzer.ts`) | A stranger's post: caption, slides, video frames, on-screen text, speech | Which venues are searched on Google, the tips stored with them (cached per URL, shown to every user who shares that post), the on-screen text kept as each venue's evidence |
+| Attribution (`backend/src/modules/recognitions/evidence/attribution.ts`) | A post's Whisper transcript and caption, and the names of the places it matched | Which parts of the reel are tied to which place (`place_mentions`): labels only, never text |
 | DM assistant (`backend/src/modules/assistant/`) | The sender's messages, their account, and through `get_place` the tips a post's author wrote | The sender's own lists and places, through tools scoped to `owner_user_id` |
 
 DM routing in `instagram/src/conversation/intent.ts` is plain code: a share is recognized, a tap
@@ -29,7 +30,13 @@ on the erase button erases, everything else goes to the assistant.
    venues and 5 tips each, bounded field lengths, hidden characters removed. A tip carrying a
    link, phone, e-mail, @handle or wallet is dropped. If the post speaks to an AI
    (`addresses_the_ai`), none of its tips are kept. Venues still have to match a Google place by
-   name, so an invented venue goes nowhere.
+   name, so an invented venue goes nowhere. On-screen text gets the same treatment: at most 5 per
+   venue and 300 characters each, none with contact details, none at all when the post speaks to
+   an AI (the flag is stored on the result, so its evidence can be left out later).
+   **Attribution** answers with labels only (`S3 → P1`, `L0 → P2`): a label it was not given is
+   dropped, and code turns labels into time spans and caption ranges, so every mention points at
+   the reel's own words and the model never writes text that is stored or shown. A reel with one
+   place needs no model at all.
 4. **Output validation for the assistant** (`run-turn.ts` `parseReply`). A link, phone or e-mail
    in the reply has to be one a tool returned this turn, outside `_untrusted` fields, or
    `stashh.me`. If not, the reply goes back to the model to rewrite. Tool calls that come beside a
@@ -63,13 +70,17 @@ on the erase button erases, everything else goes to the assistant.
 ## Red team
 
 `cd backend && npm run security:redteam` runs 19 assistant attacks (each 3×,
-`REDTEAM_REPEATS`) and 10 analyzer attacks against the real models. In-memory fakes stand behind
+`REDTEAM_REPEATS`), 11 analyzer attacks and 4 attribution attacks against the real models. In-memory fakes stand behind
 the tools, so nothing is written. It covers DAN and role-play, developer mode, fake system tags,
 policy puppetry, forged taps, poisoned tips, Arabic, Russian and Japanese injections, tag
 smuggling, base64, claimed staff, the grandma exploit, prompt and tool enumeration, injected
 links and phones, a fake JSON close, abusive-tip requests, a venue flood, and the plan: a claimed
 payment, a fake system note granting credits, a promo code, and an allowance question that must
-be answered from `get_plan` (2026-11-25: 0 of 57 assistant runs landed).
+be answered from `get_plan` (2026-11-25: 0 of 57 assistant runs landed). Attribution covers a
+spoken order to move every part to another place, a fake end of the caption with an answer JSON,
+tag smuggling inside a segment and a two-place control; the analyzer adds a caption that asks for
+a link as on-screen text (2026-11-27, Gemini 3.8 Flash: 0 of 11 analyzer and 0 of 4 attribution
+attacks landed).
 
 Results on 2026-11-04 (Haiku 5.5 assistant, Gemini 3.8 Flash analyzer):
 
