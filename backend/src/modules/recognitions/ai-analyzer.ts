@@ -15,7 +15,7 @@ import type {
   VenueRecommendation,
   VenueRecommendationKind,
 } from "../../types/schemas.js";
-import { transcribeVideo } from "./whisper.js";
+import { transcribeVideo, WhisperUnavailableError } from "./whisper.js";
 import { extractVideoMedia } from "./extract-media.js";
 
 const venueRecommendationKindValues: VenueRecommendationKind[] = [
@@ -394,24 +394,33 @@ export async function analyzeContent(
   }
 
   // Whisper gets the extracted MP3 when available (much smaller than the full video),
-  // falling back to the full video buffer when extraction didn't produce audio.
-  const whisperPromise: Promise<Transcript | null> = mediaKind === "video"
-    ? (async () => {
-        if (whisperAudio) {
-          return transcribeVideo(whisperAudio.buffer, {
-            apiKey: config.OPENROUTER_API_KEY,
-            model: config.WHISPER_MODEL,
-            log,
-            contentType: whisperAudio.contentType,
-            fileName: whisperAudio.fileName,
-          });
-        }
-        const videoItem = items.find((item) => item.kind === "video");
-        return videoItem
-          ? transcribeVideo(videoItem.buffer, { apiKey: config.OPENROUTER_API_KEY, model: config.WHISPER_MODEL, log })
-          : null;
-      })()
-    : Promise.resolve(null);
+  // falling back to the full video buffer when extraction didn't produce audio. Whisper being
+  // down never fails the analysis: the venues come from the vision model, and the result keeps
+  // whatever transcript the source already has.
+  const transcribe = async (): Promise<Transcript | null> => {
+    if (whisperAudio) {
+      return transcribeVideo(whisperAudio.buffer, {
+        apiKey: config.OPENROUTER_API_KEY,
+        model: config.WHISPER_MODEL,
+        log,
+        contentType: whisperAudio.contentType,
+        fileName: whisperAudio.fileName,
+      });
+    }
+    const videoItem = items.find((item) => item.kind === "video");
+    return videoItem ? transcribeVideo(videoItem.buffer, { apiKey: config.OPENROUTER_API_KEY, model: config.WHISPER_MODEL, log }) : null;
+  };
+  const whisperPromise: Promise<{ transcript: Transcript | null; failed: boolean }> =
+    mediaKind === "video"
+      ? transcribe().then(
+          (transcript) => ({ transcript, failed: false }),
+          (error: unknown) => {
+            if (!(error instanceof WhisperUnavailableError)) throw error;
+            log.warn({ err: error }, "transcript unavailable; the stored one is kept");
+            return { transcript: null, failed: true };
+          },
+        )
+      : Promise.resolve({ transcript: null, failed: false });
 
   const t = Date.now();
 
@@ -472,7 +481,7 @@ export async function analyzeContent(
   }
 
   // Whisper is the only transcript: Gemini listens to the audio to find venues, it does not write it down.
-  const transcript = await whisperPromise;
+  const { transcript, failed: transcriptFailed } = await whisperPromise;
   if (mediaKind === "video") {
     log.info({ chars: transcript?.full_text.length ?? 0, segments: transcript?.segments.length ?? 0 }, "transcript resolved");
   }
@@ -488,6 +497,7 @@ export async function analyzeContent(
     usage: completion.usage,
     places: checked.places,
     transcript,
+    transcript_failed: transcriptFailed,
     addresses_the_ai: checked.addressesTheAi,
   };
 }

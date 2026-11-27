@@ -232,7 +232,7 @@ export class RecognitionService {
     places: RecognitionResultPlace[],
     resultPlaces: SavedResultPlace[],
     sourceContent: SourceContent,
-    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere" | "transcript" | "addresses_the_ai">,
+    analysis: Pick<AIAnalysisResult, "video_url" | "names_elsewhere" | "transcript" | "transcript_failed" | "addresses_the_ai">,
     sourceThumbnailUrl: string | null,
   ): Promise<string> {
     return this.recognitionRepository.saveRecognitionResult({
@@ -246,7 +246,7 @@ export class RecognitionService {
       sourceThumbnailUrl,
       authorUsername: sourceContent.author_username ?? null,
       addressesTheAi: analysis.addresses_the_ai,
-      transcript: analysis.transcript,
+      transcript: analysis.transcript_failed ? "keep" : analysis.transcript,
       resultPlaces,
     });
   }

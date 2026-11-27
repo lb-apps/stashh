@@ -135,6 +135,8 @@ export interface AIAnalysisResult {
   usage: ModelUsage | null;
   /** Whisper's transcript of the video's speech; null for photos, music only, or when Whisper failed. */
   transcript: Transcript | null;
+  /** Whisper could not answer (after a retry); the source's stored transcript is kept, not erased. */
+  transcript_failed: boolean;
   /** The post spoke to the model or asked for its output to change; its tips were dropped. */
   addresses_the_ai: boolean;
 }

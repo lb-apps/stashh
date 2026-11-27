@@ -74,7 +74,8 @@ interface SaveRecognitionResultParams {
   /** Written only when present, so a share that does not name the author keeps an earlier one. */
   authorUsername: string | null;
   addressesTheAi: boolean;
-  transcript: Transcript | null;
+  /** "keep" leaves the stored transcript as it is: Whisper was down, the reel's speech has not changed. */
+  transcript: Transcript | null | "keep";
   resultPlaces: SavedResultPlace[];
 }
 
@@ -251,7 +252,7 @@ export class RecognitionRepository {
         author_username: params.authorUsername,
         addresses_the_ai: params.addressesTheAi,
       },
-      p_transcript: params.transcript ? (params.transcript as unknown as Json) : null,
+      p_transcript: params.transcript === "keep" ? { keep: true } : params.transcript ? (params.transcript as unknown as Json) : null,
       p_places: params.resultPlaces as unknown as Json,
     });
     if (error) throw error;
