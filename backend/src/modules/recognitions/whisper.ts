@@ -25,15 +25,15 @@ interface WhisperVerboseResponse {
  * The endpoint accepts mp4 directly — no ffmpeg extraction needed.
  */
 export async function transcribeVideo(
-  videoBuffer: Buffer,
-  opts: { apiKey: string; model: string; log: Logger },
+  mediaBuffer: Buffer,
+  opts: { apiKey: string; model: string; log: Logger; contentType?: string; fileName?: string },
 ): Promise<Transcript | null> {
   const { apiKey, model, log } = opts;
   const t0 = Date.now();
 
   const form = new FormData();
-  const ab = videoBuffer.buffer.slice(videoBuffer.byteOffset, videoBuffer.byteOffset + videoBuffer.byteLength) as ArrayBuffer;
-  form.append("file", new Blob([ab], { type: "video/mp4" }), "video.mp4");
+  const ab = mediaBuffer.buffer.slice(mediaBuffer.byteOffset, mediaBuffer.byteOffset + mediaBuffer.byteLength) as ArrayBuffer;
+  form.append("file", new Blob([ab], { type: opts.contentType ?? "video/mp4" }), opts.fileName ?? "video.mp4");
   form.append("model", model);
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "segment");
@@ -92,7 +92,7 @@ export async function transcribeVideo(
   }
 
   log.info(
-    { duration, model, segments: segments.length, dropped: rawSegments.length - speechSegments.length, chars: fullText.length, sizeKb: Math.round(videoBuffer.length / 1024) },
+    { duration, model, segments: segments.length, dropped: rawSegments.length - speechSegments.length, chars: fullText.length, sizeKb: Math.round(mediaBuffer.length / 1024) },
     "whisper transcription complete",
   );
 
